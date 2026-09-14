@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Barabara";
+  src: url("/fonts/BARABARA-final.otf") format("opentype");
+  font-display: swap;
+}
+
+@theme {
+  --font-brand: "Barabara", "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  --color-royal-950: #0b2247;
+  --color-royal-900: #123062;
+  --color-royal-800: #1a3f85;
+  --color-royal-700: #1e4fb0;
+  --color-royal-600: #2563df;
+  --color-royal-500: #3b81f5;
+
+  --color-lagoon-950: #071f25;
+  --color-lagoon-900: #0b3038;
+  --color-lagoon-800: #11434d;
+  --color-lagoon-700: #185662;
+  --color-sea-600: #12808f;
+  --color-sea-500: #1596a7;
+  --color-surf-400: #2fb8a6;
+  --color-surf-300: #54c9b8;
+  --color-mango-400: #f6b01e;
+  --color-mango-300: #f9c44a;
+  --color-sand-50: #f7f9f8;
+  --color-sand-100: #eef2ef;
+  --color-ink-900: #10282d;
+  --color-ink-600: #45606a;
+  --color-line: #dce5e1;
+}
+
+@layer base {
+  html {
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-sand-50 font-sans text-ink-900;
+    overflow-x: clip;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-surf-400);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-surf-400);
+    color: var(--color-lagoon-950);
+  }
+}
+
+/* Leaflet canvases are the primary graphic; keep the chrome minimal. */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #cfdcd6;
+}
+
+.leaflet-control-zoom a {
+  color: var(--color-lagoon-900);
+  border: 0 !important;
+}
+
+.suroy-pin {
+  background: transparent;
+  border: 0;
+}
+
+.suroy-pin svg {
+  filter: drop-shadow(0 3px 4px rgba(7, 31, 37, 0.45));
+  transition: transform 140ms ease;
+}
+
+.suroy-pin:hover svg {
+  transform: translateY(-3px);
+}
+
+.suroy-pin.is-active svg {
+  transform: translateY(-4px) scale(1.08);
+}
+
+.suroy-pin.is-active .pin-drop {
+  fill: var(--color-mango-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
