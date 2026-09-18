@@ -29,4 +29,4 @@
    EXPOSE 8080
 
 ENTRYPOINT ["entrypoint.sh"]
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}# trigger
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
