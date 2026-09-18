@@ -15,7 +15,7 @@ export function ProfileSection({ loggedIn, tripCount, onAction }: ProfileSection
             Keep the budget in view while the days fill themselves in.
           </h2>
           <p className="mt-3 text-base leading-relaxed text-lagoon-900/80">
-            Pin spots from the map, set number of days and party size, and Suroy tallies an estimated cost per person as
+            Pin spots from the map, set number of days and party size, and Lakbai tallies an estimated cost per person as
             you go — grouped by beach days, food, and transport.
           </p>
         </div>

@@ -28,7 +28,8 @@ export function DestinationsMapPanel({ destinations, selected, onSelect, loggedI
             <CebuMap destinations={destinations} activeId={selected?.id} onSelect={onSelect} className="h-full w-full" />
           </div>
 
-          <div>
+          <div className="relative">
+            <div aria-hidden="true" className="glass-blob" />
             {selected ? (
               <DestinationDetailPanel
                 destination={selected}
@@ -56,7 +57,7 @@ export function DestinationsMapPanel({ destinations, selected, onSelect, loggedI
 
 function PanelPlaceholder() {
   return (
-    <div className="flex h-full min-h-[280px] items-center justify-center rounded-3xl bg-white p-8 text-center ring-1 ring-line">
+    <div className="glass-frost flex h-full min-h-[280px] items-center justify-center rounded-3xl p-8 text-center">
       <div className="max-w-xs">
         <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 text-surf-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 21s7-5.1 7-11a7 7 0 10-14 0c0 5.9 7 11 7 11z" />

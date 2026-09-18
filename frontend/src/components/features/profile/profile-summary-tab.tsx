@@ -64,7 +64,7 @@ export function ProfileSummaryTab() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold text-lagoon-900">Profile</h1>
-        <p className="mt-1 text-sm text-ink-600">Your details, as other Suroy travellers see them.</p>
+        <p className="mt-1 text-sm text-ink-600">Your details, as other Lakbai travellers see them.</p>
       </div>
 
       {error ? <InlineError message={error} /> : null}
@@ -72,7 +72,7 @@ export function ProfileSummaryTab() {
         <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200">{success}</div>
       ) : null}
 
-      <Card className="space-y-6 p-6">
+      <Card className="glass-frost space-y-6 p-6">
         <div className="flex items-center gap-5">
           <div className="relative">
             <Avatar name={user.name} src={user.avatar_url ?? null} />
@@ -81,7 +81,7 @@ export function ProfileSummaryTab() {
               onClick={() => fileRef.current?.click()}
               disabled={avatarBusy}
               aria-label="Upload profile photo"
-              className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-lagoon-900 text-sand-50 ring-2 ring-white transition-colors hover:bg-lagoon-800 disabled:opacity-50"
+              className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-surf-400 text-sand-50 ring-2 ring-white transition-colors hover:bg-surf-300 disabled:opacity-50"
             >
               {avatarBusy ? <Spinner className="h-4 w-4" /> : <CameraIcon className="h-4 w-4" />}
             </button>
@@ -104,7 +104,7 @@ export function ProfileSummaryTab() {
         </div>
       </Card>
 
-      <Card className="p-6">
+      <Card className="glass-frost p-6">
         <form onSubmit={(event) => void save(event)} className="space-y-4">
           <h2 className="font-display text-lg font-semibold text-lagoon-900">Account details</h2>
           <div className="grid gap-4 sm:grid-cols-2">

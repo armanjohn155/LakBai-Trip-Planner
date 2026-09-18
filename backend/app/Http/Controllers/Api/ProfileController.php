@@ -33,12 +33,15 @@ class ProfileController extends Controller
     public function avatar(Request $request): JsonResponse
     {
         $request->validate([
-            'avatar' => ['required', 'image', 'max:2048'],
+            'avatar' => ['required', 'image', 'mimes:jpeg,png', 'max:2048'],
+        ], [
+            'avatar.mimes' => 'The avatar must be a JPG or PNG file.',
+            'avatar.max' => 'The avatar must not be larger than 2 MB.',
         ]);
 
         $user = $request->user();
         $path = $request->file('avatar')->store('avatars', 'public');
-        $url = Storage::disk('public')->url($path);
+        $url = '/storage/'.ltrim($path, '/');
 
         if ($user->avatar_url) {
             Storage::disk('public')->delete('avatars/'.basename($user->avatar_url));

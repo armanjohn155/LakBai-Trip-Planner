@@ -35,7 +35,7 @@ export function StepIndicator({ current, maxStep, onSelect }: StepIndicatorProps
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-                  state === "active" && "bg-surf-400 text-lagoon-950 ring-4 ring-surf-400/25",
+                  state === "active" && "bg-surf-400 text-white ring-4 ring-surf-400/25",
                   state === "done" && "bg-sea-500 text-sand-50",
                   state === "future" && "bg-sand-100 text-ink-600 ring-1 ring-inset ring-line",
                   reachable && state !== "active" && "group-hover:ring-2 group-hover:ring-surf-400/50",

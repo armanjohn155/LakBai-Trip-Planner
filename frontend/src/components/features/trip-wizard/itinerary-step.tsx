@@ -66,7 +66,7 @@ export function ItineraryStep({ draft, dayCount, destinations, onAddItem, onUpda
         <button
           type="button"
           onClick={() => setPickerOpen((value) => !value)}
-          className="inline-flex items-center gap-2 rounded-full bg-surf-400 px-4 py-2.5 text-sm font-semibold text-lagoon-950 transition-colors hover:bg-surf-300"
+          className="inline-flex items-center gap-2 rounded-full bg-surf-400 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
         >
           <PlusIcon className="h-4 w-4" />
           Add a stop

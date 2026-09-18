@@ -158,7 +158,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-sand-50">
+    <div className="flex min-h-dvh flex-col">
       <Header />
 
       <main className="flex flex-1 flex-col md:h-[calc(100dvh-4rem)] md:overflow-hidden">
@@ -281,8 +281,8 @@ export default function MapPage() {
 
       {showChooser && selected && loggedIn ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setShowChooser(false)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="absolute inset-0 bg-lagoon-950/50 backdrop-blur-sm" onClick={() => setShowChooser(false)} />
+          <div className="relative w-full max-w-md rounded-2xl glass p-5">
             <button
               type="button"
               onClick={() => setShowChooser(false)}
@@ -414,7 +414,7 @@ function MapSearchOverlay({ query, onQueryChange, matches, onSelect, total }: Ma
       </div>
 
       {showList ? (
-        <div className="pointer-events-auto mt-2 max-h-72 overflow-y-auto rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-line">
+        <div className="glass pointer-events-auto mt-2 max-h-72 overflow-y-auto rounded-2xl p-1.5">
           {matches.length === 0 ? (
             <p className="px-3 py-2.5 text-sm text-ink-600">
               No matches for “{query.trim()}” across {total} destinations.

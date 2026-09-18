@@ -43,7 +43,7 @@ export default function LoginPage() {
     <AuthShell
       title="Back to the island"
       detail="Sign in to pick up your trips."
-      footerText="New to Suroy?"
+      footerText="New to Lakbai?"
       footerTo="/register"
       footerLabel="Create an account"
     >

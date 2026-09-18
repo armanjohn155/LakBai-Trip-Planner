@@ -4,9 +4,10 @@ import type { AuthPayload, Destination, Itinerary, ItinerarySummary, Paginated, 
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8000/api";
 
+export const API_ORIGIN = new URL(API_URL).origin;
+
 export const api = axios.create({
   baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
 });
 
 api.interceptors.request.use((config) => {
@@ -82,9 +83,7 @@ export const updateUser = async (payload: { name: string; email: string }) => {
 export const uploadAvatar = async (file: File) => {
   const formData = new FormData();
   formData.append("avatar", file);
-  const { data } = await api.post<{ user: User }>("/user/avatar", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await api.post<{ user: User }>("/user/avatar", formData);
   return data.user;
 };
 

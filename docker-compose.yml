@@ -1,0 +1,41 @@
+name: suroy
+
+services:
+  app:
+    build:
+      context: ./backend
+    image: suroy/backend
+    environment:
+      APP_ENV: production
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_KEY: ${APP_KEY:-}
+      APP_LOCALE: en
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/storage/database.sqlite
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: 120
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      FILESYSTEM_DISK: local
+    volumes:
+      - suroy-storage:/var/www/html/storage
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    image: suroy/web
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - suroy-storage:/var/www/storage:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  suroy-storage:

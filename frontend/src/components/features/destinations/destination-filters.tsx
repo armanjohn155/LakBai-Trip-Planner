@@ -181,7 +181,7 @@ function FilterGroup({ title, defaultOpen = true, children }: { title: string; d
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-line">
+    <div className="glass-frost rounded-2xl p-4">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

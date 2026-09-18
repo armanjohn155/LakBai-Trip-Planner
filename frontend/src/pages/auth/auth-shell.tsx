@@ -18,11 +18,11 @@ interface AuthShellProps {
 
 export function AuthShell({ title, detail, children, footerText, footerTo, footerLabel }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-sand-50">
+    <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex flex-1 items-center justify-center px-4 py-16">
         <div className="w-full max-w-md">
-          <div className="rounded-3xl bg-white p-8 shadow-[0_1px_2px_rgba(7,31,37,0.06)] ring-1 ring-line">
+          <div className="glass rounded-3xl p-8">
             <h1 className="font-display text-3xl font-semibold text-lagoon-900">{title}</h1>
             <p className="mt-2 text-sm text-ink-600">{detail}</p>
             <div className="mt-6 space-y-5">{children}</div>

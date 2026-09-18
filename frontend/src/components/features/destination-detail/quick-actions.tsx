@@ -16,10 +16,11 @@ interface QuickActionsProps {
 }
 
 const BUTTON_CLASS = "h-11 w-full";
+const FROST_BUTTON_CLASS = "bg-white/15 text-lagoon-900 ring-white/25 backdrop-blur-md hover:bg-white/25";
 
 export function QuickActions({ destination, favorited, onToggleFavorite, onAddToTrip, onViewOnMap }: QuickActionsProps) {
   return (
-    <Card className="p-5">
+    <Card className="glass-frost p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-display text-lg font-semibold text-lagoon-900">Quick Actions</h2>
         <PinIcon className="h-4 w-4 text-surf-400" />
@@ -30,15 +31,15 @@ export function QuickActions({ destination, favorited, onToggleFavorite, onAddTo
           <PlusIcon className="h-4 w-4" />
           Add to My Trip
         </Button>
-        <Button size="md" variant="secondary" className={BUTTON_CLASS} onClick={onToggleFavorite}>
-          <HeartIcon filled={favorited} className={cn("h-4 w-4", favorited ? "text-mango-400" : "text-sea-500")} />
+        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={onToggleFavorite}>
+          <HeartIcon filled={favorited} className={cn("h-4 w-4", favorited ? "text-mango-500" : "text-sea-500")} />
           {favorited ? "Saved to Favorites" : "Save to Favorites"}
         </Button>
-        <Button size="md" variant="dark" className={BUTTON_CLASS} onClick={() => downloadInfo(destination)}>
+        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={() => downloadInfo(destination)}>
           <DownloadIcon className="h-4 w-4" />
           Download Info
         </Button>
-        <Button size="md" variant="dark" className={BUTTON_CLASS} onClick={onViewOnMap}>
+        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={onViewOnMap}>
           <MapIcon className="h-4 w-4" />
           View on Map
         </Button>

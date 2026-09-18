@@ -13,7 +13,7 @@ interface DestinationDetailPanelProps {
 
 export function DestinationDetailPanel({ destination, action }: DestinationDetailPanelProps) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="glass-frost overflow-hidden">
       <div className="bg-lagoon-900 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-surf-300">{destination.region}</p>
         <h3 className="mt-1 font-display text-2xl font-semibold leading-tight text-sand-50">{destination.name}</h3>

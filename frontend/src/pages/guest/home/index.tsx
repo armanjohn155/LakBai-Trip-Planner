@@ -65,6 +65,11 @@ export default function HomePage() {
     });
   }, [destinations, filters]);
 
+  const categories = useMemo(
+    () => Array.from(new Set(destinations.map((destination) => destination.category))).sort((a, b) => a.localeCompare(b)),
+    [destinations],
+  );
+
   const recentItineraries = useMemo(
     () => [...itineraries].sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""))),
     [itineraries],
@@ -123,7 +128,14 @@ export default function HomePage() {
         onSignUp={() => navigate("/register")}
       />
 
-      <CardDataSection destinations={visible} filters={filters} onFiltersChange={setFilters} onSelect={handleSelect} />
+      <CardDataSection
+        destinations={visible}
+        total={destinations.length}
+        categories={categories}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onSelect={handleSelect}
+      />
 
       <ProfileSection loggedIn={Boolean(user)} tripCount={tripCount} onAction={buildTrip} />
     </>

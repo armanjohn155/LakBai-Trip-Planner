@@ -211,8 +211,8 @@ export default function DestinationDetailPage() {
 
       {showChooser ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setShowChooser(false)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="absolute inset-0 bg-lagoon-950/50 backdrop-blur-sm" onClick={() => setShowChooser(false)} />
+          <div className="relative w-full max-w-md rounded-2xl glass p-5">
             <button
               type="button"
               onClick={() => setShowChooser(false)}

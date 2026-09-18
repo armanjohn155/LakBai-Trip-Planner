@@ -3,7 +3,7 @@ import { Section } from "@/components/common/section";
 export default function AboutPage() {
   return (
     <>
-      <Section headline="Why Suroy?">
+      <Section headline="Why Lakbai?">
         <div className="space-y-4 text-base leading-relaxed text-ink-600 sm:text-lg">
           <p>
             Cebu is one island but many trips — city mornings in Metro Cebu, canyon jumps in Badian, turtle snorkels off
@@ -11,14 +11,14 @@ export default function AboutPage() {
             the budget at the end.
           </p>
           <p>
-            Suroy (Cebuano for “to roam”) pins a curated set of real places on one map, each with an estimated cost. You
+            Lakbai (Cebuano for “to roam”) pins a curated set of real places on one map, each with an estimated cost. You
             pick a place, drop it into a trip, set your days, and the planner tallies the pesos as you go — grouped by
             category so you can see where the trip money actually goes.
           </p>
         </div>
       </Section>
 
-      <Section headline="How it works" className="bg-white pt-0 lg:pt-0 lg:pb-0 lg:mt-0">
+      <Section headline="How it works" className="bg-transparent pt-0 lg:pt-0 lg:pb-0 lg:mt-0">
         <div className="grid gap-6 sm:grid-cols-3">
           <Step number="01" title="Browse the map" detail="Metro, North, or South Cebu — tap a pin to see a place, its category, and what a visit roughly costs." />
           <Step number="02" title="Build with days in view" detail="Add stops, order them by day, and adjust any estimate if you ride a van instead of a bus." />

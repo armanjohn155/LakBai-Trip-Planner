@@ -207,7 +207,7 @@ export default function DestinationsPage() {
             <SlidersIcon className="h-4 w-4" />
             Filters
             {activeFilterCount > 0 ? (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-surf-400 px-1.5 text-xs font-bold text-lagoon-950">
+               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-surf-400 px-1.5 text-xs font-bold text-white">
                 {activeFilterCount}
               </span>
             ) : null}
@@ -253,7 +253,7 @@ export default function DestinationsPage() {
                 <button
                   type="button"
                   onClick={() => setFilters({ ...EMPTY_EXPLORER_FILTERS })}
-                  className="rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-lagoon-950 transition-colors hover:bg-surf-300"
+                   className="rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
                 >
                   Clear all filters
                 </button>
@@ -288,8 +288,8 @@ export default function DestinationsPage() {
 
       {openChooser ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setOpenChooser(null)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="absolute inset-0 bg-lagoon-950/50 backdrop-blur-sm" onClick={() => setOpenChooser(null)} />
+          <div className="relative w-full max-w-md rounded-2xl glass p-5">
             <button
               type="button"
               onClick={() => setOpenChooser(null)}

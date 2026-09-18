@@ -35,7 +35,7 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
 
   return (
     <>
-    <section className="relative overflow-hidden bg-royal-950 text-sand-50">
+    <section className="relative overflow-hidden bg-gradient-to-br from-royal-950 via-royal-900 to-royal-800 text-sand-50">
       <img
         src={HERO_IMAGE_URL}
         alt=""
@@ -43,10 +43,10 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
         loading="eager"
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-tr from-royal-950 via-royal-950/75 to-royal-950/15" aria-hidden="true" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-royal-950 via-royal-950/80 to-royal-700/30" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
-        <p className="text-surf-300">Suroy — sa usa ka mapa</p>
+        <p className="text-surf-300">LAKBAI — Cebu on one map</p>
         <h1 className="mt-3 max-w-3xl font-brand text-4xl leading-[1.05] sm:text-6xl">
           MANGLAKAW TA BAI!
         </h1>
@@ -56,11 +56,11 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button variant="sand" size="lg" onClick={onBrowse}>
-            Browse destinations
-          </Button>
-          <Button variant="ghost" size="lg" className="ring-1 ring-inset ring-sand-50/50 hover:bg-white/10" onClick={onBuildTrip}>
+          <Button variant="primary" size="lg" onClick={onBuildTrip}>
             Build a trip
+          </Button>
+          <Button variant="ghost" size="lg" className="ring-1 ring-inset ring-white/40 hover:bg-white/15" onClick={onBrowse}>
+            Browse destinations
           </Button>
         </div>
 
@@ -101,9 +101,9 @@ function tripSummary(itinerary: Itinerary): string {
 
 function RecentItinerariesCard({ recent, totalItineraries }: { recent: Itinerary[]; totalItineraries: number }) {
   return (
-    <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl bg-white shadow-lg shadow-lagoon-900/10 ring-1 ring-line">
+    <div className="glass-frost glass-frost-strong mx-auto max-w-4xl overflow-hidden rounded-2xl">
       <div className="flex items-baseline justify-between gap-3 border-b border-line px-6 pb-4 pt-5 sm:px-8 sm:pb-5">
-        <h2 className="font-display text-xl font-semibold text-lagoon-900 sm:text-2xl">Recent Itineraries</h2>
+        <h2 className="font-display text-xl text-white font-semibold text-lagoon-900 sm:text-2xl">Recent Itineraries</h2>
         {totalItineraries > recent.length ? (
           <Link to="/app/trips" className="text-sm font-semibold text-sea-600 hover:text-sea-500">
             View all

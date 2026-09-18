@@ -5,14 +5,16 @@ import type { Destination, DestinationFilters as Filters } from "@/lib/types";
 
 interface CardDataSectionProps {
   destinations: Destination[];
+  total: number;
+  categories: string[];
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   onSelect: (destination: Destination) => void;
 }
 
-export function CardDataSection({ destinations, filters, onFiltersChange, onSelect }: CardDataSectionProps) {
+export function CardDataSection({ destinations, total, categories, filters, onFiltersChange, onSelect }: CardDataSectionProps) {
   return (
-    <section id="destinations" className="scroll-mt-20 bg-sand-50">
+    <section id="destinations" className="scroll-mt-20">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <header className="mb-8 max-w-2xl">
           <h2 className="font-display text-3xl font-medium tracking-tight text-lagoon-900 sm:text-4xl">Find your spot</h2>
@@ -21,18 +23,23 @@ export function CardDataSection({ destinations, filters, onFiltersChange, onSele
           </p>
         </header>
 
-        <QuickFilters filters={filters} onChange={onFiltersChange} />
+        <QuickFilters filters={filters} categories={categories} onChange={onFiltersChange} />
 
         {destinations.length === 0 ? (
           <div className="mt-8">
             <EmptyState title="Nothing fits those filters" detail="Try clearing a filter or searching for a different place." />
           </div>
         ) : (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {destinations.map((destination) => (
-              <DestinationCard key={destination.id} destination={destination} onClick={onSelect} />
-            ))}
-          </div>
+          <>
+            <p className="mt-6 text-sm font-medium text-ink-600">
+              Showing {destinations.length} of {total} {total === 1 ? "place" : "places"}
+            </p>
+            <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {destinations.map((destination) => (
+                <DestinationCard key={destination.id} destination={destination} onClick={onSelect} />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </section>

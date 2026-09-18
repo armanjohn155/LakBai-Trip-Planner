@@ -18,7 +18,7 @@ export function Input({ className, label, error, id, ...props }: InputProps) {
       <input
         id={inputId}
         className={cn(
-          "h-11 w-full rounded-xl bg-white px-4 text-ink-900 ring-1 ring-inset ring-line placeholder:text-ink-600/50 focus:ring-2 focus:ring-surf-400 focus:outline-none",
+          "h-11 w-full rounded-xl bg-white/70 backdrop-blur-sm px-4 text-ink-900 ring-1 ring-inset ring-line placeholder:text-ink-600/50 focus:ring-2 focus:ring-surf-400 focus:outline-none",
           className,
         )}
         {...props}
@@ -56,7 +56,7 @@ export function Select({ className, label, error, id, options, emptyLabel, ...pr
       <select
         id={selectId}
         className={cn(
-          "h-11 w-full appearance-none rounded-xl bg-white px-4 text-ink-900 ring-1 ring-inset ring-line focus:ring-2 focus:ring-surf-400 focus:outline-none",
+          "h-11 w-full appearance-none rounded-xl bg-white/70 backdrop-blur-sm px-4 text-ink-900 ring-1 ring-inset ring-line focus:ring-2 focus:ring-surf-400 focus:outline-none",
           className,
         )}
         {...props}

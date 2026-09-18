@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/*
+ * Barabara font declaration — EXCLUDED from the visual redesign.
+ * Used ONLY for the home hero h1 and the LAKBAI logo wordmark.
+ * Do not move, rename, or wrap this in any shared font token.
+ */
 @font-face {
   font-family: "Barabara";
   src: url("/fonts/BARABARA-final.otf") format("opentype");
@@ -7,32 +12,65 @@
 }
 
 @theme {
+  /* ── Brand fonts ──────────────────────────────────────── */
   --font-brand: "Barabara", "Fraunces", ui-serif, Georgia, serif;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 
-  --color-royal-950: #0b2247;
-  --color-royal-900: #123062;
-  --color-royal-800: #1a3f85;
-  --color-royal-700: #1e4fb0;
-  --color-royal-600: #2563df;
-  --color-royal-500: #3b81f5;
+  /* ── Sinulog Festival accent tokens ───────────────────── */
+  --color-sinulog-magenta: #C2185B;
+  --color-sinulog-magenta-light: #E91E71;
+  --color-sinulog-yellow: #FFB800;
+  --color-sinulog-yellow-light: #FFD54F;
+  --color-sinulog-red: #DC2626;
+  --color-sinulog-blue: #0B6E99;
+  --color-sinulog-green: #16A34A;
 
-  --color-lagoon-950: #071f25;
-  --color-lagoon-900: #0b3038;
-  --color-lagoon-800: #11434d;
-  --color-lagoon-700: #185662;
-  --color-sea-600: #12808f;
-  --color-sea-500: #1596a7;
-  --color-surf-400: #2fb8a6;
-  --color-surf-300: #54c9b8;
-  --color-mango-400: #f6b01e;
-  --color-mango-300: #f9c44a;
-  --color-sand-50: #f7f9f8;
-  --color-sand-100: #eef2ef;
-  --color-ink-900: #10282d;
-  --color-ink-600: #45606a;
-  --color-line: #dce5e1;
+  /* ── Royal — dark teal (hero / navbar) ────────────────── */
+  --color-royal-950: #03211F;
+  --color-royal-900: #0A3330;
+  --color-royal-800: #0F4743;
+  --color-royal-700: #155B55;
+  --color-royal-600: #1C716A;
+  --color-royal-500: #258A81;
+
+  /* ── Lagoon — deep teal (text, overlays) ──────────────── */
+  --color-lagoon-950: #03211F;
+  --color-lagoon-900: #0A3330;
+  --color-lagoon-800: #104842;
+  --color-lagoon-700: #175B53;
+
+  /* ── Sea — mid teals (links, secondary) ───────────────── */
+  --color-sea-600: #0F8F82;
+  --color-sea-500: #17A294;
+
+  /* ── Surf — primary brand accent (mint teal) ──────────── */
+  --color-surf-500: #0E9C8E;
+  --color-surf-400: #14B8A6;
+  --color-surf-300: #2DD4BF;
+
+  /* ── Mango — warm gold ────────────────────────────────── */
+  --color-mango-500: #F0A500;
+  --color-mango-400: #FFB800;
+  --color-mango-300: #FFD54F;
+
+  /* ── Sand — neutral surfaces ──────────────────────────── */
+  --color-sand-50: #FAF9F7;
+  --color-sand-100: #F0EDE8;
+  --color-sand-200: #E5E0D8;
+  --color-sand-300: #D4CEC4;
+
+  /* ── Cream — warm page background ─────────────────────── */
+  --color-cream: #F5F3EE;
+
+  /* ── Ink — text colors ────────────────────────────────── */
+  --color-ink-900: #1A2332;
+  --color-ink-800: #2D3A4A;
+  --color-ink-700: #3D4F63;
+  --color-ink-600: #546A7F;
+
+  /* ── Line — borders ───────────────────────────────────── */
+  --color-line: #D0DAE2;
 }
 
 @layer base {
@@ -43,8 +81,18 @@
   }
 
   body {
-    @apply bg-sand-50 font-sans text-ink-900;
+    @apply bg-cream font-sans text-ink-900;
+    background-image:
+      radial-gradient(circle, rgba(20, 184, 166, 0.1), transparent 68%),
+      radial-gradient(circle, rgba(20, 184, 166, 0.08), transparent 66%),
+      radial-gradient(circle, rgba(240, 165, 0, 0.08), transparent 70%);
+    background-size: 620px 620px, 540px 540px, 700px 700px;
+    background-position: 12% 10%, 92% 30%, 80% 92%;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     overflow-x: clip;
+    animation: ambient-drift 20s ease-in-out infinite alternate;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
   }
 
   :focus-visible {
@@ -54,11 +102,174 @@
 
   ::selection {
     background: var(--color-surf-400);
-    color: var(--color-lagoon-950);
+    color: white;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.015em;
   }
 }
 
-/* Leaflet canvases are the primary graphic; keep the chrome minimal. */
+/* ── Glassmorphism custom scrollbar ─────────────────────── */
+/* Applied site-wide inside @layer base so Tailwind         */
+/* utilities (e.g. carousels with [scrollbar-width:none]    */
+/* and ::-webkit-scrollbar hidden) can still override it    */
+/* where a scrollbar is intentionally hidden.               */
+
+/* Firefox: no custom shapes or blur on scrollbars, so use  */
+/* the standard thin width + a solid teal-tinted thumb close */
+/* to the glass average color on a near-invisible track.     */
+/* scrollbar-width is NOT inherited, so target * so every    */
+/* scrollable container matches the page scrollbar.          */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 110, 100, 0.4) rgba(0, 0, 0, 0.04);
+}
+
+/* WebKit (Chrome, Edge, Safari): full custom scrollbar.     */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Thumb: frosted glass where blur is supported, solid       */
+/* teal-tinted fallback elsewhere. The padding-box clip      */
+/* keeps the translucent fill inside the 1px glass edge.     */
+::-webkit-scrollbar-thumb {
+  background-color: rgba(20, 110, 100, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(20, 110, 100, 0.55);
+}
+
+@supports ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.25);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* Dragging feedback: saturated teal in every browser.       */
+::-webkit-scrollbar-thumb:active {
+  background-color: rgba(14, 156, 142, 0.65);
+}
+
+/* ── White card surfaces ───────────────────────────────── */
+.glass {
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(10, 51, 48, 0.08);
+  box-shadow:
+    0 1px 2px rgba(3, 33, 31, 0.06),
+    0 8px 24px -8px rgba(3, 33, 31, 0.12);
+}
+
+.glass-subtle {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background-color: rgba(3, 33, 31, 0.68);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 8px 24px -8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Frosted glass surfaces (glassmorphism) ─────────────── */
+/* Design tokens shared by every frosted surface. */
+:root {
+  --glass-bg: rgba(230, 250, 245, 0.15);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.25);
+  --glass-blur: blur(20px);
+  --glass-shadow: 0 8px 32px rgba(0, 40, 35, 0.15);
+}
+
+/* Ambient colour blob placed behind a frosted panel so the */
+/* backdrop-filter has colour/texture to reveal — a panel   */
+/* with nothing behind it reads flat even with good CSS.    */
+.glass-blob {
+  position: absolute;
+  inset: -18% -14%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 30% 22%, rgba(20, 184, 166, 0.5), transparent 72%),
+    radial-gradient(55% 52% at 82% 78%, rgba(255, 184, 0, 0.42), transparent 72%);
+  filter: blur(28px);
+}
+
+/* Light frosted panel for cards floating over photos or    */
+/* colored/dark backgrounds (dark text stays legible).      */
+/* Fallback: near-opaque teal tint when backdrop-filter is  */
+/* unsupported; the @supports block swaps in translucent    */
+/* glass + blur for browsers that support it (incl. Safari  */
+/* via -webkit-backdrop-filter).                            */
+.glass-frost {
+  background-color: rgba(230, 250, 245, 0.72);
+  border: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Stronger frost for glass panels that carry dense dark    */
+/* text or black/bright copy over photos (e.g. Recent Trips */
+/* card sitting on the dark hero). Keeps blur so the photo  */
+/* still shows through softly.                              */
+.glass-frost-strong {
+  background-color: rgba(230, 250, 245, 0.9);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-frost {
+    background-color: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+
+  .glass-frost-strong {
+    background-color: rgba(230, 250, 245, 0.24);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+}
+
+/* Dark frosted panel for text zones sitting on the card's  */
+/* own photo (white text stays legible).                    */
+.glass-frost-dark {
+  background-color: rgba(3, 33, 31, 0.55);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 8px 24px -8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Leaflet map overrides ──────────────────────────────── */
 .leaflet-container {
   font-family: var(--font-sans);
   background: #cfdcd6;
@@ -89,6 +300,15 @@
 
 .suroy-pin.is-active .pin-drop {
   fill: var(--color-mango-400);
+}
+
+@keyframes ambient-drift {
+  from {
+    background-position: 12% 10%, 92% 30%, 80% 92%;
+  }
+  to {
+    background-position: 14% 12%, 90% 28%, 78% 90%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

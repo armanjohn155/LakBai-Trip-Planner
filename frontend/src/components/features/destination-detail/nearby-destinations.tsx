@@ -26,7 +26,7 @@ export function NearbyDestinations({ nearby }: NearbyDestinationsProps) {
             key={destination.id}
             to={`/destinations/${destination.id}`}
             data-card
-            className="group w-56 shrink-0 snap-start overflow-hidden rounded-2xl bg-white ring-1 ring-line transition-shadow hover:shadow-md"
+            className="glass group w-56 shrink-0 snap-start overflow-hidden rounded-2xl transition-shadow hover:shadow-md"
           >
           <div className="relative aspect-[4/3] overflow-hidden bg-sand-100">
             {destination.image_url ? (

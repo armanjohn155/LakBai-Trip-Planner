@@ -26,7 +26,7 @@ export function ExplorerListItem({ destination, hovered, selected, chooser, list
         onMouseLeave={onLeave}
         onClick={onClick}
         className={cn(
-          "cursor-pointer rounded-2xl bg-white p-4 ring-1 transition-shadow",
+          "glass cursor-pointer rounded-2xl p-4 transition-shadow",
           selected ? "ring-2 ring-surf-400 shadow-sm" : hovered ? "ring-surf-400/60 shadow-sm" : "ring-line",
         )}
       >
@@ -47,7 +47,7 @@ export function ExplorerListItem({ destination, hovered, selected, chooser, list
           </div>
         </div>
       </div>
-      {chooser ? <div className="mt-2 rounded-2xl bg-white p-4 ring-1 ring-line">{chooser}</div> : null}
+      {chooser ? <div className="glass mt-2 rounded-2xl p-4">{chooser}</div> : null}
     </li>
   );
 }

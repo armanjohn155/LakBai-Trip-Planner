@@ -5,7 +5,7 @@ export function Footer() {
     <footer className="bg-lagoon-950 text-sand-50/70">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
         <div>
-          <p className="font-display text-2xl font-semibold text-sand-50">Suroy</p>
+          <p className="font-display text-2xl font-semibold text-sand-50">Lakbai</p>
           <p className="mt-2 max-w-xs text-sm">
             From the sagas of Bantayan to the canyons of Badian — plan a Cebu trip on one map, with the budget in view.
           </p>
@@ -19,7 +19,7 @@ export function Footer() {
             Build an itinerary
           </Link>
           <Link to="/about" className="block hover:text-sand-50">
-            About Suroy
+            About Lakbai
           </Link>
           <Link to="/contact" className="block hover:text-sand-50">
             Contact
@@ -33,7 +33,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-white/10 py-4 text-center text-xs text-sand-50/50">
-        Suroy — a Cebu trip planner. Estimates only, not a booking service.
+        Lakbai — Manglakaw ta, Bai! Estimates only, not a booking service.
       </div>
     </footer>
   );

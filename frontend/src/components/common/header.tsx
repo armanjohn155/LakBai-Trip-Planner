@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Link, NavLink, useNavigate } from "react-router";
 
+import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/cn";
 
@@ -61,7 +62,7 @@ export function Header() {
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     cn(
       "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-      isActive ? "bg-surf-400 text-lagoon-950" : "text-sand-50/75 hover:bg-white/10 hover:text-sand-50",
+      isActive ? "bg-surf-400 text-white" : "text-sand-50/75 hover:bg-white/10 hover:text-sand-50",
     );
 
   const renderCenterLink = (link: CenterLink, onNavigate?: () => void) => (
@@ -69,19 +70,19 @@ export function Header() {
       {({ isActive }) => (
         <span className="inline-flex items-center gap-1.5">
           {link.label}
-          {link.dot && isActive ? <span className="h-1.5 w-1.5 rounded-full bg-surf-400" aria-hidden="true" /> : null}
+          {link.dot && isActive ? <span className="h-1.5 w-1.5 rounded-full bg-surf-300" aria-hidden="true" /> : null}
         </span>
       )}
     </NavLink>
   );
 
   return (
-    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-royal-700 text-sand-50">
+    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-gradient-to-r from-royal-950 via-royal-900 to-royal-800 text-sand-50">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <PinIcon className="h-5 w-5 text-surf-400" />
+          <PinIcon className="h-5 w-5 text-surf-300" />
           <span className="font-brand text-2xl leading-none text-sand-50">LAKBAI</span>
-          <span className="hidden text-xs text-surf-300 lg:inline">Cebu trip planner</span>
+          <span className="hidden text-xs text-sand-50/80 lg:inline">Manglakaw ta, Bai!</span>
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
@@ -103,7 +104,7 @@ export function Header() {
           <button
             type="button"
             onClick={planTrip}
-            className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3 py-2 text-sm font-semibold text-lagoon-950 transition-colors hover:bg-surf-300 sm:px-4"
+            className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300 sm:px-4"
           >
             <PinIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Plan Trip</span>
@@ -191,12 +192,10 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
       </button>
 
       {open ? (
-        <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl bg-white p-1.5 text-ink-900 shadow-xl ring-1 ring-line">
+        <div role="menu" className="glass-frost absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl p-1.5 text-ink-900">
           {user ? (
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surf-400/20 font-display text-sm font-semibold text-sea-600">
-                {user.name.charAt(0).toUpperCase()}
-              </span>
+              <Avatar name={user.name} src={user.avatar_url ?? null} className="h-9 w-9 text-sm ring-2 ring-white/30" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-lagoon-900">{user.name}</p>
                 <p className="truncate text-xs text-ink-600">{user.email}</p>
@@ -219,7 +218,7 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
             type="button"
             role="menuitem"
             onClick={onSignOut}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5"
           >
             <LogOutIcon className="h-4 w-4" />
             Sign Out

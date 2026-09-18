@@ -20,7 +20,7 @@ export function InfoCards({ entranceFee, visitDuration, openingHours }: InfoCard
 
 function InfoCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-line">
+    <div className="glass rounded-2xl p-4">
       <div className="flex items-center gap-2">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surf-400/15 text-sea-600">{icon}</span>
         <p className="text-sm font-semibold text-ink-900">{label}</p>

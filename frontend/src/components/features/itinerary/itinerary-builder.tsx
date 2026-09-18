@@ -402,7 +402,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
               type="button"
               onClick={toggleAdd}
               aria-expanded={addSectionOpen}
-              className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-lagoon-950 transition-colors hover:bg-surf-300"
+              className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
             >
               <PlusIcon className={cn("h-4 w-4 transition-transform", addSectionOpen && "rotate-45")} />
               Add a stop
@@ -502,7 +502,7 @@ function TimelineRow({
   return (
     <li
       className={cn(
-        "group relative rounded-xl bg-white p-3 pl-11 ring-1 ring-inset ring-line transition",
+        "glass group relative rounded-xl p-3 pl-11 transition",
         dropTarget && "ring-2 ring-surf-400",
         dragging && "opacity-40",
       )}

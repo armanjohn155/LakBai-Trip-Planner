@@ -49,12 +49,10 @@ export default function ProfilePage() {
     };
   }, [refreshTrips]);
 
-  const stats = useMemo(() => {
-    const visited = new Set(
-      trips.flatMap((trip) => (trip.items ?? []).filter((item) => item.visited).map((item) => item.destination_id).filter((id) => id != null)),
-    );
-    return { trips: trips.length, favorites: favorites.length, visited: visited.size };
-  }, [trips, favorites]);
+  const stats = useMemo(
+    () => ({ trips: trips.length, favorites: favorites.length }),
+    [trips, favorites],
+  );
 
   const signOut = async () => {
     await logout();

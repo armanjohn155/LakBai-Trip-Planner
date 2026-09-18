@@ -92,7 +92,7 @@ function FavoriteButton({ favorited, onToggle }: { favorited: boolean; onToggle:
   );
 }
 
-export function RatingLine({ destination, className }: { destination: Destination; className?: string }) {
+export function RatingLine({ destination, className, light = false }: { destination: Destination; className?: string; light?: boolean }) {
   const rating = toNumber(destination.rating);
   const reviewCount = destination.review_count;
   if (!rating && reviewCount === null) {
@@ -100,9 +100,11 @@ export function RatingLine({ destination, className }: { destination: Destinatio
   }
   return (
     <p className={cn("flex items-center gap-1.5 text-sm", className)}>
-      <StarIcon className="h-4 w-4 text-mango-400" />
-      <span className="font-semibold text-lagoon-900">{rating ? rating.toFixed(1) : "—"}</span>
-      {reviewCount !== null ? <span className="text-ink-600">({formatCompactNumber(reviewCount)} reviews)</span> : null}
+      <StarIcon className={cn("h-4 w-4", light ? "text-surf-300" : "text-mango-400")} />
+      <span className={cn("font-semibold", light ? "text-sand-50" : "text-lagoon-900")}>{rating ? rating.toFixed(1) : "—"}</span>
+      {reviewCount !== null ? (
+        <span className={light ? "text-sand-50/80" : "text-ink-600"}>({formatCompactNumber(reviewCount)} reviews)</span>
+      ) : null}
     </p>
   );
 }
@@ -126,34 +128,47 @@ export function DestinationGridCard({
 }: ExplorerCardProps) {
   return (
     <div ref={containerRef} className={cn("rounded-2xl transition-shadow", highlighted && "ring-2 ring-surf-400")}>
-      <Card className="group h-full overflow-hidden transition-shadow hover:shadow-md">
-        <div className="relative aspect-[4/3] overflow-hidden bg-sand-100">
-          <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+      <Card className="group relative overflow-hidden transition-shadow hover:shadow-lg">
+        <div className="relative aspect-[4/5] h-full w-full bg-sand-100">
+          <div className="absolute inset-0 transition-transform duration-300 group-hover:scale-105">
             <CoverImage destination={destination} />
           </div>
-          <CoverBadge destination={destination} />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-royal-950/95 via-royal-950/45 to-royal-950/10" aria-hidden="true" />
+
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-4 pb-16">
+            <h3 className="truncate font-display text-xl font-semibold leading-tight text-sand-50">{destination.name}</h3>
+            <p className="flex items-center gap-1 text-xs font-medium text-sand-50/80">
+              <PinIcon className="h-3.5 w-3.5" />
+              {destinationLocation(destination)}
+            </p>
+            <p className="line-clamp-2 text-sm leading-snug text-sand-50/85">{destination.description}</p>
+
+            <div className="mt-0.5 flex items-center justify-between gap-2">
+              <RatingLine destination={destination} light />
+              <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-xs font-semibold text-sand-50 backdrop-blur-sm">
+                {categoryTag(destination.category)}
+              </span>
+            </div>
+          </div>
+
           <FavoriteButton favorited={favorited} onToggle={onToggleFavorite} />
         </div>
 
-        <div className="p-4">
-          <h3 className="truncate font-display text-lg font-semibold leading-tight text-lagoon-900">{destination.name}</h3>
-          <p className="mt-1 flex items-center gap-1 text-xs font-medium text-sea-600">
-            <PinIcon className="h-3.5 w-3.5" />
-            {destinationLocation(destination)}
-          </p>
-          <RatingLine destination={destination} className="mt-1.5" />
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-600">{destination.description}</p>
-
-          <div className="mt-4 flex gap-2">
-            <Button className="flex-1" variant="secondary" size="sm" onClick={onAdd}>
-              <PlusIcon className="h-3.5 w-3.5" /> Add
+        <div className="absolute inset-x-3 bottom-3 z-10 flex gap-2">
+          <Button
+            className="flex-1 bg-white/15 text-white ring-1 ring-inset ring-white/40 backdrop-blur-sm hover:bg-white/25"
+            variant="secondary"
+            size="sm"
+            onClick={onAdd}
+          >
+            <PlusIcon className="h-3.5 w-3.5" /> Add
+          </Button>
+          <Link to={`/destinations/${destination.id}`} className="flex-[2]">
+            <Button className="w-full bg-white text-lagoon-900 hover:bg-white/90" size="sm">
+              View
             </Button>
-            <Link to={`/destinations/${destination.id}`} className="flex-1">
-              <Button className="w-full" size="sm">
-                View
-              </Button>
-            </Link>
-          </div>
+          </Link>
         </div>
       </Card>
     </div>

@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { NavLink } from "react-router";
 
 import { HeartIcon, LogOutIcon, PinIcon, ShieldIcon, UserIcon } from "@/components/icons";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
+import { API_ORIGIN } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 interface ProfileSidebarProps {
   user: User;
-  stats: { trips: number; favorites: number; visited: number };
+  stats: { trips: number; favorites: number };
   onSignOut: () => void;
 }
 
@@ -24,19 +26,18 @@ export function ProfileSidebar({ user, stats, onSignOut }: ProfileSidebarProps) 
   ];
 
   return (
-    <Card className="flex h-auto flex-col p-6">
+    <Card className="glass-frost flex h-auto flex-col p-6">
       <div className="flex flex-col items-center">
         <Avatar name={user.name} src={user.avatar_url ?? null} />
         <h2 className="mt-4 font-display text-xl font-semibold text-lagoon-900">{user.name}</h2>
-        <p className="mt-1 text-sm text-ink-600">{memberSince ? `Member since ${memberSince}` : "Suroy member"}</p>
+        <p className="mt-1 text-sm text-ink-600">{memberSince ? `Member since ${memberSince}` : "Lakbai member"}</p>
       </div>
 
       <div className="my-5 h-px bg-line" />
 
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-2 gap-2 text-center">
         <Stat value={stats.trips} label="Trips" />
         <Stat value={stats.favorites} label="Favorites" />
-        <Stat value={stats.visited} label="Visited" />
       </div>
 
       <div className="my-5 h-px bg-line" />
@@ -64,7 +65,7 @@ export function ProfileSidebar({ user, stats, onSignOut }: ProfileSidebarProps) 
         <button
           type="button"
           onClick={onSignOut}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-transparent font-semibold text-ink-900 ring-1 ring-inset ring-line transition-colors hover:bg-sand-100"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-transparent font-semibold text-sinulog-red ring-1 ring-inset ring-sinulog-red/20 transition-colors hover:bg-sinulog-red/5"
         >
           <LogOutIcon className="h-4 w-4" />
           Sign Out
@@ -74,19 +75,42 @@ export function ProfileSidebar({ user, stats, onSignOut }: ProfileSidebarProps) 
   );
 }
 
-export function Avatar({ name, src, className }: { name: string; src: string | null; className?: string }) {
-  if (src) {
-    return <img src={src} alt={`${name} profile photo`} className={cn("h-20 w-20 rounded-full object-cover ring-2 ring-line", className)} />;
+const avatarClasses = cn(
+  "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-surf-400 to-sinulog-magenta font-display text-4xl font-semibold text-white ring-2 ring-white/30",
+);
+
+function resolveAvatarUrl(src: string): string {
+  try {
+    const parsed = new URL(src, window.location.origin);
+    if (parsed.pathname.startsWith("/storage/")) {
+      return new URL(parsed.pathname, API_ORIGIN).href;
+    }
+  } catch {
+    return src;
   }
+  return src;
+}
+
+export function Avatar({ name, src, className }: { name: string; src: string | null; className?: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const url = src ? resolveAvatarUrl(src) : null;
+
+  if (!url || failedUrl === url) {
+    return (
+      <span aria-hidden="true" className={cn(avatarClasses, className)}>
+        {name.charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-surf-400 to-sea-600 font-display text-4xl font-semibold text-white ring-2 ring-line",
-        className,
-      )}
-    >
-      {name.charAt(0).toUpperCase()}
+    <span className={cn(avatarClasses, className)}>
+      <img
+        src={url}
+        alt={`${name} profile photo`}
+        className="h-full w-full object-cover"
+        onError={() => setFailedUrl(url)}
+      />
     </span>
   );
 }

@@ -52,7 +52,7 @@ export function FavoritesTab() {
           action={
             <Link
               to="/destinations"
-              className="inline-flex items-center gap-2 rounded-full bg-surf-400 px-5 py-2.5 text-sm font-semibold text-lagoon-950 transition-colors hover:bg-surf-300"
+              className="inline-flex items-center gap-2 rounded-full bg-surf-400 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
             >
               <MapIcon className="h-4 w-4" />
               Visit Destinations
@@ -80,8 +80,8 @@ export function FavoritesTab() {
 
       {chooserDestination ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setChooserDestination(null)} />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="absolute inset-0 bg-lagoon-950/50 backdrop-blur-sm" onClick={() => setChooserDestination(null)} />
+          <div className="relative w-full max-w-md rounded-2xl glass p-5">
             <button
               type="button"
               onClick={() => setChooserDestination(null)}
