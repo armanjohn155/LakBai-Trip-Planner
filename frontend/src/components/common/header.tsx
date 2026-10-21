@@ -173,8 +173,11 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
   const items = [
     { to: "/app", label: "Dashboard", Icon: GridIcon },
     { to: "/app/trips", label: "My Trips", Icon: PinIcon },
+    { to: "/app/history", label: "Visiting History", Icon: ClockIcon },
+    { to: "/app/reviews", label: "My Reviews", Icon: StarIcon },
     { to: "/app/favorites", label: "Favorites", Icon: HeartIcon },
     { to: "/app/profile", label: "Profile", Icon: UserIcon },
+    ...(user?.role === "admin" ? [{ to: "/admin", label: "Admin", Icon: ShieldIcon }] : []),
   ];
 
   return (
@@ -248,11 +251,37 @@ function HeartIcon({ className }: { className?: string }) {
   );
 }
 
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function StarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
+
 function UserIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5 20c.6-3.6 3.1-5.5 7-5.5s6.4 1.9 7 5.5" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3z" />
+      <path d="M9.5 12l1.8 1.8L15 10" />
     </svg>
   );
 }

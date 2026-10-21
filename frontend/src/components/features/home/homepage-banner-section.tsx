@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Link } from "react-router";
 
@@ -9,9 +9,33 @@ import { formatMoney, pluralise } from "@/lib/format";
 import type { Destination, Itinerary } from "@/lib/types";
 
 // Freely-licensed Cebu landmark photo (Wikimedia Commons) used as the hero
-// backdrop. Hot-linked here for the dev preview; move it under local storage
-// before production and confirm attribution.
-const HERO_IMAGE_URL = "https://commons.wikimedia.org/wiki/Special:FilePath/Kawasan%20Falls%2C%20Cebu%2C%20Philippines1.jpg";
+// poster/fallback while the background video loads — or permanently, for
+// visitors who prefer reduced motion. Hot-linked here for the dev preview;
+// move it under local storage before production and confirm attribution.
+const HERO_POSTER =
+  "https://commons.wikimedia.org/wiki/Special:FilePath/Kawasan%20Falls%2C%20Cebu%2C%20Philippines1.jpg";
+
+// Looping hero background video (public/hero-video/video-hero.mp4).
+// If you add a .webm encode, drop it next to the .mp4 and add a
+// <source> tag for it above the .mp4 source.
+const HERO_VIDEO = "/hero-video/video-hero.mp4";
+
+function usePrefersReducedMotion() {
+  // Lazy initializer is SSR-safe: falls back to `false` on the server, where
+  // window/matchMedia don't exist, and reads the real value on the client.
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setPrefersReducedMotion(event.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
+
+  return prefersReducedMotion;
+}
 
 interface HomepageBannerSectionProps {
   destinations: Destination[];
@@ -22,6 +46,8 @@ interface HomepageBannerSectionProps {
 }
 
 export function HomepageBannerSection({ destinations, loggedIn, itineraries, onBrowse, onBuildTrip }: HomepageBannerSectionProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   const stats = useMemo(
     () => ({
       spots: destinations.length,
@@ -35,15 +61,20 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
 
   return (
     <>
-    <section className="relative overflow-hidden bg-gradient-to-br from-royal-950 via-royal-900 to-royal-800 text-sand-50">
-      <img
-        src={HERO_IMAGE_URL}
-        alt=""
-        aria-hidden="true"
-        loading="eager"
+    <section className="relative overflow-hidden  text-sand-50">
+      <video
         className="absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="absolute inset-0 bg-gradient-to-tr from-royal-950 via-royal-950/80 to-royal-700/30" aria-hidden="true" />
+        autoPlay={!prefersReducedMotion}
+        loop
+        muted
+        playsInline
+        preload="auto"
+        poster={HERO_POSTER}
+        aria-hidden="true"
+      >
+        <source src={HERO_VIDEO} type="video/mp4" />
+      </video>
+      <div className="absolute inset-0 bg-gradient-to-tr from-royal-950 via-royal-950/20 to-royal-700/20" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <p className="text-surf-300">LAKBAI — Cebu on one map</p>

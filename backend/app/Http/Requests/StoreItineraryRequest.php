@@ -24,9 +24,12 @@ class StoreItineraryRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'budget' => ['nullable', 'numeric', 'min:0'],
+            'total_budget' => ['nullable', 'numeric', 'min:0'],
+            'cover_image_url' => ['nullable', 'string', 'max:2048'],
         ];
     }
 }

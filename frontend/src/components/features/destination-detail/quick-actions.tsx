@@ -13,33 +13,31 @@ interface QuickActionsProps {
   onToggleFavorite: () => void;
   onAddToTrip: () => void;
   onViewOnMap: () => void;
+  embedded?: boolean;
 }
 
 const BUTTON_CLASS = "h-11 w-full";
 const FROST_BUTTON_CLASS = "bg-white/15 text-lagoon-900 ring-white/25 backdrop-blur-md hover:bg-white/25";
 
-export function QuickActions({ destination, favorited, onToggleFavorite, onAddToTrip, onViewOnMap }: QuickActionsProps) {
-  return (
-    <Card className="glass-frost p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold text-lagoon-900">Quick Actions</h2>
-        <PinIcon className="h-4 w-4 text-surf-400" />
-      </div>
+export function QuickActions({ destination, favorited, onToggleFavorite, onAddToTrip, onViewOnMap, embedded = false }: QuickActionsProps) {
+  const secondaryClass = cn(BUTTON_CLASS, !embedded && FROST_BUTTON_CLASS);
 
-      <div className="mt-4 space-y-2.5">
+  const body = (
+    <>
+      <div className={cn("space-y-2.5", embedded && "mt-0")}>
         <Button size="md" className={BUTTON_CLASS} onClick={onAddToTrip}>
           <PlusIcon className="h-4 w-4" />
           Add to My Trip
         </Button>
-        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={onToggleFavorite}>
+        <Button size="md" variant="secondary" className={secondaryClass} onClick={onToggleFavorite}>
           <HeartIcon filled={favorited} className={cn("h-4 w-4", favorited ? "text-mango-500" : "text-sea-500")} />
           {favorited ? "Saved to Favorites" : "Save to Favorites"}
         </Button>
-        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={() => downloadInfo(destination)}>
+        <Button size="md" variant="secondary" className={secondaryClass} onClick={() => downloadInfo(destination)}>
           <DownloadIcon className="h-4 w-4" />
           Download Info
         </Button>
-        <Button size="md" variant="secondary" className={cn(BUTTON_CLASS, FROST_BUTTON_CLASS)} onClick={onViewOnMap}>
+        <Button size="md" variant="secondary" className={secondaryClass} onClick={onViewOnMap}>
           <MapIcon className="h-4 w-4" />
           View on Map
         </Button>
@@ -57,6 +55,21 @@ export function QuickActions({ destination, favorited, onToggleFavorite, onAddTo
         </p>
         <p className="mt-0.5 text-sm font-medium text-lagoon-900">{destinationLocationAddress(destination)}</p>
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return body;
+  }
+
+  return (
+    <Card className="glass-frost p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold text-lagoon-900">Quick Actions</h2>
+        <PinIcon className="h-4 w-4 text-surf-400" />
+      </div>
+
+      <div className="mt-4">{body}</div>
     </Card>
   );
 }

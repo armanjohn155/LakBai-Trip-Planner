@@ -18,7 +18,12 @@ class DestinationController extends Controller
     {
         $destinations = Destination::query()
             ->filter($request->only(['category', 'region', 'search', 'min_price', 'max_price']))
-            ->when($request->user() !== null, fn (Builder $query) => $query->with('favoritedBy'))
+            ->when($request->user() !== null, function (Builder $query) use ($request) {
+                $query->with([
+                    'favoritedBy',
+                    'visits' => fn ($inner) => $inner->where('user_id', $request->user()->id),
+                ]);
+            })
             ->orderBy('name')
             ->paginate($request->integer('per_page', 20));
 
@@ -31,7 +36,10 @@ class DestinationController extends Controller
     public function show(Destination $destination, Request $request): DestinationResource
     {
         if ($request->user() !== null) {
-            $destination->load('favoritedBy');
+            $destination->load([
+                'favoritedBy',
+                'visits' => fn ($query) => $query->where('user_id', $request->user()->id),
+            ]);
         }
 
         return new DestinationResource($destination);

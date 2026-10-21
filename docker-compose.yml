@@ -19,6 +19,9 @@ services:
       QUEUE_CONNECTION: database
       CACHE_STORE: database
       FILESYSTEM_DISK: local
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrator}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       - suroy-storage:/var/www/html/storage
     restart: unless-stopped

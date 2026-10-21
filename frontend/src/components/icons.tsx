@@ -248,3 +248,40 @@ export function CameraIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function LayersIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M12 3l9 5-9 5-9-5 9-5z" />
+      <path d="M3 13l9 5 9-5" />
+    </svg>
+  );
+}
+
+export function RouteIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="6" cy="19" r="2.5" />
+      <circle cx="18" cy="5" r="2.5" />
+      <path d="M8.5 19H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5" />
+    </svg>
+  );
+}
+
+export function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+      <path d="M14.5 6.5l3 3" />
+    </svg>
+  );
+}

@@ -16,14 +16,20 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { FavoritesProvider } from "@/hooks/use-favorites";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
-import AdminPage from "@/pages/dashboard/admin";
+import AdminDestinationEditPage from "@/pages/dashboard/admin/destination-edit";
+import AdminDestinationNewPage from "@/pages/dashboard/admin/destination-new";
+import AdminDestinationsPage from "@/pages/dashboard/admin/destinations";
+import AdminLayout from "@/pages/dashboard/admin/layout";
+import AdminReviewsPage from "@/pages/dashboard/admin/reviews";
 import AppLayout from "@/pages/dashboard/layout";
 import DestinationDetailPage from "@/pages/dashboard/user/destination-detail";
 import DestinationsPage from "@/pages/dashboard/user/destinations";
 import FavoritesPage from "@/pages/dashboard/user/favorites";
 import DashboardHomePage from "@/pages/dashboard/user/home";
+import HistoryPage from "@/pages/dashboard/user/history";
 import ItineraryPage from "@/pages/dashboard/user/itinerary";
 import ProfilePage from "@/pages/dashboard/user/profile";
+import MyReviewsPage from "@/pages/dashboard/user/reviews";
 import TripsPage from "@/pages/dashboard/user/trips";
 import TripWizardPage from "@/pages/dashboard/user/trip-wizard";
 import AboutPage from "@/pages/guest/about";
@@ -64,6 +70,15 @@ createRoot(document.getElementById("root")!).render(
               public destination pages. */}
           <Route path="app/destinations" element={<Navigate to="/destinations" replace />} />
           <Route path="app/destinations/:id" element={<DestinationDetailRedirect />} />
+          <Route path="app/admin" element={<Navigate to="/admin" replace />} />
+
+          <Route path="admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/destinations" replace />} />
+            <Route path="destinations" element={<AdminDestinationsPage />} />
+            <Route path="destinations/new" element={<AdminDestinationNewPage />} />
+            <Route path="destinations/:id/edit" element={<AdminDestinationEditPage />} />
+            <Route path="reviews" element={<AdminReviewsPage />} />
+          </Route>
 
           <Route path="app" element={<AppLayout />}>
             <Route index element={<DashboardHomePage />} />
@@ -71,13 +86,14 @@ createRoot(document.getElementById("root")!).render(
             <Route path="trips/new" element={<TripWizardPage />} />
             <Route path="trips/:id" element={<ItineraryPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
+            <Route path="history" element={<HistoryPage />} />
+            <Route path="reviews" element={<MyReviewsPage />} />
             <Route path="profile" element={<ProfilePage />}>
               <Route index element={<ProfileSummaryTab />} />
               <Route path="trips" element={<TripsTab />} />
               <Route path="favorites" element={<FavoritesTab />} />
               <Route path="settings" element={<SettingsTab />} />
             </Route>
-            <Route path="admin" element={<AdminPage />} />
             <Route path="*" element={<Navigate to="trips" replace />} />
           </Route>
 

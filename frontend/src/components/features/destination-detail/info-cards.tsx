@@ -6,9 +6,27 @@ interface InfoCardsProps {
   entranceFee: string;
   visitDuration: string;
   openingHours: string;
+  variant?: "cards" | "inline";
 }
 
-export function InfoCards({ entranceFee, visitDuration, openingHours }: InfoCardsProps) {
+export function InfoCards({ entranceFee, visitDuration, openingHours, variant = "cards" }: InfoCardsProps) {
+  if (variant === "inline") {
+    const pairs = [
+      { label: "Entrance Fee", value: entranceFee },
+      { label: "Visit Duration", value: visitDuration },
+      { label: "Opening Hours", value: openingHours },
+    ];
+    return (
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        {pairs.map((pair) => (
+          <p key={pair.label} className="text-[13px] text-ink-600">
+            {pair.label}: <span className="font-semibold text-lagoon-900">{pair.value}</span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <InfoCard icon={<TicketIcon className="h-5 w-5" />} label="Entrance Fee" value={entranceFee} />

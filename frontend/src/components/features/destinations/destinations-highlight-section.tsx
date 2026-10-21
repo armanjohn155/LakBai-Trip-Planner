@@ -39,7 +39,7 @@ export function FeaturedDestinationsBanner({ destinations, onOpen }: FeaturedDes
   return (
     <section
       aria-label="Featured destinations"
-      className="relative -mt-8 h-[300px] w-screen overflow-hidden dropdown-shadow-xl bg-royal-900 sm:-mt-10 sm:h-[400px] ml-[calc(50%_-_50vw)] lg:h-[440px]"
+      className="relative h-[220px] w-full overflow-hidden rounded-3xl bg-royal-900 shadow-xl sm:h-[240px]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -73,15 +73,15 @@ export function FeaturedDestinationsBanner({ destinations, onOpen }: FeaturedDes
               />
             ) : null}
             <span
-              className="absolute inset-0 bg-gradient-to-tr from-royal-950/95 via-royal-950/60 to-royal-950/15"
+              className="absolute inset-0 bg-gradient-to-r from-royal-950/95 via-royal-950/60 to-royal-950/10"
               aria-hidden="true"
             />
-            <span className="absolute inset-0 flex h-full flex-col justify-end px-6 pb-12 sm:px-10 sm:pb-14">
+            <span className="absolute inset-0 flex h-full flex-col justify-end px-5 pb-6 sm:px-8 sm:pb-8">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-surf-300">Featured</span>
-              <span className="mt-2 block max-w-2xl font-display text-3xl font-semibold leading-tight text-sand-50 sm:text-5xl">
+              <span className="mt-1.5 block max-w-2xl font-display text-2xl font-semibold leading-tight text-sand-50 sm:text-4xl">
                 {destination.name}
               </span>
-              <span className="mt-3 block max-w-xl line-clamp-2 text-sm leading-relaxed text-sand-50/85 sm:text-base">
+              <span className="mt-2 block max-w-xl line-clamp-2 text-sm leading-relaxed text-sand-50/85">
                 {destination.description}
               </span>
             </span>

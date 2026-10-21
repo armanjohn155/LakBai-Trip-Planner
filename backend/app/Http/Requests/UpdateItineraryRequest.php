@@ -24,9 +24,12 @@ class UpdateItineraryRequest extends FormRequest
     {
         return [
             'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'start_date' => ['sometimes', 'nullable', 'date'],
             'end_date' => ['sometimes', 'nullable', 'date'],
             'budget' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'total_budget' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'cover_image_url' => ['sometimes', 'nullable', 'string', 'max:2048'],
         ];
     }
 

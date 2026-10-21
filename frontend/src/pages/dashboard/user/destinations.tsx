@@ -10,11 +10,10 @@ import {
   FeaturedDestinationsBanner,
   PopularDestinationsCarousel,
 } from "@/components/features/destinations/destinations-highlight-section";
-import { DestinationFilters, EMPTY_EXPLORER_FILTERS, SORT_OPTIONS } from "@/components/features/destinations/destination-filters";
+import { DestinationFilters, EMPTY_EXPLORER_FILTERS } from "@/components/features/destinations/destination-filters";
 import { TripChooser } from "@/components/features/destinations/trip-chooser";
-import { GridIcon, ListIcon, SlidersIcon, XIcon } from "@/components/icons";
+import { GridIcon, ListIcon, SearchIcon, SlidersIcon, XIcon } from "@/components/icons";
 import { EmptyState, InlineError } from "@/components/ui/feedback";
-import { Select } from "@/components/ui/input";
 import { useAddToTrip } from "@/hooks/use-add-to-trip";
 import { useFavorites } from "@/hooks/use-favorites";
 import { apiError, getDestinations } from "@/lib/api";
@@ -87,8 +86,14 @@ export default function DestinationsPage() {
       }
     };
 
+    const query = filters.search.trim().toLowerCase();
+
     const filtered = destinations.filter(
       (destination) =>
+        (query === "" ||
+          destination.name.toLowerCase().includes(query) ||
+          (destination.municipality ?? "").toLowerCase().includes(query) ||
+          destination.category.toLowerCase().includes(query)) &&
         (filters.categories.length === 0 || filters.categories.includes(destination.category)) &&
         (filters.municipalities.length === 0 || filters.municipalities.includes(destination.municipality ?? "")) &&
         matchesPrice(destination) &&
@@ -102,9 +107,6 @@ export default function DestinationsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFocusedId((current) => (current && !destinations.some((d) => d.id === current) ? null : current));
   }, [destinations]);
-
-  const activeFilterCount =
-    filters.categories.length + filters.municipalities.length + (filters.priceTier ? 1 : 0) + (filters.minRating ? 1 : 0);
 
   const renderCard = (destination: Destination) => {
     const common = {
@@ -125,7 +127,7 @@ export default function DestinationsPage() {
     if (view === "list") {
       return <DestinationListCard key={destination.id} highlighted={focusedId === destination.id} {...common} />;
     }
-    return <DestinationGridCard key={destination.id} highlighted={focusedId === destination.id} {...common} />;
+    return <DestinationGridCard key={destination.id} variant="showcase" highlighted={focusedId === destination.id} {...common} />;
   };
 
   const handleSelectTrip = async (trip: Itinerary) => {
@@ -144,107 +146,120 @@ export default function DestinationsPage() {
     return <p className="text-sm text-ink-600">Loading destinations…</p>;
   }
 
-  const filtersSidebar = (
-    <DestinationFilters filters={filters} allDestinations={destinations} onFiltersChange={setFilters} />
-  );
-
   return (
-    <div className="space-y-6">
-      <FeaturedDestinationsBanner destinations={destinations} onOpen={(destination) => navigate(`/destinations/${destination.id}`)} />
-
-      
-
-      {error ? <InlineError message={error} /> : null}
-
-      {toast ? (
-        <div className="bg-lagoon-900 px-4 py-3 text-sm text-sand-50 shadow-lg">
-          {toast.message}{" "}
-          {toast.href ? (
-            <Link to={toast.href} className="font-semibold text-surf-300 hover:text-surf-400">
-              {toast.label}
-            </Link>
-          ) : null}
+    <div className="space-y-8">
+      {/* 1. Page header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-lagoon-900 sm:text-4xl">Destinations</h1>
+          <p className="mt-1 text-sm text-ink-600">Every stop, every spot — filter, sort, and pin your favorites.</p>
         </div>
-      ) : null}
 
-     
-
-      <PopularDestinationsCarousel
-        destinations={destinations}
-        isFavorited={isFavorited}
-        onToggleFavorite={(destination) => void toggleFavorite(destination)}
-        onAdd={(destination) => {
-          resetError();
-          setOpenChooser(destination);
-        }}
-      />
-
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-lagoon-900">Destinations</h1>
-        <p className="mt-1 text-sm text-ink-600">Every stop, every spot — filter, sort, and pin your favorites.</p>
-      </div>
-      
- <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-600">
-          Showing <span className="font-semibold text-lagoon-900">{visible.length}</span> of{" "}
-          <span className="font-semibold text-lagoon-900">{destinations.length}</span> destinations
-        </p>
-
-        <div className="flex items-center gap-2">
-          <Select
-            className="h-10 w-44"
-            aria-label="Sort by"
-            value={filters.sortBy}
-            onChange={(event) => setFilters((current) => ({ ...current, sortBy: event.target.value as SortBy }))}
-            options={SORT_OPTIONS}
-          />
-
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-lagoon-900 ring-1 ring-line transition-colors hover:bg-sand-100 lg:hidden"
-          >
-            <SlidersIcon className="h-4 w-4" />
-            Filters
-            {activeFilterCount > 0 ? (
-               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-surf-400 px-1.5 text-xs font-bold text-white">
-                {activeFilterCount}
-              </span>
-            ) : null}
-          </button>
-
-          <div className="flex items-center rounded-full bg-sand-200/70 p-1" role="group" aria-label="View mode">
+        <div className="w-full sm:w-80">
+          <label htmlFor="destination-search" className="block text-xs font-semibold uppercase tracking-wide text-ink-600">
+            Search
+          </label>
+          <div className="mt-1.5 flex">
+            <input
+              id="destination-search"
+              type="search"
+              value={filters.search}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Search destinations…"
+              className="h-11 w-full rounded-l-xl border border-r-0 border-line bg-white px-4 text-sm text-ink-900 placeholder:text-ink-600/50 focus:outline-none focus:ring-2 focus:ring-surf-400"
+            />
             <button
               type="button"
-              onClick={() => setView("grid")}
-              aria-label="Grid view"
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-                view === "grid" ? "bg-white text-lagoon-900 shadow-sm" : "text-ink-600 hover:text-lagoon-900",
-              )}
+              aria-label="Search"
+              className="flex h-11 w-12 shrink-0 items-center justify-center rounded-r-xl bg-surf-400 text-white transition-colors hover:bg-surf-300"
             >
-              <GridIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("list")}
-              aria-label="List view"
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-                view === "list" ? "bg-white text-lagoon-900 shadow-sm" : "text-ink-600 hover:text-lagoon-900",
-              )}
-            >
-              <ListIcon className="h-4 w-4" />
+              <SearchIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
-      <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+
+      {/* 2. Two-column body */}
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        {/* 3. Left sidebar */}
         <aside className="hidden lg:block">
-          <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1">{filtersSidebar}</div>
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
+            <DestinationFilters filters={filters} allDestinations={destinations} onFiltersChange={setFilters} />
+          </div>
         </aside>
 
-        <div>
+        {/* 4. Right column */}
+        <div className="min-w-0 space-y-6">
+          {/* 4a. Banner */}
+          <FeaturedDestinationsBanner destinations={destinations} onOpen={(destination) => navigate(`/destinations/${destination.id}`)} />
+
+          {error ? <InlineError message={error} /> : null}
+
+          {toast ? (
+            <div className="rounded-2xl bg-lagoon-900 px-4 py-3 text-sm text-sand-50 shadow-lg">
+              {toast.message}{" "}
+              {toast.href ? (
+                <Link to={toast.href} className="font-semibold text-surf-300 hover:text-surf-400">
+                  {toast.label}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* 4b. Results header */}
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-xl font-bold text-lagoon-900 sm:text-2xl">Places to fall in love with</h2>
+              <p className="mt-0.5 text-sm text-ink-600">
+                Showing <span className="font-semibold text-lagoon-900">{visible.length}</span> of{" "}
+                <span className="font-semibold text-lagoon-900">{destinations.length}</span> destinations
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-lagoon-900 lg:hidden"
+              >
+                <SlidersIcon className="h-4 w-4" />
+                Filters
+              </button>
+
+              <div className="flex items-center gap-2" role="group" aria-label="View mode">
+                <button
+                  type="button"
+                  onClick={() => setView("grid")}
+                  aria-label="Grid view"
+                  aria-pressed={view === "grid"}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-xl border transition-colors",
+                    view === "grid"
+                      ? "border-surf-400 bg-surf-400/10 text-sea-600"
+                      : "border-line bg-white text-ink-600 hover:text-lagoon-900",
+                  )}
+                >
+                  <GridIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("list")}
+                  aria-label="List view"
+                  aria-pressed={view === "list"}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-xl border transition-colors",
+                    view === "list"
+                      ? "border-surf-400 bg-surf-400/10 text-sea-600"
+                      : "border-line bg-white text-ink-600 hover:text-lagoon-900",
+                  )}
+                >
+                  <ListIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4c. Results */}
           {visible.length === 0 ? (
             <EmptyState
               title="Nothing matches"
@@ -253,25 +268,36 @@ export default function DestinationsPage() {
                 <button
                   type="button"
                   onClick={() => setFilters({ ...EMPTY_EXPLORER_FILTERS })}
-                   className="rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
+                  className="rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
                 >
                   Clear all filters
                 </button>
               }
             />
           ) : view === "grid" ? (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{visible.map(renderCard)}</div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{visible.map(renderCard)}</div>
           ) : (
             <div className="space-y-4">{visible.map(renderCard)}</div>
           )}
+
+          {/* Popular destinations carousel (preserved) */}
+          <PopularDestinationsCarousel
+            destinations={destinations}
+            isFavorited={isFavorited}
+            onToggleFavorite={(destination) => void toggleFavorite(destination)}
+            onAdd={(destination) => {
+              resetError();
+              setOpenChooser(destination);
+            }}
+          />
         </div>
       </div>
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-[1200] lg:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-80 max-w-[85vw] overflow-y-auto bg-sand-50 p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-end">
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-sand-50 p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
@@ -281,7 +307,7 @@ export default function DestinationsPage() {
                 <XIcon className="h-5 w-5" />
               </button>
             </div>
-            {filtersSidebar}
+            <DestinationFilters filters={filters} allDestinations={destinations} onFiltersChange={setFilters} />
           </div>
         </div>
       ) : null}

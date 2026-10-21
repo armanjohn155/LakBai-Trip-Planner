@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
+import { apiError, apiFieldErrors } from "@/lib/api";
 import { AuthForm, AuthShell } from "@/pages/auth/auth-shell";
 
 export default function RegisterPage() {
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const redirectTarget = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -26,6 +28,7 @@ export default function RegisterPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    setFieldErrors({});
     if (password !== confirm) {
       setError("Passwords do not match.");
       return;
@@ -35,7 +38,8 @@ export default function RegisterPage() {
       await register(name, email, password);
       navigate(redirectTarget());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed. Try again.");
+      setError(apiError(err));
+      setFieldErrors(apiFieldErrors(err));
     } finally {
       setBusy(false);
     }
@@ -54,10 +58,45 @@ export default function RegisterPage() {
       footerLabel="Sign in"
     >
       <AuthForm onSubmit={submit} error={error} busy={busy} submitLabel="Create account">
-        <Input label="Name" autoComplete="name" required value={name} onChange={(event) => setName(event.target.value)} />
-        <Input label="Email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-        <Input label="Password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} />
-        <Input label="Confirm password" type="password" autoComplete="new-password" required value={confirm} onChange={(event) => setConfirm(event.target.value)} />
+        <Input
+          label="Name"
+          name="name"
+          autoComplete="name"
+          required
+          value={name}
+          error={fieldErrors.name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <Input
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          error={fieldErrors.email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+        <Input
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={password}
+          error={fieldErrors.password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <Input
+          label="Confirm password"
+          name="password_confirmation"
+          type="password"
+          autoComplete="new-password"
+          required
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+        />
       </AuthForm>
     </AuthShell>
   );

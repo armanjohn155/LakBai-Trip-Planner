@@ -14,6 +14,8 @@ fi
 chown www-data:www-data storage/database.sqlite
 
 php artisan migrate --force
+php artisan db:seed --class=DestinationSeeder --force
+php artisan db:seed --class=AdminSeeder --force
 php artisan storage:link --force 2>/dev/null || true
 
 chown -R www-data:www-data storage bootstrap/cache

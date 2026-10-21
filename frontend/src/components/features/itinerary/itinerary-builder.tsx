@@ -1,84 +1,105 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Link } from "react-router";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
+import { AddStopCard } from "@/components/features/itinerary/add-stop-panel";
 import { BudgetSummary } from "@/components/features/itinerary/budget-summary";
-import { DeleteIcon } from "@/components/features/itinerary/trip-card";
-import { CebuMap } from "@/components/features/map/cebu-map";
+import { ExportMenu } from "@/components/features/itinerary/export-menu";
+import { ItineraryMap } from "@/components/features/itinerary/itinerary-map";
+import { StopCard } from "@/components/features/itinerary/stop-card";
+import { StopEditor } from "@/components/features/itinerary/stop-editor";
+import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
+import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, InlineError } from "@/components/ui/feedback";
-import { Input, Select } from "@/components/ui/input";
-import { CheckIcon, GripIcon, PlusIcon } from "@/components/icons";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { LayersIcon, PlusIcon, RouteIcon, SlidersIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import {
-  addItineraryItem,
   apiError,
   deleteItineraryItem,
   getDestinations,
   getItinerary,
+  getItineraryRouteEstimates,
   getItinerarySummary,
+  reorderItineraryItems,
   updateItinerary,
   updateItineraryItem,
+  type ReorderStop,
 } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
-import type { Destination, Itinerary, ItineraryItem, ItinerarySummary } from "@/lib/types";
+import type { Destination, Itinerary, ItineraryItem, ItineraryRouteEstimate, ItineraryRouteLeg, ItinerarySummary } from "@/lib/types";
 
 interface ItineraryBuilderProps {
   itineraryId: number;
   initialAddDestinationId?: number | null;
 }
 
-interface EditingState {
-  itemId: number;
-  day_number: string;
-  estimated_budget: string;
-  notes: string;
+interface DayGroup {
+  day: number;
+  items: ItineraryItem[];
 }
+
+function groupByDay(items: ItineraryItem[]): DayGroup[] {
+  const sorted = [...items].sort((a, b) => a.day_number - b.day_number || a.order - b.order);
+  const groups: DayGroup[] = [];
+  for (const item of sorted) {
+    const current = groups[groups.length - 1];
+    if (current && current.day === item.day_number) current.items.push(item);
+    else groups.push({ day: item.day_number, items: [item] });
+  }
+  return groups;
+}
+
+const DAY_COUNT = 30;
 
 export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: ItineraryBuilderProps) {
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [summary, setSummary] = useState<ItinerarySummary | null>(null);
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [estimates, setEstimates] = useState<ItineraryRouteEstimate | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [savingTrip, setSavingTrip] = useState(false);
-  const [tripError, setTripError] = useState<string | null>(null);
-
-  const [destinationId, setDestinationId] = useState<string>(initialAddDestinationId ? String(initialAddDestinationId) : "");
-  const [dayNumber, setDayNumber] = useState("1");
-  const [budget, setBudget] = useState("");
-  const [notes, setNotes] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-
-  const [updatingItem, setUpdatingItem] = useState<number | null>(null);
   const [itemError, setItemError] = useState<string | null>(null);
-  const [editingItem, setEditingItem] = useState<EditingState | null>(null);
-  const [addOpen, setAddOpen] = useState<boolean | null>(null);
+  const [busyItem, setBusyItem] = useState<number | null>(null);
 
-  const [visitedBusy, setVisitedBusy] = useState<number | null>(null);
-  const [dragItemId, setDragItemId] = useState<number | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<number | null>(null);
-  const [reordering, setReordering] = useState(false);
+  const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(initialAddDestinationId != null);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [focusItemId, setFocusItemId] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const refresh = useCallback(async () => {
-    const [trip, bud, dests] = await Promise.all([
+    const [trip, bud, dests, routes] = await Promise.all([
       getItinerary(itineraryId),
       getItinerarySummary(itineraryId),
       getDestinations({ per_page: 100 }),
+      getItineraryRouteEstimates(itineraryId).catch(() => null),
     ]);
     setItinerary(trip);
     setSummary(bud);
     setDestinations(dests.data);
-    setTitle(trip.title);
-    setStartDate(trip.start_date ?? "");
-    setEndDate(trip.end_date ?? "");
+    setEstimates(routes);
   }, [itineraryId]);
 
   useEffect(() => {
@@ -97,179 +118,129 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     };
   }, [refresh]);
 
-  const prevSelected = useMemo(() => destinations.find((d) => String(d.id) === destinationId), [destinations, destinationId]);
-  const maxDay = useMemo(() => Math.max(...itinerary?.items?.map((item) => item.day_number) ?? [1], initialAddDestinationId ? 1 : 1), [itinerary, initialAddDestinationId]);
+  const items = useMemo(() => itinerary?.items ?? [], [itinerary]);
+  const groups = useMemo(() => groupByDay(items), [items]);
 
-  const groups = useMemo(() => {
-    const items = [...(itinerary?.items ?? [])].sort((a, b) => a.day_number - b.day_number || a.order - b.order);
-    const result: { day: number; items: ItineraryItem[] }[] = [];
-    for (const item of items) {
-      const current = result[result.length - 1];
-      if (current && current.day === item.day_number) {
-        current.items.push(item);
-      } else {
-        result.push({ day: item.day_number, items: [item] });
+  const travelByLeg = useMemo(() => {
+    const map = new Map<string, ItineraryRouteLeg>();
+    for (const day of estimates?.days ?? []) {
+      for (const leg of day.legs) {
+        map.set(`${leg.from_stop_id}-${leg.to_stop_id}`, leg);
       }
     }
-    return result;
-  }, [itinerary]);
+    return map;
+  }, [estimates]);
 
-  const selectDestination = useCallback(
-    (destination: Destination) => {
-      setDestinationId(String(destination.id));
-      if (!budget) setBudget(destination.estimated_cost ?? "");
-    },
-    [budget],
-  );
+  const applyItinerary = useCallback((next: Itinerary) => {
+    setItinerary(next);
+  }, []);
 
-  const handleAdd = async (event: FormEvent) => {
-    event.preventDefault();
-    setAddError(null);
-    setAdding(true);
-    try {
-      await addItineraryItem(itineraryId, {
-        destination_id: Number(destinationId),
-        day_number: Number(dayNumber) || undefined,
-        estimated_budget: budget === "" ? null : Number(budget),
-        notes: notes === "" ? null : notes,
-      });
-      setDestinationId("");
-      setDayNumber(String(maxDay));
-      setBudget("");
-      setNotes("");
-      await refresh();
-    } catch (error) {
-      setAddError(apiError(error));
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleSaveTrip = async (event: FormEvent) => {
-    event.preventDefault();
-    setTripError(null);
-    setSavingTrip(true);
-    try {
-      await updateItinerary(itineraryId, {
-        title,
-        start_date: startDate === "" ? null : startDate,
-        end_date: endDate === "" ? null : endDate,
-      });
-      setEditing(false);
-      await refresh();
-    } catch (error) {
-      setTripError(apiError(error));
-    } finally {
-      setSavingTrip(false);
-    }
-  };
-
-  const handleToggleVisited = async (item: ItineraryItem) => {
-    setVisitedBusy(item.id);
+  const handleToggleStatus = async (item: ItineraryItem) => {
     setItemError(null);
+    setBusyItem(item.id);
     try {
-      await updateItineraryItem(itineraryId, item.id, { visited: !item.visited });
+      applyItinerary(await updateItineraryItem(itineraryId, item.id, { status: item.status === "done" ? "planned" : "done" }));
+      const bud = await getItinerarySummary(itineraryId);
+      setSummary(bud);
+    } catch (error) {
+      setItemError(apiError(error));
+    } finally {
+      setBusyItem(null);
+    }
+  };
+
+  const handleDeleteItem = async (item: ItineraryItem) => {
+    setItemError(null);
+    setBusyItem(item.id);
+    try {
+      await deleteItineraryItem(itineraryId, item.id);
       await refresh();
     } catch (error) {
       setItemError(apiError(error));
     } finally {
-      setVisitedBusy(null);
+      setBusyItem(null);
     }
   };
 
-  const handleUpdateItem = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!editingItem) return;
-    setItemError(null);
-    setUpdatingItem(editingItem.itemId);
+  const handleReorder = async (nextGroups: DayGroup[]) => {
+    const ordered: ItineraryItem[] = nextGroups.flatMap((group) => group.items.map((item) => ({ ...item, day_number: group.day })));
+
+    const stops: ReorderStop[] = [];
+    let position = 1;
+    let currentDay = ordered[0]?.day_number ?? 1;
+    for (const item of ordered) {
+      if (item.day_number !== currentDay) {
+        currentDay = item.day_number;
+        position = 1;
+      }
+      stops.push({ id: item.id, day_number: item.day_number, order: position });
+      position += 1;
+    }
+
+    // Optimistic update, then persist; roll back on failure.
+    const previous = itinerary;
+    if (itinerary) applyItinerary({ ...itinerary, items: ordered });
+
     try {
-      await updateItineraryItem(itineraryId, editingItem.itemId, {
-        day_number: Number(editingItem.day_number),
-        estimated_budget: editingItem.estimated_budget === "" ? null : Number(editingItem.estimated_budget),
-        notes: editingItem.notes === "" ? null : editingItem.notes,
-      });
-      setEditingItem(null);
-      await refresh();
+      applyItinerary(await reorderItineraryItems(itineraryId, stops));
     } catch (error) {
+      if (previous) applyItinerary(previous);
       setItemError(apiError(error));
-    } finally {
-      setUpdatingItem(null);
     }
   };
 
-  const handleDeleteItem = async (itemId: number) => {
-    setItemError(null);
-    setUpdatingItem(itemId);
-    try {
-      await deleteItineraryItem(itineraryId, itemId);
-      setEditingItem(null);
-      await refresh();
-    } catch (error) {
-      setItemError(apiError(error));
-    } finally {
-      setUpdatingItem(null);
-    }
-  };
+  const handleDragStart = (event: DragStartEvent) => setActiveId(Number(event.active.id));
 
-  const handleReorder = async (fromId: number, toId: number) => {
-    const ordered = [...(itinerary?.items ?? [])].sort((a, b) => a.day_number - b.day_number || a.order - b.order);
-    const from = ordered.findIndex((item) => item.id === fromId);
-    const to = ordered.findIndex((item) => item.id === toId);
-    if (from < 0 || to < 0 || from === to) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over) return;
 
-    const reordered = ordered.filter((item) => item.id !== fromId);
-    const dragged = ordered[from];
-    reordered.splice(to, 0, dragged);
-    dragged.day_number = to === 0 ? (reordered[1]?.day_number ?? dragged.day_number) : reordered[to - 1].day_number;
+    const activeItemId = Number(active.id);
+    const overId = String(over.id);
 
-    let runIndex = 0;
-    const patches: { id: number; day_number: number; order: number }[] = [];
-    for (let index = 0; index < reordered.length; index++) {
-      const current = reordered[index];
-      const previous = index === 0 ? null : reordered[index - 1];
-      runIndex = previous && previous.day_number === current.day_number ? runIndex + 1 : 0;
-      patches.push({ id: current.id, day_number: current.day_number, order: runIndex });
+    const sourceGroup = groups.find((group) => group.items.some((item) => item.id === activeItemId));
+    if (!sourceGroup) return;
+
+    // Determine the destination day: either a day container ("day-3") or another stop.
+    let targetDay: number;
+    let targetIndex: number;
+
+    if (overId.startsWith("day-")) {
+      targetDay = Number(overId.replace("day-", ""));
+      const targetGroup = groups.find((group) => group.day === targetDay);
+      targetIndex = targetGroup ? targetGroup.items.length : 0;
+    } else {
+      const overItem = items.find((item) => item.id === Number(overId));
+      if (!overItem) return;
+      targetDay = overItem.day_number;
+      const targetGroup = groups.find((group) => group.day === targetDay);
+      targetIndex = targetGroup ? targetGroup.items.findIndex((item) => item.id === overItem.id) : 0;
     }
 
-    const changed = patches.filter((patch) => {
-      const item = itinerary?.items?.find((candidate) => candidate.id === patch.id);
-      return item !== undefined && (item.day_number !== patch.day_number || item.order !== patch.order);
-    });
-    if (changed.length === 0) return;
+    const nextGroups = groups.map((group) => ({ day: group.day, items: [...group.items] }));
+    const from = nextGroups.find((group) => group.day === sourceGroup.day);
+    if (!from) return;
 
-    setReordering(true);
-    setItemError(null);
-    try {
-      await Promise.all(
-        changed.map((patch) => updateItineraryItem(itineraryId, patch.id, { day_number: patch.day_number, order: patch.order })),
-      );
-      await refresh();
-    } catch (error) {
-      setItemError(apiError(error));
-    } finally {
-      setReordering(false);
-    }
+    const fromIndex = from.items.findIndex((item) => item.id === activeItemId);
+    if (fromIndex < 0) return;
+
+    const [moved] = from.items.splice(fromIndex, 1);
+
+    const toGroup = nextGroups.find((group) => group.day === targetDay) ?? { day: targetDay, items: [] };
+    if (!nextGroups.some((group) => group.day === targetDay)) nextGroups.push(toGroup);
+
+    const insertAt = Math.max(0, Math.min(targetIndex, toGroup.items.length));
+    toGroup.items.splice(insertAt, 0, { ...moved, day_number: targetDay });
+
+    nextGroups.sort((a, b) => a.day - b.day);
+    void handleReorder(nextGroups);
   };
 
-  const handleDragStart = (event: DragEvent, itemId: number) => {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", String(itemId));
-    setDragItemId(itemId);
-  };
-  const handleDragOver = (event: DragEvent<HTMLLIElement>, itemId: number) => {
-    event.preventDefault();
-    if (dragItemId === null || dragItemId === itemId) return;
-    setDropTargetId(itemId);
-  };
-  const handleDrop = (event: DragEvent<HTMLLIElement>, itemId: number) => {
-    event.preventDefault();
-    if (dragItemId !== null && dragItemId !== itemId) void handleReorder(dragItemId, itemId);
-    setDragItemId(null);
-    setDropTargetId(null);
-  };
-  const handleDragEnd = () => {
-    setDragItemId(null);
-    setDropTargetId(null);
+  const handleSaveSettings = async (payload: SettingsPayload) => {
+    applyItinerary(await updateItinerary(itineraryId, payload));
+    const bud = await getItinerarySummary(itineraryId);
+    setSummary(bud);
   };
 
   if (loading) {
@@ -287,317 +258,344 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     );
   }
 
-  const toggleEditItem = (item: ItineraryItem) =>
-    setEditingItem({
-      itemId: item.id,
-      day_number: String(item.day_number),
-      estimated_budget: item.estimated_budget == null ? "" : String(item.estimated_budget),
-      notes: item.notes ?? "",
-    });
-
-  const addSectionDefaultOpen = initialAddDestinationId != null || (itinerary.items?.length ?? 0) === 0;
-  const addSectionOpen = addOpen ?? addSectionDefaultOpen;
-  const toggleAdd = () => setAddOpen((value) => !(value ?? addSectionDefaultOpen));
+  const dayOptions = Array.from({ length: DAY_COUNT }, (_, index) => index + 1);
+  const maxDay = Math.max(...groups.map((group) => group.day), 1);
+  const activeItem = activeId !== null ? items.find((item) => item.id === activeId) ?? null : null;
+  const showEstimates = estimates?.enabled ?? false;
 
   return (
     <div className="space-y-6 pb-10 sm:pb-14">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <Link to="/app/trips" className="text-sm font-semibold text-sea-500 hover:text-sea-600">
             ← My trips
           </Link>
-          {itinerary.title ? (
-            <h1 className="mt-1 font-display text-3xl font-semibold text-lagoon-900">{itinerary.title}</h1>
-          ) : null}
+          <h1 className="mt-1 truncate font-display text-3xl font-semibold text-lagoon-900">{itinerary.title}</h1>
+          <p className="mt-0.5 text-sm text-ink-600">
+            {summary.item_count} stops · {summary.day_count} days
+            {summary.total_duration_minutes > 0 ? ` · ${formatDuration(summary.total_duration_minutes)} planned` : ""}
+          </p>
         </div>
-        <Button variant="secondary" onClick={() => setEditing((value) => !value)}>
-          {editing ? "Cancel" : "Edit trip"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
+            <LayersIcon className="h-4 w-4" /> Templates
+          </Button>
+          <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
+            <SlidersIcon className="h-4 w-4" /> Settings
+          </Button>
+          <ExportMenu itinerary={itinerary} onError={setItemError} />
+        </div>
       </div>
 
-      {editing ? (
-        <Card className="p-5">
-          <form onSubmit={handleSaveTrip} className="grid gap-4 sm:grid-cols-2">
-            <Input label="Trip name" value={title} onChange={(event) => setTitle(event.target.value)} required />
-            <div />
-            <Input label="Start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-            <Input label="End date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-            {tripError ? <p className="text-sm text-red-600 sm:col-span-2">{tripError}</p> : null}
-            <div className="sm:col-span-2">
-              <Button type="submit" disabled={savingTrip || !title.trim()}>
-                {savingTrip ? "Saving…" : "Save trip"}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
+      {itemError ? <InlineError message={itemError} /> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="min-w-0 space-y-6">
           <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pb-2 pt-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-2 pt-5 sm:px-6">
               <h2 className="font-display text-xl font-medium text-lagoon-900">Itinerary</h2>
-              <span className="text-sm text-ink-600">{summary.item_count} stops · {summary.day_count} days</span>
+              <button
+                type="button"
+                onClick={() => setAddOpen((value) => !value)}
+                aria-expanded={addOpen}
+                className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
+              >
+                <PlusIcon className={cn("h-4 w-4 transition-transform", addOpen && "rotate-45")} />
+                Add a stop
+              </button>
             </div>
 
-            {itemError ? <div className="px-5 pb-2 sm:px-6"><InlineError message={itemError} /></div> : null}
-
-            <div className="px-5 pt-1 pb-5 sm:px-6">
-              {(itinerary.items?.length ?? 0) === 0 ? (
-                <EmptyState title="No stops yet" detail="Use the “+ Add a stop” pill above to start planning your trip." />
-              ) : (
-                <div className="relative">
-                  <div aria-hidden="true" className="absolute bottom-8 top-8 left-[1.375rem] w-px -translate-x-1/2 bg-surf-400" />
-                  <ol className="space-y-4">
-                    {groups.map((group) => (
-                      <li key={`day-${group.day}`} className="relative">
-                        <div className="relative flex items-center gap-2.5 pl-11">
-                          <span
-                            aria-hidden="true"
-                            className="absolute left-[1.375rem] h-3 w-3 -translate-x-1/2 rounded-full bg-lagoon-900 ring-4 ring-surf-400/30"
-                          />
-                          <h3 className="font-display text-base font-semibold text-lagoon-900">Day {group.day}</h3>
-                          <p className="text-xs text-ink-600">
-                            {group.items.length} {group.items.length === 1 ? "stop" : "stops"}
-                          </p>
-                        </div>
-                        <ul className="mt-3 space-y-3">
-                          {group.items.map((item) => (
-                            <TimelineRow
-                              key={item.id}
-                              item={item}
-                              editing={editingItem}
-                              busy={updatingItem === item.id}
-                              visitedBusy={visitedBusy === item.id}
-                              reordering={reordering}
-                              dragging={dragItemId === item.id}
-                              dropTarget={dropTargetId === item.id}
-                              onToggleVisited={() => void handleToggleVisited(item)}
-                              onEdit={() => toggleEditItem(item)}
-                              onChange={setEditingItem}
-                              onSave={handleUpdateItem}
-                              onCancel={() => setEditingItem(null)}
-                              onDelete={() => void handleDeleteItem(item.id)}
-                              onDragStart={(event) => handleDragStart(event, item.id)}
-                              onDragOver={(event) => handleDragOver(event, item.id)}
-                              onDrop={(event) => handleDrop(event, item.id)}
-                              onDragEnd={handleDragEnd}
-                            />
-                          ))}
-                        </ul>
-                      </li>
-                    ))}
-                  </ol>
+            <div className="px-3 pt-1 pb-5 sm:px-4">
+              {items.length === 0 ? (
+                <div className="px-2">
+                  <EmptyState
+                    title="No stops yet"
+                    detail="Add places from our destinations, or drop a custom stop anywhere in Cebu."
+                    action={
+                      <Button onClick={() => setAddOpen(true)}>
+                        <PlusIcon className="h-4 w-4" /> Add your first stop
+                      </Button>
+                    }
+                  />
                 </div>
+              ) : (
+                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                  <div className="space-y-4">
+                    {groups.map((group, groupIndex) => (
+                      <DayColumn
+                        key={group.day}
+                        group={group}
+                        groups={groups}
+                        groupIndex={groupIndex}
+                        busyItem={busyItem}
+                        estimateEnabled={showEstimates}
+                        travelByLeg={travelByLeg}
+                        onToggleStatus={handleToggleStatus}
+                        onEdit={setEditingItem}
+                        onDelete={handleDeleteItem}
+                        onFocus={(id) => setFocusItemId(id)}
+                      />
+                    ))}
+                    <NewDayDrop day={groups.length === 0 ? 1 : groups[groups.length - 1].day + 1} />
+                  </div>
+
+                  <DragOverlay>
+                    {activeItem ? (
+                      <div className="glass rounded-xl p-3 opacity-95 shadow-xl">
+                        <p className="text-sm font-semibold text-ink-900">{activeItem.title}</p>
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               )}
             </div>
           </Card>
 
+          {addOpen ? (
+            <div>
+              <AddStopCard
+                itinerary={itinerary}
+                destinations={destinations}
+                dayOptions={dayOptions}
+                defaultDay={maxDay}
+                initialDestinationId={initialAddDestinationId}
+                onAdded={refresh}
+              />
+            </div>
+          ) : null}
+
           <BudgetSummary summary={summary} />
         </div>
 
-        <aside aria-label="Add a stop" className="min-w-0 space-y-3 lg:sticky lg:top-24">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={toggleAdd}
-              aria-expanded={addSectionOpen}
-              className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
-            >
-              <PlusIcon className={cn("h-4 w-4 transition-transform", addSectionOpen && "rotate-45")} />
-              Add a stop
-            </button>
-            <p className="hidden text-sm text-ink-600 sm:block">
-              {addSectionOpen ? "Pick a place, then set its day and cost." : "Drag stops to reorder, or add more places."}
-            </p>
-          </div>
-
-          {addSectionOpen ? (
-            <Card className="overflow-hidden">
-              <h2 className="px-5 pt-5 font-display text-xl font-medium text-lagoon-900">Add a stop by pin or list</h2>
-              <div className="m-5 h-56 overflow-hidden rounded-2xl">
-                <CebuMap destinations={destinations} activeId={prevSelected?.id} onSelect={selectDestination} className="h-full w-full" />
-              </div>
-              <form onSubmit={handleAdd} className="space-y-4 px-5 pb-5">
-                <Select
-                  name="destination_id"
-                  label="Destination"
-                  emptyLabel="Pick a place…"
-                  required
-                  value={destinationId}
-                  onChange={(event) => {
-                    setDestinationId(event.target.value);
-                    const found = destinations.find((d) => String(d.id) === event.target.value);
-                    if (found && budget === "") setBudget(found.estimated_cost ?? "");
-                  }}
-                  options={destinations.map((destination) => ({
-                    value: String(destination.id),
-                    label: `${destination.name} — ${formatMoney(destination.estimated_cost)}`,
-                  }))}
-                />
-                <div className="space-y-4 rounded-2xl bg-sand-50/70 p-4 ring-1 ring-inset ring-line">
-                  <p className="text-sm font-semibold text-ink-900">Stop details</p>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Input label="Day" type="number" min={1} value={dayNumber} onChange={(event) => setDayNumber(event.target.value)} />
-                    <Input label="Estimated budget (₱)" type="number" min={0} placeholder="autofill" value={budget} onChange={(event) => setBudget(event.target.value)} />
-                  </div>
-                  <Input label="Notes (optional)" placeholder="Arrive early, Klook pass…" value={notes} onChange={(event) => setNotes(event.target.value)} />
+        <aside aria-label="Trip map" className="min-w-0 space-y-3 lg:sticky lg:top-24">
+          <Card className="overflow-hidden">
+            <h2 className="px-5 pt-5 font-display text-xl font-medium text-lagoon-900">Route map</h2>
+            {showEstimates ? (
+              <p className="px-5 pt-1 text-xs text-ink-600">
+                <RouteIcon className="mr-1 inline h-3.5 w-3.5" /> Travel estimates enabled — dashed lines link each day's stops.
+              </p>
+            ) : null}
+            <div className="m-5 h-[26rem] overflow-hidden rounded-2xl">
+              {items.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-2xl bg-sand-50 text-sm text-ink-600">
+                  Stops will appear here as you add them.
                 </div>
-                {addError ? <p className="text-sm text-red-600">{addError}</p> : null}
-                <Button type="submit" disabled={adding || !destinationId}>
-                  {adding ? "Adding…" : "Add stop"}
-                </Button>
-              </form>
-            </Card>
-          ) : null}
+              ) : (
+                <ItineraryMap
+                  items={items}
+                  activeItemId={focusItemId}
+                  followActive
+                  onSelectItem={(item) => setEditingItem(item)}
+                  className="h-full w-full"
+                />
+              )}
+            </div>
+            {destinations.length === 0 ? <p className="px-5 pb-5 text-xs text-ink-600">No destinations loaded.</p> : null}
+          </Card>
         </aside>
       </div>
+
+      <StopEditor
+        open={editingItem !== null}
+        itinerary={itinerary}
+        item={editingItem}
+        destinations={destinations}
+        onClose={() => setEditingItem(null)}
+        onSaved={async () => {
+          await refresh();
+          setEditingItem(null);
+        }}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        itinerary={itinerary}
+        onClose={() => setSettingsOpen(false)}
+        onSave={handleSaveSettings}
+      />
+
+      <TemplatesDialog open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
     </div>
   );
 }
 
-interface TimelineRowProps {
-  item: ItineraryItem;
-  editing: EditingState | null;
-  busy: boolean;
-  visitedBusy: boolean;
-  reordering: boolean;
-  dragging: boolean;
-  dropTarget: boolean;
-  onToggleVisited: () => void;
-  onEdit: () => void;
-  onChange: (state: EditingState | null) => void;
-  onSave: (event: FormEvent) => void;
-  onCancel: () => void;
-  onDelete: () => void;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
-  onDragOver: (event: DragEvent<HTMLLIElement>) => void;
-  onDrop: (event: DragEvent<HTMLLIElement>) => void;
-  onDragEnd: () => void;
+interface DayColumnProps {
+  group: DayGroup;
+  groups: DayGroup[];
+  groupIndex: number;
+  busyItem: number | null;
+  estimateEnabled: boolean;
+  travelByLeg: Map<string, ItineraryRouteLeg>;
+  onToggleStatus: (item: ItineraryItem) => void;
+  onEdit: (item: ItineraryItem) => void;
+  onDelete: (item: ItineraryItem) => void;
+  onFocus: (id: number) => void;
 }
 
-function TimelineRow({
-  item,
-  editing,
-  busy,
-  visitedBusy,
-  reordering,
-  dragging,
-  dropTarget,
-  onToggleVisited,
-  onEdit,
-  onChange,
-  onSave,
-  onCancel,
-  onDelete,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: TimelineRowProps) {
-  const isEditing = editing?.itemId === item.id;
-  const name = item.destination?.name ?? `Stop #${item.id}`;
-  const interactiveDisabled = busy || reordering;
+function DayColumn({ group, groups, groupIndex, busyItem, estimateEnabled, travelByLeg, onToggleStatus, onEdit, onDelete, onFocus }: DayColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${group.day}` });
+  const ids = group.items.map((item) => item.id);
+
+  // Global sequence numbering across all days.
+  const offset = groups.slice(0, groupIndex).reduce((total, current) => total + current.items.length, 0);
+  const duration = group.items.reduce((total, item) => total + (item.duration_minutes ?? 0), 0);
 
   return (
-    <li
+    <section ref={setNodeRef} className={cn("rounded-2xl transition-colors", isOver && "bg-surf-400/10 ring-2 ring-surf-400/40")}>
+      <header className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+        <h3 className="font-display text-base font-semibold text-lagoon-900">Day {group.day}</h3>
+        <p className="text-xs text-ink-600">
+          {group.items.length} {group.items.length === 1 ? "stop" : "stops"}
+          {duration > 0 ? ` · ${formatDuration(duration)}` : ""}
+        </p>
+      </header>
+
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-3 px-1">
+          {group.items.map((item, itemIndex) => {
+            const next = group.items[itemIndex + 1];
+            const leg = next ? travelByLeg.get(`${item.id}-${next.id}`) : undefined;
+            return (
+              <Fragment key={item.id}>
+                <StopCard
+                  item={item}
+                  sequence={offset + itemIndex + 1}
+                  busy={busyItem === item.id}
+                  onToggleStatus={() => onToggleStatus(item)}
+                  onEdit={() => onEdit(item)}
+                  onDelete={() => onDelete(item)}
+                  onFocus={() => onFocus(item.id)}
+                />
+                {estimateEnabled && leg && leg.duration_s !== null ? (
+                  <li className="px-2 text-[11px] text-ink-500">↓ {formatTravel(leg.distance_m, leg.duration_s)}</li>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </ul>
+      </SortableContext>
+    </section>
+  );
+}
+
+function NewDayDrop({ day }: { day: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
+  return (
+    <div
+      ref={setNodeRef}
       className={cn(
-        "glass group relative rounded-xl p-3 pl-11 transition",
-        dropTarget && "ring-2 ring-surf-400",
-        dragging && "opacity-40",
+        "rounded-2xl border border-dashed border-line px-3 py-3 text-center text-xs text-ink-500 transition-colors",
+        isOver && "border-surf-400 bg-surf-400/10 text-sea-600",
       )}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
     >
-      <span
-        aria-hidden="true"
-        className="absolute left-[1.375rem] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surf-500 ring-4 ring-surf-400/25"
-      />
+      Drop here to add Day {day}
+    </div>
+  );
+}
 
-      {isEditing ? (
-        <form onSubmit={onSave} className="space-y-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="font-display text-lg font-semibold text-lagoon-900">{name}</p>
-            <p className="text-sm text-ink-600">{item.destination?.region}</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Day" type="number" min={1} value={editing.day_number} onChange={(event) => onChange({ ...editing, day_number: event.target.value })} />
-            <Input label="Estimated budget (₱)" type="number" min={0} value={editing.estimated_budget} onChange={(event) => onChange({ ...editing, estimated_budget: event.target.value })} />
-          </div>
-          <Input label="Notes" value={editing.notes} onChange={(event) => onChange({ ...editing, notes: event.target.value })} />
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={busy}>
-              {busy ? "Saving…" : "Save"}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="button" size="sm" variant="danger" onClick={onDelete}>
-              Delete
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex items-center gap-3">
-          <label className="flex shrink-0 cursor-pointer items-center" title={item.visited ? "Marked as visited" : "Mark as visited"}>
-            <input
-              type="checkbox"
-              className="peer sr-only"
-              checked={item.visited}
-              disabled={visitedBusy || interactiveDisabled}
-              onChange={onToggleVisited}
-              aria-label={`Mark ${name} as visited`}
-            />
-            <span className="flex h-5 w-5 items-center justify-center rounded-md border-2 border-surf-500 bg-white text-white transition-colors peer-checked:bg-surf-500 peer-checked:text-white peer-disabled:opacity-60">
-              {item.visited ? <CheckIcon className="h-3.5 w-3.5" /> : <span aria-hidden="true" />}
-            </span>
-          </label>
+function formatTravel(distanceM: number | null, durationS: number): string {
+  const minutes = Math.max(1, Math.round(durationS / 60));
+  const km = distanceM !== null ? `${(distanceM / 1000).toFixed(1)} km` : null;
+  return km ? `${km} · ~${minutes} min drive` : `~${minutes} min drive`;
+}
 
-          <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" title={`Edit ${name}`}>
-            <span className={cn("block truncate text-sm font-semibold", item.visited ? "text-ink-600/70" : "text-ink-900")}>
-              {name}
-            </span>
-            <span
-              className="mt-1.5 block"
-              title="Estimated budget — actual-spend tracking is on the roadmap, so this bar is filled as a placeholder."
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-ink-600">Budget</span>
-                <span className="text-xs font-semibold text-sea-600">{formatMoney(item.estimated_budget)}</span>
-              </span>
-              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-sand-100">
-                <span className="block h-full rounded-full bg-surf-400" style={{ width: "100%" }} />
-              </span>
-            </span>
-            {item.notes ? <span className="mt-1.5 block truncate text-xs text-ink-600">{item.notes}</span> : null}
-          </button>
+interface SettingsPayload {
+  title: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  total_budget: string | number | null;
+  cover_image_url: string | null;
+}
 
-          <span
-            draggable={!interactiveDisabled}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            aria-label={`Reorder ${name}`}
-            title="Drag to reorder"
-            className={cn(
-              "shrink-0 cursor-grab rounded-lg p-1.5 text-ink-500 transition-colors select-none hover:bg-sand-100 hover:text-ink-900 active:cursor-grabbing",
-              interactiveDisabled && "cursor-not-allowed opacity-50",
-            )}
-          >
-            <GripIcon className="h-5 w-5" />
-          </span>
+interface SettingsDialogProps {
+  open: boolean;
+  itinerary: Itinerary;
+  onClose: () => void;
+  onSave: (payload: SettingsPayload) => Promise<void>;
+}
 
-          <button
-            type="button"
-            onClick={onDelete}
-            aria-label={`Delete ${name}`}
-            title="Remove stop"
-            disabled={interactiveDisabled}
-            className="shrink-0 rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          >
-            <DeleteIcon />
-          </button>
+function SettingsDialog({ open, itinerary, onClose, onSave }: SettingsDialogProps) {
+  const [title, setTitle] = useState(itinerary.title);
+  const [description, setDescription] = useState(itinerary.description ?? "");
+  const [startDate, setStartDate] = useState(itinerary.start_date ?? "");
+  const [endDate, setEndDate] = useState(itinerary.end_date ?? "");
+  const [budget, setBudget] = useState(itinerary.budget_limit !== null ? String(itinerary.budget_limit) : "");
+  const [cover, setCover] = useState(itinerary.cover_image_url ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    // Re-seed fields each time the dialog opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTitle(itinerary.title);
+    setDescription(itinerary.description ?? "");
+    setStartDate(itinerary.start_date ?? "");
+    setEndDate(itinerary.end_date ?? "");
+    setBudget(itinerary.budget_limit !== null ? String(itinerary.budget_limit) : "");
+    setCover(itinerary.cover_image_url ?? "");
+    setError(null);
+  }, [open, itinerary]);
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description === "" ? null : description,
+        start_date: startDate === "" ? null : startDate,
+        end_date: endDate === "" ? null : endDate,
+        total_budget: budget === "" ? null : Number(budget),
+        cover_image_url: cover === "" ? null : cover,
+      });
+      onClose();
+    } catch (saveError) {
+      setError(apiError(saveError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} busy={saving} title="Trip settings" description="Rename, date and budget this plan.">
+      <form id="trip-settings-form" onSubmit={handleSubmit} className="space-y-4">
+        <Input label="Trip name" value={title} onChange={(event) => setTitle(event.target.value)} required />
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-ink-900">Description</p>
+          <textarea
+            className="min-h-20 w-full rounded-xl bg-white/70 px-4 py-3 text-sm text-ink-900 ring-1 ring-inset ring-line placeholder:text-ink-600/50 focus:outline-none focus:ring-2 focus:ring-surf-400"
+            value={description}
+            maxLength={2000}
+            placeholder="What's this trip about?"
+            onChange={(event) => setDescription(event.target.value)}
+          />
         </div>
-      )}
-    </li>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input label="Start date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          <Input label="End date" type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)} />
+          <Input
+            label="Budget limit (₱)"
+            type="number"
+            min={0}
+            placeholder="No limit"
+            value={budget}
+            onChange={(event) => setBudget(event.target.value)}
+          />
+          <Input label="Cover image URL" value={cover} onChange={(event) => setCover(event.target.value)} placeholder="https://…" />
+        </div>
+        {error ? <InlineError message={error} /> : null}
+      </form>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="submit" form="trip-settings-form" disabled={saving || title.trim() === ""}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
+    </Modal>
   );
 }

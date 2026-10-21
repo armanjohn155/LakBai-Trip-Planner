@@ -34,9 +34,27 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Determine whether the user holds the administrator role.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
     public function itineraries(): HasMany
     {
         return $this->hasMany(Itinerary::class);
+    }
+
+    public function visits(): HasMany
+    {
+        return $this->hasMany(Visit::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
     }
 
     public function favoriteDestinations(): BelongsToMany

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Review;
+use App\Observers\ReviewObserver;
+use App\Services\CheckInVerifier;
+use App\Services\RouteEstimator;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +15,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(CheckInVerifier::class, fn () => CheckInVerifier::fromConfig());
+        $this->app->bind(RouteEstimator::class, fn () => RouteEstimator::fromConfig());
     }
 
     /**
@@ -19,6 +24,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Review::observe(ReviewObserver::class);
     }
 }

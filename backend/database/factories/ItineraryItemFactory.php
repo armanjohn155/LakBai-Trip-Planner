@@ -24,9 +24,27 @@ class ItineraryItemFactory extends Factory
             'destination_id' => Destination::factory(),
             'day_number' => 1,
             'order' => 0,
+            'start_time' => fake()->optional(0.5, null)->time('H:i'),
+            'duration_minutes' => fake()->optional(0.5, null)->numberBetween(30, 240),
+            'category' => null,
             'estimated_budget' => fake()->randomFloat(2, 0, 2000),
             'notes' => fake()->sentence(),
             'visited' => false,
+            'status' => 'planned',
         ];
+    }
+
+    /**
+     * A free-form stop that has no destination.
+     */
+    public function custom(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'destination_id' => null,
+            'custom_title' => fake()->words(3, true),
+            'custom_latitude' => fake()->latitude(9.4, 11.4),
+            'custom_longitude' => fake()->longitude(123.2, 124.3),
+            'custom_address' => fake()->address(),
+        ]);
     }
 }

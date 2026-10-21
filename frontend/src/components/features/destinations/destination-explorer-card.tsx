@@ -75,7 +75,7 @@ function CoverBadge({ destination }: { destination: Destination }) {
   );
 }
 
-function FavoriteButton({ favorited, onToggle }: { favorited: boolean; onToggle: () => void }) {
+function FavoriteButton({ favorited, onToggle, className }: { favorited: boolean; onToggle: () => void; className?: string }) {
   return (
     <button
       type="button"
@@ -85,7 +85,10 @@ function FavoriteButton({ favorited, onToggle }: { favorited: boolean; onToggle:
         onToggle();
       }}
       aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-      className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-lagoon-950/40 text-sand-50 backdrop-blur-sm transition-colors hover:bg-lagoon-950/60"
+      className={cn(
+        "absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-lagoon-950/40 text-sand-50 backdrop-blur-sm transition-colors hover:bg-lagoon-950/60",
+        className,
+      )}
     >
       <HeartIcon filled={favorited} className={cn("h-5 w-5", favorited ? "text-mango-400" : "")} />
     </button>
@@ -116,9 +119,90 @@ interface ExplorerCardProps {
   onAdd: () => void;
   containerRef?: Ref<HTMLDivElement>;
   highlighted?: boolean;
+  /**
+   * "default" is the shared card used by favorites and the map page.
+   * "showcase" is the editorial card used only on the /destinations listing.
+   */
+  variant?: "default" | "showcase";
 }
 
-export function DestinationGridCard({
+export function DestinationGridCard(props: ExplorerCardProps) {
+  if (props.variant === "showcase") {
+    return <DestinationShowcaseCard {...props} />;
+  }
+  return <DestinationDefaultGridCard {...props} />;
+}
+
+function DestinationShowcaseCard({
+  destination,
+  favorited,
+  onToggleFavorite,
+  onAdd,
+  containerRef,
+  highlighted,
+}: ExplorerCardProps) {
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "group relative flex h-full flex-col rounded-2xl border border-line bg-white p-2 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+        highlighted && "ring-2 ring-surf-400",
+      )}
+    >
+      <Link
+        to={`/destinations/${destination.id}`}
+        aria-label={`View ${destination.name}`}
+        className="absolute inset-0 z-10 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
+      />
+
+      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-sand-100">
+        <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
+          <CoverImage destination={destination} />
+        </div>
+        <span className="absolute left-2.5 top-2.5 rounded-md bg-white/90 px-2 py-0.5 text-xs font-semibold text-lagoon-900 shadow-sm">
+          {categoryTag(destination.category)}
+        </span>
+        <FavoriteButton
+          favorited={favorited}
+          onToggle={onToggleFavorite}
+          className="right-2.5 top-2.5 h-8 w-8 bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line hover:bg-white"
+        />
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onAdd();
+          }}
+          aria-label="Add to trip"
+          className="absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line transition-colors hover:bg-white"
+        >
+          <PlusIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex flex-1 flex-col p-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sea-600">
+          {categoryTag(destination.category)}
+        </span>
+        <h3 className="mt-1 truncate text-base font-bold leading-tight text-lagoon-900">{destination.name}</h3>
+        <p className="mt-1 flex items-center gap-1 text-xs text-ink-600">
+          <PinIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{destinationLocation(destination)}</span>
+        </p>
+
+        <div className="my-3 border-t border-line/70" />
+
+        <div className="flex items-center justify-between gap-2">
+          <RatingLine destination={destination} className="text-[13px]" />
+          <span className="shrink-0 text-sm font-bold text-lagoon-900">{formatMoney(destination.estimated_cost)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DestinationDefaultGridCard({
   destination,
   favorited,
   onToggleFavorite,

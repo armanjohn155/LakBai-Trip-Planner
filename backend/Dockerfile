@@ -6,6 +6,11 @@
             git \
             zip \
             unzip \
+            freetype-dev \
+            libjpeg-turbo-dev \
+            libpng-dev \
+        && docker-php-ext-configure gd --with-freetype --with-jpeg \
+        && docker-php-ext-install -j"$(nproc)" gd \
         && docker-php-ext-enable opcache
 
     COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

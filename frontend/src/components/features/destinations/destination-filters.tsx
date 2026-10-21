@@ -15,6 +15,7 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 ];
 
 export const EMPTY_EXPLORER_FILTERS: ExplorerFilters = {
+  search: "",
   categories: [],
   municipalities: [],
   priceTier: "",
@@ -93,9 +94,9 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
   const clearAll = () => onFiltersChange({ ...EMPTY_EXPLORER_FILTERS });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-lagoon-900">
+    <div className="overflow-hidden rounded-2xl border border-line/70 bg-white shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <h2 className="flex items-center gap-2 font-display text-base font-bold text-lagoon-900">
           <SlidersIcon className="h-4 w-4 text-sea-600" />
           Filters
         </h2>
@@ -104,75 +105,77 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
         </button>
       </div>
 
-      <FilterGroup title="Categories" defaultOpen>
-        <div className="space-y-0.5">
-          {CATEGORIES.map((category) => {
-            const count = categoryCounts.get(category) ?? 0;
-            const checked = filters.categories.includes(category);
-            const disabled = count === 0 && !checked;
-            return (
-              <label
-                key={category}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink-900 hover:bg-sand-100",
-                  disabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
-                )}
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded accent-surf-400"
-                  checked={checked}
-                  disabled={disabled}
-                  onChange={() => toggleCategory(category)}
-                />
-                <span className="flex-1 leading-tight">{category}</span>
-                <span
+      <div className="divide-y divide-line/60 border-t border-line/60">
+        <FilterGroup title="Categories" defaultOpen>
+          <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
+            {CATEGORIES.map((category) => {
+              const count = categoryCounts.get(category) ?? 0;
+              const checked = filters.categories.includes(category);
+              const disabled = count === 0 && !checked;
+              return (
+                <label
+                  key={category}
                   className={cn(
-                    "rounded-full bg-sand-100 px-2 py-0.5 text-xs tabular-nums text-ink-600",
-                    checked && "bg-surf-400/15 font-semibold text-sea-600",
+                    "flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink-900 hover:bg-sand-100",
+                    disabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
                   )}
                 >
-                  {count}
-                </span>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 rounded accent-surf-400"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => toggleCategory(category)}
+                  />
+                  <span className="flex-1 leading-tight">{category}</span>
+                  <span
+                    className={cn(
+                      "rounded-full bg-sand-100 px-2 py-0.5 text-xs tabular-nums text-ink-600",
+                      checked && "bg-surf-400/15 font-semibold text-sea-600",
+                    )}
+                  >
+                    {count}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </FilterGroup>
+
+        <FilterGroup title="Municipalities" defaultOpen={false}>
+          <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
+            {municipalities.map((municipality) => (
+              <label key={municipality} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink-900 hover:bg-sand-100">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 rounded accent-surf-400"
+                  checked={filters.municipalities.includes(municipality)}
+                  onChange={() => toggleMunicipality(municipality)}
+                />
+                <span>{municipality}</span>
               </label>
-            );
-          })}
-        </div>
-      </FilterGroup>
+            ))}
+          </div>
+        </FilterGroup>
 
-      <FilterGroup title="Municipalities" defaultOpen>
-        <div className="space-y-0.5">
-          {municipalities.map((municipality) => (
-            <label key={municipality} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink-900 hover:bg-sand-100">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded accent-surf-400"
-                checked={filters.municipalities.includes(municipality)}
-                onChange={() => toggleMunicipality(municipality)}
-              />
-              <span>{municipality}</span>
-            </label>
-          ))}
-        </div>
-      </FilterGroup>
+        <FilterGroup title="Price Range" defaultOpen>
+          <RadioGroup options={PRICE_TIERS} value={filters.priceTier} onChange={(tier) => onFiltersChange({ ...filters, priceTier: tier as PriceTier })} />
+        </FilterGroup>
 
-      <FilterGroup title="Price Range" defaultOpen>
-        <RadioGroup options={PRICE_TIERS} value={filters.priceTier} onChange={(tier) => onFiltersChange({ ...filters, priceTier: tier as PriceTier })} />
-      </FilterGroup>
+        <FilterGroup title="Rating" defaultOpen={false}>
+          <RadioGroup options={RATING_OPTIONS} value={String(filters.minRating)} onChange={(rating) => onFiltersChange({ ...filters, minRating: Number(rating) })} />
+        </FilterGroup>
 
-      <FilterGroup title="Rating" defaultOpen={false}>
-        <RadioGroup options={RATING_OPTIONS} value={String(filters.minRating)} onChange={(rating) => onFiltersChange({ ...filters, minRating: Number(rating) })} />
-      </FilterGroup>
-
-      <FilterGroup title="Sort By" defaultOpen>
-        <Select
-          className="h-10"
-          aria-label="Sort by"
-          value={filters.sortBy}
-          onChange={(event) => onFiltersChange({ ...filters, sortBy: event.target.value as SortBy })}
-          options={SORT_OPTIONS}
-        />
-      </FilterGroup>
+        <FilterGroup title="Sort By" defaultOpen>
+          <Select
+            className="h-10"
+            aria-label="Sort by"
+            value={filters.sortBy}
+            onChange={(event) => onFiltersChange({ ...filters, sortBy: event.target.value as SortBy })}
+            options={SORT_OPTIONS}
+          />
+        </FilterGroup>
+      </div>
     </div>
   );
 }
@@ -181,17 +184,17 @@ function FilterGroup({ title, defaultOpen = true, children }: { title: string; d
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="glass-frost rounded-2xl p-4">
+    <div className="px-4">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between font-display text-base font-semibold text-lagoon-900"
+        className="flex w-full items-center justify-between py-3.5 text-sm font-bold text-lagoon-900"
       >
         {title}
         <ChevronIcon className={cn("h-4 w-4 text-ink-600 transition-transform", open && "rotate-180")} />
       </button>
-      {open ? <div className="mt-3">{children}</div> : null}
+      {open ? <div className="pb-3.5">{children}</div> : null}
     </div>
   );
 }

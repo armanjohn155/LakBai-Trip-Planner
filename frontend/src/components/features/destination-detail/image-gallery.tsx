@@ -17,7 +17,7 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
   const go = (delta: number) => setIndex((prev) => (prev + delta + images.length) % images.length);
 
   const gallery = (
-    <GalleryItem src={images[current]} name={name} fallbackTone={fallbackTone} />
+    <GalleryItem src={images[current]} name={name} fallbackTone={fallbackTone} className="h-full w-full object-cover" />
   );
 
   const dots = (
@@ -41,7 +41,7 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
 
   return (
     <div className="space-y-2">
-      <div className="relative overflow-hidden rounded-2xl ring-1 ring-line">
+      <div className="relative aspect-[4/3] max-h-[420px] overflow-hidden rounded-2xl ring-1 ring-line">
         {gallery}
         {images.length > 1 ? (
           <>
@@ -71,8 +71,28 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
         >
           <ExpandIcon className="h-5 w-5" />
         </button>
+        {images.length > 1 ? <div className="absolute inset-x-0 bottom-3">{dots}</div> : null}
       </div>
-      {dots}
+
+      {images.length > 0 ? (
+        <div className="flex gap-2 overflow-hidden">
+          {images.map((image, thumbIndex) => (
+            <button
+              key={`${image}-${thumbIndex}`}
+              type="button"
+              onClick={() => setIndex(thumbIndex)}
+              aria-label={`View photo ${thumbIndex + 1}`}
+              aria-current={thumbIndex === current}
+              className={cn(
+                "aspect-[16/10] w-[calc((100%-2rem)/5)] shrink-0 overflow-hidden rounded-[10px] transition-all",
+                thumbIndex === current ? "ring-2 ring-surf-400" : "opacity-70 ring-1 ring-line hover:opacity-100",
+              )}
+            >
+              <img src={image} alt="" loading="lazy" className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {fullscreen ? (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-lagoon-950/95 p-4" role="dialog" aria-modal="true" aria-label={`${name} photos`}>
@@ -87,7 +107,7 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
 
           <div className="relative w-full max-w-5xl">
             <div className="overflow-hidden rounded-2xl">
-              <div className="max-h-[80vh]">{gallery}</div>
+              <div className="h-[80vh]">{gallery}</div>
             </div>
             {images.length > 1 ? (
               <>
@@ -120,10 +140,20 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
   );
 }
 
-function GalleryItem({ src, name, fallbackTone }: { src: string; name: string; fallbackTone: string }) {
+function GalleryItem({
+  src,
+  name,
+  fallbackTone,
+  className,
+}: {
+  src: string;
+  name: string;
+  fallbackTone: string;
+  className?: string;
+}) {
   const [broken, setBroken] = useState(false);
   if (broken) {
-    return <div className={cn("h-[300px] w-full bg-gradient-to-br sm:h-[360px]", fallbackTone)} aria-hidden="true" />;
+    return <div className={cn("h-full w-full bg-gradient-to-br", fallbackTone, className)} aria-hidden="true" />;
   }
   return (
     <img
@@ -131,7 +161,7 @@ function GalleryItem({ src, name, fallbackTone }: { src: string; name: string; f
       alt={`${name} photo`}
       loading="lazy"
       onError={() => setBroken(true)}
-      className="h-[300px] w-full object-cover sm:h-[360px] lg:h-[440px]"
+      className={cn("h-full w-full object-cover", className)}
     />
   );
 }

@@ -41,4 +41,25 @@ class ItineraryPolicyTest extends TestCase
 
         $this->assertTrue((new ItineraryPolicy)->create($user));
     }
+
+    public function test_owner_can_duplicate_and_export(): void
+    {
+        $user = User::factory()->create();
+        $itinerary = Itinerary::factory()->for($user)->create();
+        $policy = new ItineraryPolicy;
+
+        $this->assertTrue($policy->duplicate($user, $itinerary));
+        $this->assertTrue($policy->export($user, $itinerary));
+    }
+
+    public function test_other_user_cannot_duplicate_or_export(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $itinerary = Itinerary::factory()->for($owner)->create();
+        $policy = new ItineraryPolicy;
+
+        $this->assertFalse($policy->duplicate($other, $itinerary));
+        $this->assertFalse($policy->export($other, $itinerary));
+    }
 }
