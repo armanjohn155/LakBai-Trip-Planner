@@ -66,4 +66,11 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserSettings::class);
     }
+
+    public function sharedItineraries(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Itinerary::class, 'itinerary_user')
+            ->withPivot(['role', 'invited_by', 'joined_at'])
+            ->withTimestamps();
+    }
 }

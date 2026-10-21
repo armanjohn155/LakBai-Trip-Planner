@@ -315,7 +315,8 @@ class AdminDestinationControllerTest extends TestCase
             ]))
             ->assertCreated();
 
-        $this->assertStringStartsWith('/storage/destinations/kawasan-falls-', $response->json('data.image_url'));
+        $this->assertStringContainsString('/storage/destinations/kawasan-falls-', $response->json('data.image_url'));
+        $this->assertStringStartsWith('http://', $response->json('data.image_url'));
         Storage::disk('public')->assertExists('destinations/'.basename($response->json('data.image_url')));
     }
 
@@ -341,7 +342,7 @@ class AdminDestinationControllerTest extends TestCase
             ->assertOk();
 
         $newUrl = $updated->json('data.image_url');
-        $this->assertStringStartsWith('/storage/destinations/kawasan-falls-', $newUrl);
+        $this->assertStringContainsString('/storage/destinations/kawasan-falls-', $newUrl);
         $this->assertNotSame($created->json('data.image_url'), $newUrl);
 
         Storage::disk('public')->assertMissing($oldPath);

@@ -2,40 +2,37 @@
 
 namespace App\Policies;
 
+use App\Models\Itinerary;
 use App\Models\ItineraryItem;
 use App\Models\User;
 
 class ItineraryItemPolicy
 {
-    /**
-     * Determine whether the user can view the model.
-     */
-    public function view(User $user, ItineraryItem $itineraryItem): bool
+    public function view(User $user, ItineraryItem $item): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        $role = $item->itinerary?->roleFor($user);
+
+        return $role === 'owner' || $role === 'editor' || $role === 'viewer';
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-    public function create(User $user): bool
+    public function create(User $user, Itinerary $itinerary): bool
     {
-        return true;
+        $role = $itinerary->roleFor($user);
+
+        return $role === 'owner' || $role === 'editor';
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
-    public function update(User $user, ItineraryItem $itineraryItem): bool
+    public function update(User $user, ItineraryItem $item): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        $role = $item->itinerary?->roleFor($user);
+
+        return $role === 'owner' || $role === 'editor';
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
-    public function delete(User $user, ItineraryItem $itineraryItem): bool
+    public function delete(User $user, ItineraryItem $item): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        $role = $item->itinerary?->roleFor($user);
+
+        return $role === 'owner' || $role === 'editor';
     }
 }
