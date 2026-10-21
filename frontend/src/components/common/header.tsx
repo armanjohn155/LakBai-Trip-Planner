@@ -10,7 +10,6 @@ interface CenterLink {
   label: string;
   to: string;
   exact?: boolean;
-  dot?: boolean;
 }
 
 const svgIconProps = {
@@ -41,7 +40,7 @@ export function Header() {
     { to: "/", label: "Home", exact: true },
     { to: "/destinations", label: "Destinations" },
     { to: "/map", label: "Map" },
-    { to: loggedIn ? "/app/trips" : "/register", label: "Trips", dot: loggedIn },
+    { to: loggedIn ? "/app/trips" : "/register", label: "Trips" },
   ];
 
   const closeMenu = () => setOpen(false);
@@ -61,28 +60,33 @@ export function Header() {
 
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-      isActive ? "bg-surf-400 text-white" : "text-sand-50/75 hover:bg-white/10 hover:text-sand-50",
+      "relative rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+      isActive ? "text-lagoon-900" : "text-ink-700",
     );
 
   const renderCenterLink = (link: CenterLink, onNavigate?: () => void) => (
     <NavLink key={link.label} to={link.to} end={link.exact} onClick={onNavigate} className={navItemClass}>
       {({ isActive }) => (
-        <span className="inline-flex items-center gap-1.5">
+        <>
           {link.label}
-          {link.dot && isActive ? <span className="h-1.5 w-1.5 rounded-full bg-surf-300" aria-hidden="true" /> : null}
-        </span>
+          {isActive ? (
+            <span
+              className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-surf-400"
+              aria-hidden="true"
+            />
+          ) : null}
+        </>
       )}
     </NavLink>
   );
 
   return (
-    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-gradient-to-r from-royal-950 via-royal-900 to-royal-800 text-sand-50">
+    <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <PinIcon className="h-5 w-5 text-surf-300" />
-          <span className="font-brand text-2xl leading-none text-sand-50">LAKBAI</span>
-          <span className="hidden text-xs text-sand-50/80 lg:inline">Manglakaw ta, Bai!</span>
+          <PinIcon className="h-5 w-5 text-surf-500" />
+          <span className="font-brand text-2xl leading-none text-lagoon-900">LAKBAI</span>
+          <span className="hidden text-xs text-ink-600 lg:inline">Manglakaw ta, Bai!</span>
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
@@ -92,10 +96,10 @@ export function Header() {
             <AccountDropdown onSignOut={handleSignOut} />
           ) : (
             <>
-              <Link to="/login" className="rounded-full px-3 py-2 text-sm font-semibold text-sand-50/80 transition-colors hover:text-sand-50">
+              <Link to="/login" className="rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink-900">
                 Sign in
               </Link>
-              <Link to="/register" className="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-sand-50 transition-colors hover:bg-white/15 sm:inline">
+              <Link to="/register" className="hidden rounded-full bg-sand-100 px-4 py-2 text-sm font-semibold text-lagoon-900 transition-colors hover:bg-sand-200 sm:inline">
                 Create account
               </Link>
             </>
@@ -113,7 +117,7 @@ export function Header() {
 
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/10 md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-700 transition-colors hover:bg-sand-100 md:hidden"
             onClick={() => setOpen((value) => !value)}
             aria-label="Toggle menu"
             aria-expanded={open}
@@ -124,11 +128,11 @@ export function Header() {
       </div>
 
       {open ? (
-        <div className="border-t border-white/10 px-4 py-3 md:hidden">
+        <div className="border-t border-line px-4 py-3 md:hidden">
           <nav className="flex flex-col gap-1">
             {centerLinks.map((link) => renderCenterLink(link, closeMenu))}
             {!user ? (
-              <Link to="/register" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-sand-50/80 hover:bg-white/10">
+              <Link to="/register" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">
                 Create account
               </Link>
             ) : null}
@@ -187,7 +191,7 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-sand-50/80 transition-colors hover:bg-white/10 hover:text-sand-50"
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-100 hover:text-ink-900"
       >
         <UserIcon className="h-4 w-4" />
         <span className="hidden sm:inline">Account</span>
