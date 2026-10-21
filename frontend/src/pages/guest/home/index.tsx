@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { CardDataSection } from "@/components/features/home/card-data-section";
 import { DestinationsMapPanel } from "@/components/features/home/destinations-map-panel";
+import { FeatureSection } from "@/components/features/home/feature-section";
 import { HomepageBannerSection } from "@/components/features/home/homepage-banner-section";
 import { ProfileSection } from "@/components/features/home/profile-section";
 import { InlineError } from "@/components/ui/feedback";
@@ -127,6 +128,8 @@ export default function HomePage() {
         onAddToTrip={(destination) => navigate("/app/trips", { state: { addDestinationId: destination.id } })}
         onSignUp={() => navigate("/register")}
       />
+
+      <FeatureSection />
 
       <CardDataSection
         destinations={visible}
