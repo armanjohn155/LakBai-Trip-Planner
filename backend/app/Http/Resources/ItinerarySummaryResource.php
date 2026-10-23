@@ -20,6 +20,26 @@ class ItinerarySummaryResource extends JsonResource
             ? (float) ($this->total_budget ?? $this->budget)
             : null;
 
+        $role = $this->roleFor($request->user());
+        $canSeeBudget = $role !== null && ($role !== \App\Models\Itinerary::ROLE_VIEWER || (bool) $this->share_budget);
+
+        if (! $canSeeBudget) {
+            return [
+                'itinerary_id' => $this->id,
+                'title' => $this->title,
+                'budget' => null,
+                'total_budget' => null,
+                'budget_limit' => null,
+                'remaining_budget' => null,
+                'over_budget' => false,
+                'item_count' => $items->count(),
+                'day_count' => $items->pluck('day_number')->unique()->count(),
+                'total_duration_minutes' => (int) $items->sum('duration_minutes'),
+                'days' => $this->dayBreakdown()->map(fn (array $day) => [...$day, 'estimated_budget' => null])->all(),
+                'breakdown_by_category' => [],
+            ];
+        }
+
         return [
             'itinerary_id' => $this->id,
             'title' => $this->title,

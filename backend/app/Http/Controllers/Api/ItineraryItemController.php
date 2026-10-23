@@ -9,6 +9,8 @@ use App\Http\Resources\ItineraryResource;
 use App\Models\Destination;
 use App\Models\Itinerary;
 use App\Models\ItineraryItem;
+use App\Services\ItineraryActivityLogger;
+use App\Services\ItineraryConflictGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -18,11 +20,19 @@ use Illuminate\Validation\ValidationException;
 
 class ItineraryItemController extends Controller
 {
+    public function __construct(
+        private readonly ItineraryActivityLogger $activityLogger,
+        private readonly ItineraryConflictGuard $conflictGuard,
+    ) {}
+
     /**
      * Add a stop (destination-backed or custom) to the itinerary.
      */
     public function store(StoreItineraryItemRequest $request, Itinerary $itinerary): JsonResponse
     {
+        Gate::authorize('update', $itinerary);
+        $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'));
+
         $dayNumber = $request->integer('day_number', 1);
         $order = $request->integer('order', ItineraryItem::query()
             ->whereBelongsTo($itinerary, 'itinerary')
@@ -31,22 +41,33 @@ class ItineraryItemController extends Controller
 
         $destinationId = $request->input('destination_id');
 
-        $itinerary->items()->create([
-            'destination_id' => $destinationId,
-            'custom_title' => $destinationId === null ? $request->input('custom_title') : null,
-            'custom_latitude' => $destinationId === null ? $request->input('custom_latitude') : null,
-            'custom_longitude' => $destinationId === null ? $request->input('custom_longitude') : null,
-            'custom_address' => $destinationId === null ? $request->input('custom_address') : null,
-            'day_number' => $dayNumber,
-            'order' => $order,
-            'start_time' => $request->input('start_time'),
-            'duration_minutes' => $request->input('duration_minutes'),
-            'category' => $request->input('category'),
-            'estimated_budget' => $this->resolveBudget($request, $destinationId),
-            'notes' => $request->input('notes'),
-            'visited' => $request->boolean('visited'),
-            'status' => $request->input('status', 'planned'),
-        ]);
+        $item = null;
+
+        DB::transaction(function () use ($request, $itinerary, $dayNumber, $order, $destinationId, &$item) {
+            $item = $itinerary->items()->create([
+                'destination_id' => $destinationId,
+                'custom_title' => $destinationId === null ? $request->input('custom_title') : null,
+                'custom_latitude' => $destinationId === null ? $request->input('custom_latitude') : null,
+                'custom_longitude' => $destinationId === null ? $request->input('custom_longitude') : null,
+                'custom_address' => $destinationId === null ? $request->input('custom_address') : null,
+                'day_number' => $dayNumber,
+                'order' => $order,
+                'start_time' => $request->input('start_time'),
+                'duration_minutes' => $request->input('duration_minutes'),
+                'category' => $request->input('category'),
+                'estimated_budget' => $this->resolveBudget($request, $destinationId),
+                'notes' => $request->input('notes'),
+                'visited' => $request->boolean('visited'),
+                'status' => $request->input('status', 'planned'),
+                'updated_by' => $request->user()->id,
+            ]);
+
+            $this->activityLogger->recordChange($itinerary, 'stop.created', $request->user(), $item, [
+                'item_id' => $item->id,
+                'title' => $item->resolvedTitle(),
+                'day_number' => $item->day_number,
+            ]);
+        });
 
         return (new ItineraryResource($itinerary->loadForDisplay($request->user())))
             ->response()
@@ -62,6 +83,7 @@ class ItineraryItemController extends Controller
         ItineraryItem $item
     ): ItineraryResource {
         Gate::authorize('update', $item);
+        $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'), 'stop', $item->id);
 
         $attributes = $request->safe()->only([
             'destination_id',
@@ -88,7 +110,14 @@ class ItineraryItemController extends Controller
             $attributes['custom_address'] = null;
         }
 
-        $item->update($attributes);
+        $attributes['updated_by'] = $request->user()->id;
+
+        DB::transaction(function () use ($itinerary, $item, $attributes, $request) {
+            $item->update($attributes);
+            $this->activityLogger->recordChange($itinerary, 'stop.updated', $request->user(), $item, [
+                'item_id' => $item->id,
+            ]);
+        });
 
         return new ItineraryResource($itinerary->loadForDisplay($request->user()));
     }
@@ -99,8 +128,15 @@ class ItineraryItemController extends Controller
     public function destroy(Itinerary $itinerary, ItineraryItem $item): Response
     {
         Gate::authorize('delete', $item);
+        $this->conflictGuard->assertFresh($itinerary, request()->input('base_version'), 'stop', $item->id);
 
-        $item->delete();
+        $itemId = $item->id;
+
+        DB::transaction(function () use ($itinerary, $item, $itemId) {
+            $meta = ['item_id' => $itemId, 'title' => $item->resolvedTitle()];
+            $item->delete();
+            $this->activityLogger->recordChange($itinerary, 'stop.deleted', request()->user(), null, $meta);
+        });
 
         return response()->noContent();
     }
@@ -112,6 +148,8 @@ class ItineraryItemController extends Controller
     public function reorder(Request $request, Itinerary $itinerary): ItineraryResource
     {
         Gate::authorize('update', $itinerary);
+        // A stale base_version for reorder returns 409 with the fresh order.
+        $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'));
 
         // Accept either a bare array [{id, day_number, order}] or {stops: [...]}.
         $payload = $request->input('stops', $request->all());
@@ -136,7 +174,7 @@ class ItineraryItemController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($validated, $itinerary) {
+        DB::transaction(function () use ($validated, $itinerary, $request) {
             // Group by target day, order within the day, then renumber to 1..n.
             $byDay = collect($validated['stops'])
                 ->groupBy('day_number')
@@ -148,11 +186,13 @@ class ItineraryItemController extends Controller
                 foreach ($stops->sortBy('order')->values() as $stop) {
                     $itinerary->items()
                         ->whereKey($stop['id'])
-                        ->update(['day_number' => $dayNumber, 'order' => $position]);
+                        ->update(['day_number' => $dayNumber, 'order' => $position, 'updated_by' => $request->user()->id]);
 
                     $position++;
                 }
             }
+
+            $this->activityLogger->recordChange($itinerary, 'stops.reordered', $request->user());
         });
 
         return new ItineraryResource($itinerary->loadForDisplay($request->user()));

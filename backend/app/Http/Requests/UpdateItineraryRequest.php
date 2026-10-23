@@ -30,6 +30,8 @@ class UpdateItineraryRequest extends FormRequest
             'budget' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'total_budget' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'cover_image_url' => ['sometimes', 'nullable', 'string', 'max:2048'],
+            'share_budget' => ['sometimes', 'boolean'],
+            'base_version' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 

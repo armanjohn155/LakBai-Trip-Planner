@@ -45,6 +45,7 @@ class UpdateItineraryItemRequest extends FormRequest
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'visited' => ['sometimes', 'boolean'],
             'status' => ['sometimes', Rule::in(ItineraryItem::STATUSES)],
+            'base_version' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 

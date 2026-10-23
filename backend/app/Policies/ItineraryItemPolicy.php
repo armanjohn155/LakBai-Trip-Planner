@@ -8,34 +8,32 @@ use App\Models\User;
 class ItineraryItemPolicy
 {
     /**
-     * Determine whether the user can view the model.
+     * A stop is viewable when its parent itinerary is viewable.
      */
     public function view(User $user, ItineraryItem $itineraryItem): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        return $itineraryItem->itinerary->roleFor($user) !== null;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
         return true;
     }
 
     /**
-     * Determine whether the user can update the model.
+     * A stop is editable when the user can edit its parent itinerary
+     * (owner or editor).
      */
     public function update(User $user, ItineraryItem $itineraryItem): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        return $itineraryItem->itinerary->isEditableBy($user);
     }
 
     /**
-     * Determine whether the user can delete the model.
+     * Deleting a stop follows the same rule as editing it.
      */
     public function delete(User $user, ItineraryItem $itineraryItem): bool
     {
-        return $itineraryItem->itinerary->user_id === $user->id;
+        return $itineraryItem->itinerary->isEditableBy($user);
     }
 }

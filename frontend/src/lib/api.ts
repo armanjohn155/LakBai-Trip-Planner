@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import type { AuthPayload, Destination, ExportFormat, Itinerary, ItineraryItemStatus, ItineraryRouteEstimate, ItinerarySummary, ItineraryTemplate, Paginated, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
+import type { AuthPayload, Destination, ExportFormat, InvitePreview, Itinerary, ItineraryActivity, ItineraryInvite, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8000/api";
 
@@ -125,6 +125,8 @@ export interface ItineraryPayload {
   budget?: string | number | null;
   total_budget?: string | number | null;
   cover_image_url?: string | null;
+  share_budget?: boolean;
+  base_version?: number;
 }
 
 export interface ItineraryItemPayload {
@@ -142,6 +144,7 @@ export interface ItineraryItemPayload {
   notes?: string | null;
   visited?: boolean;
   status?: ItineraryItemStatus;
+  base_version?: number;
 }
 
 export interface ReorderStop {
@@ -180,7 +183,7 @@ export const duplicateItinerary = async (id: number) => {
 };
 
 export const getItinerarySummary = async (id: number) => {
-  const { data } = await api.get<{ data: ItinerarySummary }>(`/itineraries/${id}/summary`);
+  const { data } = await api.get<{ data: import("@/lib/types").ItinerarySummary }>(`/itineraries/${id}/summary`);
   return data.data;
 };
 
@@ -203,8 +206,8 @@ export const deleteItineraryItem = async (itineraryId: number, itemId: number) =
   await api.delete(`/itineraries/${itineraryId}/items/${itemId}`);
 };
 
-export const reorderItineraryItems = async (itineraryId: number, stops: ReorderStop[]) => {
-  const { data } = await api.put<{ data: Itinerary }>(`/itineraries/${itineraryId}/items/reorder`, { stops });
+export const reorderItineraryItems = async (itineraryId: number, stops: ReorderStop[], baseVersion?: number) => {
+  const { data } = await api.put<{ data: Itinerary }>(`/itineraries/${itineraryId}/items/reorder`, baseVersion ? { stops, base_version: baseVersion } : { stops });
   return data.data;
 };
 
@@ -419,6 +422,62 @@ export const unhideAdminReview = async (reviewId: number) => {
   return data.data;
 };
 
-export const deleteAdminReview = async (reviewId: number) => {
-  await api.delete(`/admin/reviews/${reviewId}`);
+export const getItineraryChanges = async (id: number, sinceVersion: number) => {
+  const { data } = await api.get(`/itineraries/${id}/changes?since_version=${sinceVersion}`);
+  return data;
+};
+
+export const getItineraryActivities = async (id: number, page = 1) => {
+  const { data } = await api.get<Paginated<ItineraryActivity>>(`/itineraries/${id}/activities`, { params: { page } });
+  return data;
+};
+
+export const getItineraryMembers = async (id: number) => {
+  const { data } = await api.get<{ data: ItineraryMember[] }>(`/itineraries/${id}/members`);
+  return data.data;
+};
+
+export const updateItineraryMemberRole = async (itineraryId: number, userId: number, role: "editor" | "viewer") => {
+  const { data } = await api.patch<{ data: ItineraryMember }>(`/itineraries/${itineraryId}/members/${userId}`, { role });
+  return data.data;
+};
+
+export const removeItineraryMember = async (itineraryId: number, userId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/members/${userId}`);
+};
+
+export const leaveItinerary = async (itineraryId: number, userId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/members/${userId}`);
+};
+
+export const transferItineraryOwnership = async (itineraryId: number, userId: number) => {
+  const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/itineraries/${itineraryId}/transfer-ownership`, { user_id: userId });
+  return data;
+};
+
+export const getItineraryInvites = async (id: number) => {
+  const { data } = await api.get<{ data: ItineraryInvite[] }>(`/itineraries/${id}/invites`);
+  return data.data;
+};
+
+export const createItineraryInvite = async (
+  itineraryId: number,
+  payload: { type: "email" | "link"; email?: string; role: "editor" | "viewer"; expires_in_days?: number; max_uses?: number | null },
+) => {
+  const { data } = await api.post<{ data: ItineraryInvite; invite_url?: string; token?: string; message?: string }>(`/itineraries/${itineraryId}/invites`, payload);
+  return data;
+};
+
+export const revokeItineraryInvite = async (itineraryId: number, inviteId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/invites/${inviteId}`);
+};
+
+export const getInvitePreview = async (token: string) => {
+  const { data } = await api.get<{ data: InvitePreview }>(`/invites/${token}`);
+  return data.data;
+};
+
+export const acceptInvite = async (token: string) => {
+  const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/invites/${token}/accept`);
+  return data;
 };

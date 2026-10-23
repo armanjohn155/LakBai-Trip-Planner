@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Listeners\NotificationEventSubscriber;
 use App\Models\Review;
 use App\Observers\ReviewObserver;
 use App\Services\CheckInVerifier;
 use App\Services\RouteEstimator;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,5 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Review::observe(ReviewObserver::class);
+
+        Event::subscribe(NotificationEventSubscriber::class);
     }
 }

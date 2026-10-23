@@ -8,7 +8,8 @@ use App\Models\User;
 class ItineraryPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Determine whether the user can list itineraries. The index endpoint
+     * further scopes results to owned + shared.
      */
     public function viewAny(User $user): bool
     {
@@ -16,11 +17,13 @@ class ItineraryPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Determine whether the user can view the model. Owners, editors and
+     * viewers may view; everyone else is denied (the resource layer turns a
+     * denied view into a 404 so membership is never leaked).
      */
     public function view(User $user, Itinerary $itinerary): bool
     {
-        return $this->isOwner($user, $itinerary);
+        return $itinerary->roleFor($user) !== null;
     }
 
     /**
@@ -32,45 +35,52 @@ class ItineraryPolicy
     }
 
     /**
-     * Determine whether the user can update the model.
+     * Determine whether the user can update the model (details, stops,
+     * reorder, notes). Owners and editors may edit; viewers may not.
      */
     public function update(User $user, Itinerary $itinerary): bool
     {
-        return $this->isOwner($user, $itinerary);
+        return $itinerary->isEditableBy($user);
     }
 
     /**
-     * Determine whether the user can delete the model.
+     * Determine whether the user can delete the model. Owner only.
      */
     public function delete(User $user, Itinerary $itinerary): bool
     {
-        return $this->isOwner($user, $itinerary);
+        return $itinerary->roleFor($user) === Itinerary::ROLE_OWNER;
     }
 
     /**
-     * Determine whether the user can duplicate the model. Only owners may
-     * duplicate; this mirrors the update permission today and is a separate
-     * ability so sharing roles can diverge later.
+     * Manage members, invites and sharing settings. Owner only.
      */
-    public function duplicate(User $user, Itinerary $itinerary): bool
+    public function manageMembers(User $user, Itinerary $itinerary): bool
     {
-        return $this->isOwner($user, $itinerary);
+        return $itinerary->roleFor($user) === Itinerary::ROLE_OWNER;
     }
 
     /**
-     * Determine whether the user can export the model (PDF/ICS/GPX).
+     * Any member (owner, editor, viewer) may export.
      */
     public function export(User $user, Itinerary $itinerary): bool
     {
-        return $this->isOwner($user, $itinerary);
+        return $itinerary->roleFor($user) !== null;
     }
 
     /**
-     * Owner-only for now. When itinerary sharing lands, replace this with a
-     * role lookup (owner / editor / viewer) and branch each ability above.
+     * Any member may duplicate into their own account, producing a fresh
+     * itinerary with no members or invites. Non-members are denied.
      */
-    private function isOwner(User $user, Itinerary $itinerary): bool
+    public function duplicate(User $user, Itinerary $itinerary): bool
     {
-        return $itinerary->user_id === $user->id;
+        return $itinerary->roleFor($user) !== null;
+    }
+
+    /**
+     * Transfer ownership. Owner only.
+     */
+    public function transferOwnership(User $user, Itinerary $itinerary): bool
+    {
+        return $itinerary->roleFor($user) === Itinerary::ROLE_OWNER;
     }
 }

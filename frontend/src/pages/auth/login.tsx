@@ -19,7 +19,10 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const redirectTarget = () => {
-    const from = (location.state as { from?: string } | null)?.from;
+    const search = new URLSearchParams(location.search);
+    const redirect = search.get("redirect");
+    const fromState = (location.state as { from?: string } | null)?.from;
+    const from = redirect || fromState;
     return from && from !== "/login" && from !== "/register" ? from : "/";
   };
 

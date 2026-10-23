@@ -117,6 +117,8 @@ export interface DestinationFilters {
   max_price?: number | "";
 }
 
+export type ItineraryItemStatus = "planned" | "done" | "skipped";
+
 export interface ItineraryItem {
   id: number;
   itinerary_id: number;
@@ -140,10 +142,9 @@ export interface ItineraryItem {
   status: ItineraryItemStatus;
   unavailable: boolean;
   verified: boolean;
+  updated_by?: number | null;
   destination?: Destination;
 }
-
-export type ItineraryItemStatus = "planned" | "done" | "skipped";
 
 export interface ItinerarySummaryDay {
   day_number: number;
@@ -190,6 +191,13 @@ export interface Itinerary {
   items?: ItineraryItem[];
   created_at?: string;
   updated_at?: string;
+  version?: number;
+  share_budget?: boolean;
+  my_role?: 'owner' | 'editor' | 'viewer' | null;
+  is_shared?: boolean;
+  member_count?: number;
+  updated_by?: { id: number; name: string } | number | null;
+  owner?: { id: number; name: string; email?: string } | null;
 }
 
 export interface ItineraryTemplate {
@@ -228,6 +236,47 @@ export interface ItinerarySummary {
   total_duration_minutes: number;
   days: ItinerarySummaryDay[];
   breakdown_by_category: BudgetBreakdown[];
+}
+
+
+export interface ItineraryMember {
+  id: number;
+  name: string;
+  avatar_url?: string | null;
+  role: 'owner' | 'editor' | 'viewer';
+  joined_at?: string | null;
+  email?: string | null;
+}
+
+export interface ItineraryInvite {
+  id: number;
+  email?: string | null;
+  type: 'email' | 'link';
+  role: 'editor' | 'viewer';
+  max_uses?: number | null;
+  uses_count: number;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+  is_redeemable?: boolean;
+}
+
+export interface ItineraryActivity {
+  id: number;
+  action: string;
+  user?: string | null;
+  subject_type?: string | null;
+  subject_id?: number | null;
+  meta?: Record<string, unknown> | null;
+  created_at?: string;
+}
+
+export interface InvitePreview {
+  itinerary_name: string;
+  owner_name?: string | null;
+  role: 'editor' | 'viewer';
+  expires_at?: string | null;
+  member_count?: number;
 }
 
 export interface UserSettings {

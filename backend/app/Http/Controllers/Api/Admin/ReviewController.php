@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Events\ReviewHidden;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReviewResource;
 use App\Models\Review;
@@ -57,11 +58,17 @@ class ReviewController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $wasHidden = (bool) $review->is_hidden;
+
         $review->forceFill([
             'is_hidden' => true,
             'hidden_reason' => $validated['reason'] ?? 'Hidden by moderator.',
             'hidden_by' => $request->user()->id,
         ])->save();
+
+        if (! $wasHidden) {
+            event(new ReviewHidden($review, $request->user(), $review->hidden_reason));
+        }
 
         return (new ReviewResource($review->load(['user', 'destination', 'photos'])))
             ->response()

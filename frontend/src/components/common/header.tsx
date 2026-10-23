@@ -77,12 +77,10 @@ export function Header() {
   );
 
   return (
-    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-gradient-to-r from-royal-950 via-royal-900 to-royal-800 text-sand-50">
+    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-white text-sand-50">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <PinIcon className="h-5 w-5 text-surf-300" />
-          <span className="font-brand text-2xl leading-none text-sand-50">LAKBAI</span>
-          <span className="hidden text-xs text-sand-50/80 lg:inline">Manglakaw ta, Bai!</span>
+          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>

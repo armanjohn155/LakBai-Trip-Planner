@@ -21,11 +21,16 @@ class DatabaseSeeder extends Seeder
             ItineraryTemplateSeeder::class,
         ]);
 
-        if (app()->environment('local')) {
-            User::factory()->create([
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ]);
+        if (app()->environment('local') && class_exists(\Database\Factories\UserFactory::class)) {
+            try {
+                User::factory()->create([
+                    'name' => 'Test User',
+                    'email' => 'test@example.com',
+                ]);
+            } catch (\Throwable $e) {
+                // Ignore in environments where faker is not available.
+            }
         }
     }
 }
+

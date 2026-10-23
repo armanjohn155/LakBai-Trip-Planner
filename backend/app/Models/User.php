@@ -14,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'avatar_url'])]
+#[Fillable(['name', 'email', 'password', 'avatar_url', 'username', 'friend_code', 'friend_code_regenerated_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,6 +31,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'friend_code_regenerated_at' => 'datetime',
         ];
     }
 
@@ -45,6 +46,24 @@ class User extends Authenticatable
     public function itineraries(): HasMany
     {
         return $this->hasMany(Itinerary::class);
+    }
+
+    /**
+     * Itineraries shared with this user (where they are a member, not owner).
+     */
+    public function sharedItineraries(): BelongsToMany
+    {
+        return $this->belongsToMany(Itinerary::class, 'itinerary_user')
+            ->withPivot(['role', 'status', 'rsvp', 'invited_by', 'invited_at', 'responded_at', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Invites this user created for other users.
+     */
+    public function createdItineraryInvites(): HasMany
+    {
+        return $this->hasMany(ItineraryInvite::class, 'created_by');
     }
 
     public function visits(): HasMany
@@ -65,5 +84,15 @@ class User extends Authenticatable
     public function settings(): HasOne
     {
         return $this->hasOne(UserSettings::class);
+    }
+
+    public function sentFriendRequests(): HasMany
+    {
+        return $this->hasMany(Friendship::class, 'requester_id');
+    }
+
+    public function receivedFriendRequests(): HasMany
+    {
+        return $this->hasMany(Friendship::class, 'addressee_id');
     }
 }

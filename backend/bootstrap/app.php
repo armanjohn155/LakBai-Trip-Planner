@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
         ]);
     })
+    ->withSchedule(function ($schedule): void {
+        $schedule->command('invites:prune')->daily();
+        $schedule->command('invite-links:prune')->daily();
+        $schedule->command('notifications:prune')->daily();
+        $schedule->command('trips:notify-starting-soon')->dailyAt('08:00');
+    })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

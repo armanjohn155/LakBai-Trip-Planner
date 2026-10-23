@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'notes',
     'visited',
     'status',
+    'updated_by',
 ])]
 class ItineraryItem extends Model
 {
@@ -73,6 +74,11 @@ class ItineraryItem extends Model
     public function destination(): BelongsTo
     {
         return $this->belongsTo(Destination::class);
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**

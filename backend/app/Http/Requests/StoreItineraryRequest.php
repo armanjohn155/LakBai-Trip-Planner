@@ -30,6 +30,10 @@ class StoreItineraryRequest extends FormRequest
             'budget' => ['nullable', 'numeric', 'min:0'],
             'total_budget' => ['nullable', 'numeric', 'min:0'],
             'cover_image_url' => ['nullable', 'string', 'max:2048'],
+            'trip_type' => ['nullable', 'in:solo,group'],
+            'invite_user_ids' => ['nullable', 'array'],
+            'invite_user_ids.*' => ['integer', 'exists:users,id'],
+            'role' => ['nullable', 'in:editor,viewer'],
         ];
     }
 }

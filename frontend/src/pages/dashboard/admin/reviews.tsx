@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { EmptyState, InlineError, Spinner } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/input";
 import { StarIcon } from "@/components/icons";
-import { apiError, deleteAdminReview, getAdminReviews, hideAdminReview, unhideAdminReview } from "@/lib/api";
+import { apiError, getAdminReviews, hideAdminReview, unhideAdminReview } from "@/lib/api";
+import { deleteReview } from "@/lib/api";
 import type { AdminReviewParams } from "@/lib/api";
 import { formatCompactNumber, pluralise } from "@/lib/format";
 import type { Paginated, Review } from "@/lib/types";
@@ -97,7 +98,7 @@ export default function AdminReviewsPage() {
         await unhideAdminReview(pending.review.id);
         showToast("Review restored.");
       } else {
-        await deleteAdminReview(pending.review.id);
+        await deleteReview(pending.review.id);
         showToast("Review deleted.");
       }
       setPending(null);

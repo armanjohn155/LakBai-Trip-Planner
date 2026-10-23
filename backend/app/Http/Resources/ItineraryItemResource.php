@@ -19,6 +19,10 @@ class ItineraryItemResource extends JsonResource
         $unavailable = $hasDestination && $destinationLoaded
             && ($this->destination === null || $this->destination->trashed());
 
+        // The parent ItineraryResource flags items when a viewer may not see
+        // budget values; default to visible for standalone use (owner/editor).
+        $budgetVisible = $this->budgetVisible ?? true;
+
         return [
             'id' => $this->id,
             'itinerary_id' => $this->itinerary_id,
@@ -36,12 +40,13 @@ class ItineraryItemResource extends JsonResource
             'order' => $this->order,
             'start_time' => $this->start_time,
             'duration_minutes' => $this->duration_minutes,
-            'estimated_budget' => $this->estimated_budget,
+            'estimated_budget' => $budgetVisible ? $this->estimated_budget : null,
             'notes' => $this->notes,
             'visited' => (bool) $this->visited,
             'status' => $this->status ?? 'planned',
             'unavailable' => $unavailable,
             'verified' => (bool) ($this->verified ?? false),
+            'updated_by' => $this->whenLoaded('updatedBy', fn () => $this->updatedBy?->name, fn () => null),
             'destination' => new DestinationResource($this->whenLoaded('destination')),
         ];
     }

@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use RuntimeException;
+use Illuminate\Support\Facades\Hash;
 
 class AdminSeeder extends Seeder
 {
@@ -18,8 +18,22 @@ class AdminSeeder extends Seeder
         $password = config('admin.password');
         $name = config('admin.name');
 
-        if (! is_string($email) || $email === '' || ! is_string($password) || $password === '') {
-            throw new RuntimeException(
+        if ((! is_string($email) || $email === '' || ! is_string($password) || $password === '')) {
+            if (app()->environment('testing')) {
+                User::query()->firstOrCreate(
+                    ['email' => 'admin@example.com'],
+                    [
+                        'name' => 'Administrator',
+                        'password' => Hash::make('password'),
+                        'role' => 'admin',
+                        'email_verified_at' => now(),
+                    ]
+                );
+
+                return;
+            }
+
+            throw new \RuntimeException(
                 'ADMIN_EMAIL and ADMIN_PASSWORD must be set before seeding the administrator account. '
                 .'Add them to your .env file and run `php artisan config:clear`.'
             );
@@ -36,3 +50,4 @@ class AdminSeeder extends Seeder
         $this->command?->info("Admin account ready: {$email}");
     }
 }
+

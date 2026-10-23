@@ -14,6 +14,7 @@ import { SettingsTab } from "@/components/features/profile/settings-tab";
 import { TripsTab } from "@/components/features/profile/trips-tab";
 import { AuthProvider } from "@/hooks/use-auth";
 import { FavoritesProvider } from "@/hooks/use-favorites";
+import InviteAcceptPage from "@/pages/invite/accept";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
 import AdminDestinationEditPage from "@/pages/dashboard/admin/destination-edit";
@@ -64,6 +65,7 @@ createRoot(document.getElementById("root")!).render(
 
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="invite/:token" element={<InviteAcceptPage />} />
 
           {/* Declared before the /app layout so stale dashboard destination URLs
               never hit AppLayout's auth guard — guests land straight on the
