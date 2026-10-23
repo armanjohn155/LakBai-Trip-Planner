@@ -18,7 +18,12 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = User::create($request->safe()->only(['name', 'email', 'password']));
+        $data = $request->safe()->only(['name', 'email', 'password']);
+        $user = new User($data);
+        $user->username = User::generateUsername($user->name);
+        $user->friend_code = User::generateFriendCode();
+        $user->friend_code_regenerated_at = now();
+        $user->save();
 
         return response()->json([
             'user' => $user,

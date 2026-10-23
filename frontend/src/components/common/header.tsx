@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 
 import { Link, NavLink, useNavigate } from "react-router";
 
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { getFriendRequests } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 interface CenterLink {
@@ -81,19 +82,10 @@ export function Header() {
   );
 
   return (
-<<<<<<< HEAD
-    <header className="sticky top-0 z-[1100] border-b border-white/10 bg-white text-sand-50">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
-=======
     <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <PinIcon className="h-5 w-5 text-surf-500" />
-          <span className="font-brand text-2xl leading-none text-lagoon-900">LAKBAI</span>
-          <span className="hidden text-xs text-ink-600 lg:inline">Manglakaw ta, Bai!</span>
->>>>>>> origin/main
+          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
@@ -154,10 +146,34 @@ interface AccountDropdownProps {
   onSignOut: () => void;
 }
 
+interface AccountItem {
+  to: string;
+  label: string;
+  Icon: ComponentType<{ className?: string }>;
+  badge?: number;
+}
+
 function AccountDropdown({ onSignOut }: AccountDropdownProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getFriendRequests("incoming")
+      .then((requests) => {
+        if (!cancelled) setFriendRequestCount(requests.length);
+      })
+      .catch(() => {
+        if (!cancelled) setFriendRequestCount(0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -181,12 +197,13 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
 
   const close = () => setOpen(false);
 
-  const items = [
+  const items: AccountItem[] = [
     { to: "/app", label: "Dashboard", Icon: GridIcon },
     { to: "/app/trips", label: "My Trips", Icon: PinIcon },
     { to: "/app/history", label: "Visiting History", Icon: ClockIcon },
     { to: "/app/reviews", label: "My Reviews", Icon: StarIcon },
     { to: "/app/favorites", label: "Favorites", Icon: HeartIcon },
+    { to: "/app/friends", label: "Friends", Icon: FriendsIcon, badge: friendRequestCount },
     { to: "/app/profile", label: "Profile", Icon: UserIcon },
     ...(user?.role === "admin" ? [{ to: "/admin", label: "Admin", Icon: ShieldIcon }] : []),
   ];
@@ -219,10 +236,15 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
 
           <div className="my-1 h-px bg-line" />
 
-          {items.map(({ to, label, Icon }) => (
+          {items.map(({ to, label, Icon, badge }) => (
             <Link key={to} to={to} role="menuitem" onClick={close} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100">
               <Icon className="h-4 w-4 text-ink-600" />
               {label}
+              {badge ? (
+                <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-mango-400/30 px-1.5 py-0.5 text-[11px] font-bold text-lagoon-900">
+                  {badge > 9 ? "9+" : badge}
+                </span>
+              ) : null}
             </Link>
           ))}
 
@@ -258,6 +280,17 @@ function HeartIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
       <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    </svg>
+  );
+}
+
+function FriendsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19c.5-3 2.6-4.7 5.5-4.7s5 1.7 5.5 4.7" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 14.4c2.4.1 4.1 1.6 4.5 4.1" />
     </svg>
   );
 }

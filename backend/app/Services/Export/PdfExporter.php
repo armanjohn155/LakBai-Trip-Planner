@@ -23,6 +23,8 @@ class PdfExporter extends AbstractItineraryExporter
     {
         $this->ensureNotEmpty($itinerary);
 
+        $showBudget = $itinerary->budgetVisible;
+
         $days = $this->orderedItems($itinerary)
             ->groupBy('day_number')
             ->sortKeys()
@@ -30,7 +32,7 @@ class PdfExporter extends AbstractItineraryExporter
                 'day_number' => (int) $day,
                 'date' => $this->dateForDay($itinerary, (int) $day)?->toDateString(),
                 'items' => $items->values(),
-                'budget' => (float) $items->sum('estimated_budget'),
+                'budget' => $showBudget ? (float) $items->sum('estimated_budget') : 0.0,
                 'duration' => (int) $items->sum('duration_minutes'),
             ])
             ->values();
@@ -39,8 +41,9 @@ class PdfExporter extends AbstractItineraryExporter
         $pdf = Pdf::loadView('exports.itinerary', [
             'itinerary' => $itinerary,
             'days' => $days,
-            'totalEstimated' => (float) $itinerary->items->sum('estimated_budget'),
-            'budgetLimit' => $itinerary->total_budget !== null || $itinerary->budget !== null
+            'showBudget' => $showBudget,
+            'totalEstimated' => $showBudget ? (float) $itinerary->items->sum('estimated_budget') : 0.0,
+            'budgetLimit' => $showBudget && ($itinerary->total_budget !== null || $itinerary->budget !== null)
                 ? (float) ($itinerary->total_budget ?? $itinerary->budget)
                 : null,
             'mapLink' => fn (ItineraryItem $item) => $this->mapLink($item),

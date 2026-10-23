@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Resources\FriendUserResource;
 use App\Http\Resources\FriendshipResource;
+use App\Http\Resources\FriendUserResource;
 use App\Models\Friendship;
 use App\Models\User;
 use App\Services\FriendshipService;
@@ -49,6 +49,10 @@ class FriendController extends Controller
         $user = $request->user();
         $direction = $request->query('direction', 'incoming');
 
+        if (! in_array($direction, ['incoming', 'outgoing'], true)) {
+            abort(422, 'The direction must be incoming or outgoing.');
+        }
+
         if ($direction === 'outgoing') {
             $requests = Friendship::query()
                 ->with(['requester', 'addressee'])
@@ -80,8 +84,9 @@ class FriendController extends Controller
         $addressee = null;
 
         // Exact match only
-        if (str_starts_with($identifier, 'LAKBAI-')) {
-            $addressee = User::query()->where('friend_code', strtoupper($identifier))->first();
+        $upperIdentifier = strtoupper($identifier);
+        if (str_starts_with($upperIdentifier, 'LAKBAI-')) {
+            $addressee = User::query()->where('friend_code', $upperIdentifier)->first();
         } else {
             $identifierLower = strtolower($identifier);
             if (str_contains($identifierLower, '@')) {
@@ -197,7 +202,7 @@ class FriendController extends Controller
         $this->enforceCodeRegenThrottle($request);
         $user = $request->user();
 
-        $user->friend_code = $this->generateFriendCode($user->id);
+        $user->friend_code = User::generateFriendCode($user->id);
         $user->friend_code_regenerated_at = now();
         $user->save();
 
@@ -210,28 +215,15 @@ class FriendController extends Controller
         ]);
     }
 
-    private function generateFriendCode(int $userId): string
-    {
-        $chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-        do {
-            $code = 'LAKBAI-';
-            for ($i = 0; $i < 6; $i++) {
-                $code .= $chars[random_int(0, strlen($chars) - 1)];
-            }
-        } while (User::where('friend_code', $code)->where('id', '!=', $userId)->exists());
-
-        return $code;
-    }
-
     private function enforceRequestThrottle(Request $request): void
     {
         $key = 'friend-request:'.$request->user()->id;
         $throttle = config('lakbai.friends.request_throttle', '15,1');
         [$max, $decay] = array_map('intval', explode(',', $throttle));
-        RateLimiter::hit($key, $decay * 60);
         if (RateLimiter::tooManyAttempts($key, $max)) {
             abort(429, 'Too many attempts. Please try again later.');
         }
+        RateLimiter::hit($key, $decay * 60);
     }
 
     private function enforceCodeRegenThrottle(Request $request): void
@@ -239,9 +231,9 @@ class FriendController extends Controller
         $key = 'friend-code-regen:'.$request->user()->id;
         $throttle = config('lakbai.friends.friend_code_regen_throttle', '5,1');
         [$max, $decay] = array_map('intval', explode(',', $throttle));
-        RateLimiter::hit($key, $decay * 60);
         if (RateLimiter::tooManyAttempts($key, $max)) {
             abort(429, 'Too many attempts. Please try again later.');
         }
+        RateLimiter::hit($key, $decay * 60);
     }
 }

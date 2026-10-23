@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\TripDeleted;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreItineraryRequest;
 use App\Http\Requests\UpdateItineraryRequest;
+use App\Http\Resources\ItineraryPendingInviteResource;
 use App\Http\Resources\ItineraryResource;
 use App\Http\Resources\ItinerarySummaryResource;
-use App\Events\TripDeleted;
 use App\Models\Itinerary;
 use App\Models\Visit;
 use App\Services\ItineraryActivityLogger;
@@ -38,6 +39,26 @@ class ItineraryController extends Controller
         $user = request()->user();
         $filter = (string) request()->query('filter', 'all');
 
+        // Pending invitees get a deliberately narrow projection: no stops,
+        // budgets, dates, descriptions or collaborator list until they accept.
+        if ($filter === 'invited') {
+            $invites = Itinerary::query()
+                ->pendingFor($user)
+                ->withCount([
+                    'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+                ])
+                ->with([
+                    'user:id,name,username,avatar_url',
+                    'members' => fn ($query) => $query
+                        ->whereKey($user->id)
+                        ->select('users.id', 'users.name', 'users.username', 'users.avatar_url'),
+                ])
+                ->latest('updated_at')
+                ->paginate(20);
+
+            return ItineraryPendingInviteResource::collection($invites);
+        }
+
         $query = Itinerary::query()
             ->withCount([
                 'items',
@@ -54,8 +75,7 @@ class ItineraryController extends Controller
 
         $query->when($filter === 'owned', fn ($query) => $query->whereBelongsTo($user))
             ->when($filter === 'shared', fn ($query) => $query->accessibleBy($user)->where('user_id', '!=', $user->id))
-            ->when($filter === 'invited', fn ($query) => $query->pendingFor($user))
-            ->when(! in_array($filter, ['owned', 'shared', 'invited'], true), fn ($query) => $query->accessibleBy($user));
+            ->when(! in_array($filter, ['owned', 'shared'], true), fn ($query) => $query->accessibleBy($user));
 
         $itineraries = $query->latest('updated_at')->paginate(20);
 
@@ -72,21 +92,25 @@ class ItineraryController extends Controller
     {
         $user = $request->user();
 
-        $itinerary = DB::transaction(function () use ($request, $user) {
-            $itinerary = $user->itineraries()->create(
-                $request->safe()->only([
-                    'title',
-                    'description',
-                    'start_date',
-                    'end_date',
-                    'budget',
-                    'total_budget',
-                    'cover_image_url',
-                    'trip_type',
-                ]) + ['trip_type' => Itinerary::TRIP_SOLO]
-            );
+        $inviteIds = $request->input('invite_user_ids', []);
 
-            $inviteIds = $request->input('invite_user_ids', []);
+        $itinerary = DB::transaction(function () use ($request, $user, $inviteIds) {
+            $attributes = $request->safe()->only([
+                'title',
+                'description',
+                'start_date',
+                'end_date',
+                'budget',
+                'total_budget',
+                'cover_image_url',
+                'trip_type',
+            ]);
+
+            $attributes['trip_type'] ??= is_array($inviteIds) && $inviteIds !== []
+                ? Itinerary::TRIP_GROUP
+                : Itinerary::TRIP_SOLO;
+
+            $itinerary = $user->itineraries()->create($attributes);
 
             if (is_array($inviteIds) && $inviteIds !== []) {
                 $this->invitations->invite(
@@ -234,25 +258,30 @@ class ItineraryController extends Controller
     {
         Gate::authorize('view', $itinerary);
 
-        $since = (int) request()->query('since_version', 0);
+        $since = max(0, (int) request()->query('since_version', 0));
+        $changed = (int) $itinerary->version > $since;
 
-        $activities = $itinerary->activities()
-            ->with('user:id,name')
-            ->when($since > 0, fn ($query) => $query->where('id', '>', $since))
-            ->limit(50)
-            ->get()
-            ->map(fn ($activity) => [
-                'id' => $activity->id,
-                'action' => $activity->action,
-                'user' => $activity->user?->name,
-                'meta' => $activity->meta,
-                'created_at' => $activity->created_at,
-            ]);
+        // `since_version` is an itinerary version, not an activity id. Only
+        // query the feed when something actually changed; this keeps polling
+        // cheap for the common no-op case.
+        $activities = $changed
+            ? $itinerary->activities()
+                ->with('user:id,name')
+                ->limit(20)
+                ->get()
+                ->map(fn ($activity) => [
+                    'id' => $activity->id,
+                    'action' => $activity->action,
+                    'user' => $activity->user?->name,
+                    'meta' => $activity->meta,
+                    'created_at' => $activity->created_at,
+                ])
+            : collect();
 
         return response()->json([
             'data' => [
                 'version' => (int) $itinerary->version,
-                'changed' => (int) $itinerary->version > $since,
+                'changed' => $changed,
                 'updated_by' => $itinerary->updatedBy?->name,
                 'activities' => $activities,
             ],

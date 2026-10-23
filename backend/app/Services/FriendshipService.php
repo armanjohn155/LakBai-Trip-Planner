@@ -9,7 +9,6 @@ use App\Events\Unfriended;
 use App\Events\UserBlocked;
 use App\Models\Friendship;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,13 +17,14 @@ class FriendshipService
     public function areFriends(User $a, User $b): bool
     {
         return Friendship::query()
-            ->where(function ($q) use ($a, $b) {
-                $q->where('requester_id', $a->id)->where('addressee_id', $b->id);
-            })
-            ->orWhere(function ($q) use ($a, $b) {
-                $q->where('requester_id', $b->id)->where('addressee_id', $a->id);
-            })
             ->where('status', 'accepted')
+            ->where(function ($q) use ($a, $b) {
+                $q->where(function ($q) use ($a, $b) {
+                    $q->where('requester_id', $a->id)->where('addressee_id', $b->id);
+                })->orWhere(function ($q) use ($a, $b) {
+                    $q->where('requester_id', $b->id)->where('addressee_id', $a->id);
+                });
+            })
             ->exists();
     }
 
@@ -88,7 +88,7 @@ class FriendshipService
             $cooldownDays = (int) config('lakbai.friends.resend_cooldown_days', 7);
             $lastResponded = $existing->responded_at;
 
-            if ($lastResponded && Carbon::now()->diffInDays($lastResponded) < $cooldownDays) {
+            if ($lastResponded && $lastResponded->copy()->addDays($cooldownDays)->isFuture()) {
                 throw ValidationException::withMessages([
                     'identifier' => 'If that user exists, a request was sent.',
                 ]);

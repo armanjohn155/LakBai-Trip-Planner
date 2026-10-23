@@ -2,15 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useLocation, useNavigate } from "react-router";
 
+import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { TripCard, tripStatus } from "@/components/features/itinerary/trip-card";
-import { ChevronIcon, PinIcon } from "@/components/icons";
+import { CheckIcon, ChevronIcon, FriendsIcon, PinIcon, UserIcon, XIcon } from "@/components/icons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/feedback";
-import { addItineraryItem, apiError, createItinerary, deleteItinerary, getDestinations, getItineraries } from "@/lib/api";
+import {
+  acceptPendingInvitation,
+  addItineraryItem,
+  apiError,
+  createItinerary,
+  declinePendingInvitation,
+  deleteItinerary,
+  getAllItineraries,
+  getDestinations,
+  getPendingInvitations,
+} from "@/lib/api";
 import { cn } from "@/lib/cn";
-import type { Destination, Itinerary } from "@/lib/types";
+import type { Destination, Itinerary, PendingInvite } from "@/lib/types";
 
 type TripSort = "upcoming" | "recent" | "soonest" | "latest";
+type TripFilter = "all" | "owned" | "shared" | "invited";
 
 const TRIP_SORT_OPTIONS: { value: TripSort; label: string }[] = [
   { value: "upcoming", label: "Upcoming first" },
@@ -25,15 +38,23 @@ export default function TripsPage() {
   const addDestinationId = routeState.addDestinationId;
 
   const [trips, setTrips] = useState<Itinerary[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<TripSort>("upcoming");
+  const [filter, setFilter] = useState<TripFilter>("all");
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [busyInviteId, setBusyInviteId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [tripList, page] = await Promise.all([getItineraries(), getDestinations({ per_page: 100 })]);
+    const [tripList, invites, page] = await Promise.all([
+      getAllItineraries(),
+      getPendingInvitations(),
+      getDestinations({ per_page: 100 }),
+    ]);
     setTrips(tripList);
+    setPendingInvites(invites);
     setDestinations(page.data);
   }, []);
 
@@ -64,6 +85,34 @@ export default function TripsPage() {
       setTrips((current) => current.filter((trip) => trip.id !== itinerary.id));
     } catch (err) {
       setError(apiError(err));
+    }
+  };
+
+  const acceptInvite = async (invite: PendingInvite) => {
+    setBusyInviteId(invite.id);
+    setError(null);
+    try {
+      await acceptPendingInvitation(invite.id);
+      setPendingInvites((current) => current.filter((item) => item.id !== invite.id));
+      await refresh();
+      navigate(`/app/trips/${invite.id}`);
+    } catch (err) {
+      setError(apiError(err));
+    } finally {
+      setBusyInviteId(null);
+    }
+  };
+
+  const declineInvite = async (invite: PendingInvite) => {
+    setBusyInviteId(invite.id);
+    setError(null);
+    try {
+      await declinePendingInvitation(invite.id);
+      setPendingInvites((current) => current.filter((item) => item.id !== invite.id));
+    } catch (err) {
+      setError(apiError(err));
+    } finally {
+      setBusyInviteId(null);
     }
   };
 
@@ -121,6 +170,16 @@ export default function TripsPage() {
     }
   }, [trips, sortBy]);
 
+  const visibleTrips = useMemo(() => {
+    if (filter === "owned") return sortedTrips.filter((trip) => (trip.my_role ?? "owner") === "owner");
+    if (filter === "shared") return sortedTrips.filter((trip) => trip.is_shared);
+    return sortedTrips;
+  }, [filter, sortedTrips]);
+
+  const showInvites = filter === "all" || filter === "invited";
+  const showTrips = filter !== "invited";
+  const inviteCount = pendingInvites.length;
+
   if (loading) {
     return <p className="text-sm text-ink-600">Loading your trips…</p>;
   }
@@ -145,6 +204,39 @@ export default function TripsPage() {
       </div>
 
       {error ? <InlineError message={error} /> : null}
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter trips">
+        {([
+          { id: "all", label: "All trips", count: trips.length + inviteCount },
+          { id: "owned", label: "Mine", count: trips.filter((trip) => (trip.my_role ?? "owner") === "owner").length },
+          { id: "shared", label: "Shared with me", count: trips.filter((trip) => trip.is_shared).length },
+          { id: "invited", label: "Invitations", count: inviteCount },
+        ] as const).map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === item.id}
+            onClick={() => setFilter(item.id)}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+              filter === item.id
+                ? "bg-lagoon-900 text-sand-50"
+                : "bg-white/60 text-ink-700 ring-1 ring-inset ring-line hover:bg-sand-100",
+            )}
+          >
+            {item.label}
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[11px] font-bold",
+                filter === item.id ? "bg-white/15 text-sand-50" : "bg-sand-200/80 text-ink-600",
+              )}
+            >
+              {item.count}
+            </span>
+          </button>
+        ))}
+      </div>
 
       {addDestinationId ? (
         <div className="rounded-2xl bg-lagoon-900 p-5 text-sand-50">
@@ -171,31 +263,99 @@ export default function TripsPage() {
         </div>
       ) : null}
 
-      {sortedTrips.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sand-100 text-sea-600">
-            <PinIcon className="h-6 w-6" />
-          </span>
-          <h3 className="mt-1 font-display text-2xl font-medium text-lagoon-900">No trips yet</h3>
-          <p className="max-w-md text-sm text-ink-600">Start planning your first Cebu adventure.</p>
-          <Button size="lg" className="mt-3" onClick={() => navigate("/app/trips/new")}>
-            Plan a new trip
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedTrips.map((trip) => (
-            <TripCard
-              key={trip.id}
-              itinerary={trip}
-              onOpen={() => navigate(`/app/trips/${trip.id}`)}
-              onDelete={() => remove(trip)}
-              onDuplicate={() => void duplicate(trip)}
-              duplicateBusy={duplicatingId === trip.id}
-            />
-          ))}
-        </div>
-      )}
+      {showInvites && pendingInvites.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-xl font-semibold text-lagoon-900">Invitations</h2>
+            <Badge tone="mango">{inviteCount}</Badge>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingInvites.map((invite) => (
+              <article key={invite.id} className="relative overflow-hidden rounded-2xl bg-lagoon-900 p-5 text-sand-50">
+                <div className="absolute -right-5 -top-8 h-24 w-24 rounded-full bg-surf-400/20" aria-hidden="true" />
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold">
+                      <FriendsIcon className="h-3.5 w-3.5" />
+                      {invite.trip_type === "group" ? "Group trip" : "Trip invite"}
+                    </span>
+                    <span className="rounded-full bg-mango-400 px-2.5 py-1 text-xs font-bold text-lagoon-950">
+                      {invite.invited_role === "editor" ? "Editor" : "Viewer"}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 font-display text-xl font-semibold">{invite.title}</h3>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Avatar
+                      name={invite.owner.name ?? "LakBai traveller"}
+                      src={invite.owner.avatar_url ?? null}
+                      className="h-8 w-8 text-xs"
+                    />
+                    <p className="min-w-0 text-sm text-sand-50/80">
+                      <span className="font-semibold text-sand-50">{invite.owner.name ?? "A traveller"}</span> invited you
+                      {invite.member_count ? ` · ${invite.member_count} ${invite.member_count === 1 ? "traveller" : "travellers"}` : ""}
+                    </p>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      className="flex-1 bg-surf-400 text-white hover:bg-surf-300"
+                      onClick={() => void acceptInvite(invite)}
+                      disabled={busyInviteId === invite.id}
+                    >
+                      <CheckIcon className="h-4 w-4" />
+                      {busyInviteId === invite.id ? "Joining..." : "Accept"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="ring-1 ring-inset ring-white/20"
+                      onClick={() => void declineInvite(invite)}
+                      disabled={busyInviteId === invite.id}
+                    >
+                      <XIcon className="h-4 w-4" />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {showTrips ? (
+        visibleTrips.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sand-100 text-sea-600">
+              {filter === "shared" ? <UserIcon className="h-6 w-6" /> : <PinIcon className="h-6 w-6" />}
+            </span>
+            <h3 className="mt-1 font-display text-2xl font-medium text-lagoon-900">
+              {filter === "shared" ? "No shared trips yet" : filter === "owned" ? "No trips of your own yet" : "No trips yet"}
+            </h3>
+            <p className="max-w-md text-sm text-ink-600">
+              {filter === "shared"
+                ? "When a friend invites you, their trip will show up here."
+                : "Start planning your first Cebu adventure."}
+            </p>
+            {filter !== "shared" ? (
+              <Button size="lg" className="mt-3" onClick={() => navigate("/app/trips/new")}>
+                Plan a new trip
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleTrips.map((trip) => (
+              <TripCard
+                key={trip.id}
+                itinerary={trip}
+                onOpen={() => navigate(`/app/trips/${trip.id}`)}
+                onDelete={() => remove(trip)}
+                onDuplicate={() => void duplicate(trip)}
+                duplicateBusy={duplicatingId === trip.id}
+              />
+            ))}
+          </div>
+        )
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import type { AuthPayload, Destination, ExportFormat, InvitePreview, Itinerary, ItineraryActivity, ItineraryInvite, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
+import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8000/api";
 
@@ -21,6 +21,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status = error.response?.status;
+    const method = (error.config?.method ?? "get").toUpperCase();
+    const url = `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`;
+    console.error(
+      `[api] ${method} ${url} failed${status ? ` with status ${status}` : " (no response from server)"}`,
+      error.response?.data ?? error.message,
+    );
     if (error.response?.status === 401 && !error.config?.url?.includes("login")) {
       localStorage.removeItem("suroy.token");
       localStorage.removeItem("suroy.user");
@@ -117,6 +124,63 @@ export const updateSettings = async (payload: UserSettings) => {
   return data.data;
 };
 
+export const getFriends = async (q = "") => {
+  const { data } = await api.get<{ data: FriendUser[] }>("/friends", { params: q ? { q } : undefined });
+  return data.data;
+};
+
+export const getFriendRequests = async (direction: "incoming" | "outgoing") => {
+  const { data } = await api.get<{ data: Friendship[] }>("/friends/requests", { params: { direction } });
+  return data.data;
+};
+
+export const sendFriendRequest = async (identifier: string) => {
+  const { data } = await api.post<{ message: string }>("/friends/requests", { identifier });
+  return data;
+};
+
+export const acceptFriendRequest = async (friendshipId: number) => {
+  const { data } = await api.post<{ data: Friendship; message: string }>(`/friends/requests/${friendshipId}/accept`);
+  return data;
+};
+
+export const declineFriendRequest = async (friendshipId: number) => {
+  const { data } = await api.post<{ message: string }>(`/friends/requests/${friendshipId}/decline`);
+  return data;
+};
+
+export const cancelFriendRequest = async (friendshipId: number) => {
+  await api.delete(`/friends/requests/${friendshipId}`);
+};
+
+export const unfriend = async (userId: number) => {
+  await api.delete(`/friends/${userId}`);
+};
+
+export const getBlockedUsers = async () => {
+  const { data } = await api.get<{ data: Friendship[] }>("/blocks");
+  return data.data;
+};
+
+export const blockUser = async (userId: number) => {
+  const { data } = await api.post<{ data: Friendship; message: string }>(`/blocks/${userId}`);
+  return data;
+};
+
+export const unblockUser = async (userId: number) => {
+  await api.delete(`/blocks/${userId}`);
+};
+
+export const getFriendCode = async () => {
+  const { data } = await api.get<{ data: FriendCode }>("/me/friend-code");
+  return data.data;
+};
+
+export const regenerateFriendCode = async () => {
+  const { data } = await api.post<{ data: FriendCode; message: string }>("/me/friend-code/regenerate");
+  return data;
+};
+
 export interface ItineraryPayload {
   title?: string;
   description?: string | null;
@@ -127,6 +191,9 @@ export interface ItineraryPayload {
   cover_image_url?: string | null;
   share_budget?: boolean;
   base_version?: number;
+  trip_type?: "solo" | "group";
+  invite_user_ids?: number[];
+  role?: "editor" | "viewer";
 }
 
 export interface ItineraryItemPayload {
@@ -153,8 +220,32 @@ export interface ReorderStop {
   order: number;
 }
 
-export const getItineraries = async () => {
+export type ItineraryFilter = "all" | "owned" | "shared" | "invited";
+
+export const getItineraries = async (filter: ItineraryFilter = "all") => {
+  const { data } = await api.get<Paginated<Itinerary>>("/itineraries", {
+    params: filter === "all" ? undefined : { filter },
+  });
+  return data.data;
+};
+
+export const getAllItineraries = async () => {
   const { data } = await api.get<Paginated<Itinerary>>("/itineraries");
+  return data.data;
+};
+
+export const getOwnedItineraries = async () => {
+  const { data } = await api.get<Paginated<Itinerary>>("/itineraries", { params: { filter: "owned" } });
+  return data.data;
+};
+
+export const getSharedItineraries = async () => {
+  const { data } = await api.get<Paginated<Itinerary>>("/itineraries", { params: { filter: "shared" } });
+  return data.data;
+};
+
+export const getPendingInvitations = async () => {
+  const { data } = await api.get<Paginated<PendingInvite>>("/itineraries", { params: { filter: "invited" } });
   return data.data;
 };
 
@@ -202,8 +293,10 @@ export const updateItineraryItem = async (itineraryId: number, itemId: number, p
   return data.data;
 };
 
-export const deleteItineraryItem = async (itineraryId: number, itemId: number) => {
-  await api.delete(`/itineraries/${itineraryId}/items/${itemId}`);
+export const deleteItineraryItem = async (itineraryId: number, itemId: number, baseVersion?: number) => {
+  await api.delete(`/itineraries/${itineraryId}/items/${itemId}`, {
+    data: baseVersion ? { base_version: baseVersion } : undefined,
+  });
 };
 
 export const reorderItineraryItems = async (itineraryId: number, stops: ReorderStop[], baseVersion?: number) => {
@@ -303,6 +396,28 @@ export const restoreAdminDestination = async (id: number) => {
 
 export const forceDeleteAdminDestination = async (id: number) => {
   await api.delete(`/admin/destinations/${id}/force`);
+};
+
+export interface ItineraryConflict {
+  message: string;
+  itinerary: Itinerary;
+  stop?: ItineraryItem | null;
+}
+
+export const apiConflict = (error: unknown): ItineraryConflict | null => {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) return null;
+  const payload = error.response.data as {
+    message?: string;
+    conflict?: boolean;
+    data?: Itinerary;
+    stop?: ItineraryItem | null;
+  };
+  if (!payload?.conflict || !payload.data) return null;
+  return {
+    message: payload.message ?? "This trip changed while you were editing it.",
+    itinerary: payload.data,
+    stop: payload.stop ?? null,
+  };
 };
 
 export const apiFieldErrors = (error: unknown): Record<string, string> => {
@@ -423,7 +538,9 @@ export const unhideAdminReview = async (reviewId: number) => {
 };
 
 export const getItineraryChanges = async (id: number, sinceVersion: number) => {
-  const { data } = await api.get(`/itineraries/${id}/changes?since_version=${sinceVersion}`);
+  const { data } = await api.get<ItineraryChanges>(`/itineraries/${id}/changes`, {
+    params: { since_version: sinceVersion },
+  });
   return data;
 };
 
@@ -437,8 +554,38 @@ export const getItineraryMembers = async (id: number) => {
   return data.data;
 };
 
+export const inviteItineraryMembers = async (
+  id: number,
+  payload: { user_ids: number[]; role: "editor" | "viewer" },
+) => {
+  const { data } = await api.post<{ data: ItineraryMember[] }>(`/itineraries/${id}/members`, payload);
+  return data.data;
+};
+
+export const getPendingInvitation = async (itineraryId: number) => {
+  const { data } = await api.get<{ data: { itinerary_id: number; title: string; owner: Itinerary["owner"]; role: "editor" | "viewer"; status: "pending"; invited_at?: string | null } }>(
+    `/itineraries/${itineraryId}/invitation`,
+  );
+  return data.data;
+};
+
+export const acceptPendingInvitation = async (itineraryId: number) => {
+  const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/itineraries/${itineraryId}/invitation/accept`);
+  return data;
+};
+
+export const declinePendingInvitation = async (itineraryId: number) => {
+  const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/itineraries/${itineraryId}/invitation/decline`);
+  return data;
+};
+
+export const rsvpItinerary = async (itineraryId: number, rsvp: "going" | "maybe" | "declined") => {
+  const { data } = await api.patch<{ data: ItineraryMember[] }>(`/itineraries/${itineraryId}/rsvp`, { rsvp });
+  return data.data;
+};
+
 export const updateItineraryMemberRole = async (itineraryId: number, userId: number, role: "editor" | "viewer") => {
-  const { data } = await api.patch<{ data: ItineraryMember }>(`/itineraries/${itineraryId}/members/${userId}`, { role });
+  const { data } = await api.patch<{ data: ItineraryMember[] }>(`/itineraries/${itineraryId}/members/${userId}`, { role });
   return data.data;
 };
 
@@ -453,6 +600,26 @@ export const leaveItinerary = async (itineraryId: number, userId: number) => {
 export const transferItineraryOwnership = async (itineraryId: number, userId: number) => {
   const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/itineraries/${itineraryId}/transfer-ownership`, { user_id: userId });
   return data;
+};
+
+export const getInviteLinks = async (id: number) => {
+  const { data } = await api.get<{ data: ItineraryInvite[] }>(`/itineraries/${id}/invite-links`);
+  return data.data;
+};
+
+export const createInviteLink = async (
+  id: number,
+  payload: { role: "editor" | "viewer"; expires_in_days?: number; max_uses?: number | null },
+) => {
+  const { data } = await api.post<{ data: ItineraryInvite; token: string; invite_url: string }>(
+    `/itineraries/${id}/invite-links`,
+    payload,
+  );
+  return data;
+};
+
+export const revokeInviteLink = async (itineraryId: number, inviteId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/invite-links/${inviteId}`);
 };
 
 export const getItineraryInvites = async (id: number) => {

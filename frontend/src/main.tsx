@@ -26,6 +26,7 @@ import AppLayout from "@/pages/dashboard/layout";
 import DestinationDetailPage from "@/pages/dashboard/user/destination-detail";
 import DestinationsPage from "@/pages/dashboard/user/destinations";
 import FavoritesPage from "@/pages/dashboard/user/favorites";
+import FriendsPage from "@/pages/dashboard/user/friends";
 import DashboardHomePage from "@/pages/dashboard/user/home";
 import HistoryPage from "@/pages/dashboard/user/history";
 import ItineraryPage from "@/pages/dashboard/user/itinerary";
@@ -88,6 +89,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="trips/new" element={<TripWizardPage />} />
             <Route path="trips/:id" element={<ItineraryPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
+            <Route path="friends" element={<FriendsPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="reviews" element={<MyReviewsPage />} />
             <Route path="profile" element={<ProfilePage />}>

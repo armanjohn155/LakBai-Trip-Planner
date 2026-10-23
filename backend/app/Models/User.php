@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'password', 'avatar_url', 'username', 'friend_code', 'friend_code_regenerated_at'])]
@@ -86,7 +87,6 @@ class User extends Authenticatable
         return $this->hasOne(UserSettings::class);
     }
 
-<<<<<<< HEAD
     public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'requester_id');
@@ -95,12 +95,38 @@ class User extends Authenticatable
     public function receivedFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'addressee_id');
-=======
-    public function sharedItineraries(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    }
+
+    public static function generateUsername(string $name, ?int $excludeId = null): string
     {
-        return $this->belongsToMany(Itinerary::class, 'itinerary_user')
-            ->withPivot(['role', 'invited_by', 'joined_at'])
-            ->withTimestamps();
->>>>>>> origin/main
+        $base = Str::slug($name, '_');
+        $base = strtolower(preg_replace('/[^a-z0-9_]/', '', $base) ?: 'user');
+        if (strlen($base) < 3) {
+            $base = $base.'user';
+        }
+        $base = substr($base, 0, 12);
+
+        $username = $base;
+        $i = 0;
+        while (static::query()->where('username', $username)->when($excludeId, fn ($q, $id) => $q->where('id', '!=', $id))->exists()) {
+            $i++;
+            $suffix = (string) $i;
+            $username = substr($base, 0, max(3, 12 - strlen($suffix))).$suffix;
+        }
+
+        return $username;
+    }
+
+    public static function generateFriendCode(?int $excludeId = null): string
+    {
+        $chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        do {
+            $code = 'LAKBAI-';
+            for ($i = 0; $i < 6; $i++) {
+                $code .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        } while (static::query()->where('friend_code', $code)->when($excludeId, fn ($q, $id) => $q->where('id', '!=', $id))->exists());
+
+        return $code;
     }
 }

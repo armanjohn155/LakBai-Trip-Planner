@@ -149,12 +149,12 @@ export interface ItineraryItem {
 export interface ItinerarySummaryDay {
   day_number: number;
   item_count: number;
-  estimated_budget: number;
+  estimated_budget: number | null;
   duration_minutes: number;
 }
 
 export interface ItineraryBudgetSummary {
-  total_estimated_budget: number;
+  total_estimated_budget: number | null;
   budget_limit: number | null;
   remaining_budget: number | null;
   over_budget: boolean;
@@ -173,6 +173,11 @@ export interface ItineraryRouteEstimate {
   days: Array<{ day_number: number; legs: ItineraryRouteLeg[] }>;
 }
 
+export type TripType = "solo" | "group";
+export type TripRole = "owner" | "editor" | "viewer";
+export type TripMemberStatus = "pending" | "accepted" | "declined";
+export type TripRsvp = "going" | "maybe" | "declined";
+
 export interface Itinerary {
   id: number;
   title: string;
@@ -180,11 +185,12 @@ export interface Itinerary {
   start_date: string | null;
   end_date: string | null;
   budget: string | number | null;
-  total_budget: string | number;
+  total_budget: string | number | null;
   budget_limit: number | null;
   cover_image_url: string | null;
   is_template: boolean;
   template_key: string | null;
+  trip_type: TripType;
   day_count: number;
   item_count?: number;
   summary: ItineraryBudgetSummary;
@@ -193,11 +199,27 @@ export interface Itinerary {
   updated_at?: string;
   version?: number;
   share_budget?: boolean;
-  my_role?: 'owner' | 'editor' | 'viewer' | null;
+  my_role?: TripRole | null;
+  my_status?: TripMemberStatus | null;
   is_shared?: boolean;
   member_count?: number;
-  updated_by?: { id: number; name: string } | number | null;
-  owner?: { id: number; name: string; email?: string } | null;
+  members?: ItineraryMember[];
+  updated_by?: string | null;
+  owner?: { id: number; name: string | null; username?: string | null; avatar_url?: string | null; email?: string } | null;
+}
+
+export interface PendingInvite {
+  id: number;
+  title: string;
+  trip_type: TripType;
+  my_role: null;
+  my_status: "pending";
+  invited_role: "editor" | "viewer";
+  member_count?: number;
+  owner: { id: number; name: string | null; username?: string | null; avatar_url?: string | null };
+  invited_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ItineraryTemplate {
@@ -227,7 +249,7 @@ export interface ItinerarySummary {
   itinerary_id: number;
   title: string;
   budget: string | number | null;
-  total_budget: number;
+  total_budget: number | null;
   budget_limit: number | null;
   remaining_budget: number | null;
   over_budget: boolean;
@@ -238,14 +260,27 @@ export interface ItinerarySummary {
   breakdown_by_category: BudgetBreakdown[];
 }
 
+export interface ItineraryChanges {
+  data: {
+    version: number;
+    changed: boolean;
+    updated_by: string | null;
+    activities: ItineraryActivity[];
+  };
+}
+
 
 export interface ItineraryMember {
   id: number;
   name: string;
+  username?: string | null;
   avatar_url?: string | null;
-  role: 'owner' | 'editor' | 'viewer';
+  role: TripRole;
+  status?: TripMemberStatus;
+  rsvp?: TripRsvp | null;
+  invited_at?: string | null;
+  responded_at?: string | null;
   joined_at?: string | null;
-  email?: string | null;
 }
 
 export interface ItineraryInvite {
@@ -272,9 +307,17 @@ export interface ItineraryActivity {
 }
 
 export interface InvitePreview {
+  itinerary_id?: number;
   itinerary_name: string;
   owner_name?: string | null;
-  role: 'editor' | 'viewer';
+  owner_username?: string | null;
+  owner?: {
+    name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+  };
+  type?: "email" | "link";
+  role: "editor" | "viewer";
   expires_at?: string | null;
   member_count?: number;
 }
@@ -289,6 +332,9 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  username?: string | null;
+  friend_code?: string | null;
+  friend_code_regenerated_at?: string | null;
   role?: "user" | "admin";
   avatar_url?: string | null;
   created_at?: string | null;
@@ -298,6 +344,30 @@ export interface User {
 export interface AuthPayload {
   user: User;
   token: string;
+}
+
+export interface FriendUser {
+  id: number;
+  name: string;
+  username?: string | null;
+  avatar_url?: string | null;
+}
+
+export type FriendshipStatus = "pending" | "accepted" | "declined" | "blocked";
+
+export interface Friendship {
+  id: number;
+  status: FriendshipStatus;
+  requester_id: number;
+  addressee_id: number;
+  responded_at?: string | null;
+  created_at?: string | null;
+  user: FriendUser | null;
+}
+
+export interface FriendCode {
+  friend_code: string | null;
+  friend_code_regenerated_at: string | null;
 }
 
 export interface Paginated<T> {

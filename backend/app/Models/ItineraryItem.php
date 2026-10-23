@@ -32,6 +32,9 @@ class ItineraryItem extends Model
     /** @use HasFactory<ItineraryItemFactory> */
     use HasFactory;
 
+    /** Request-scoped flag used by resources and exports; never persisted. */
+    public bool $budgetVisible = true;
+
     public const STATUSES = ['planned', 'done', 'skipped'];
 
     /**
@@ -71,7 +74,9 @@ class ItineraryItem extends Model
 
         return $query->whereHas('itinerary', function (Builder $it) use ($user) {
             $it->where('user_id', $user->id)
-                ->orWhereHas('members', fn (Builder $m) => $m->where('users.id', $user->id));
+                ->orWhereHas('members', fn (Builder $m) => $m
+                    ->where('users.id', $user->id)
+                    ->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED));
         });
     }
 

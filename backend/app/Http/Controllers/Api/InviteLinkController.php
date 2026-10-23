@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\RateLimiter;
 
 class InviteLinkController extends Controller
 {
@@ -39,7 +38,6 @@ class InviteLinkController extends Controller
     public function store(Itinerary $itinerary): JsonResponse
     {
         Gate::authorize('manageMembers', $itinerary);
-        $this->enforceThrottle('itinerary-link:'.request()->user()->id, 'invite_throttle', '20,1');
 
         $validated = request()->validate([
             'role' => ['required', 'in:editor,viewer'],
@@ -117,25 +115,11 @@ class InviteLinkController extends Controller
      */
     public function accept(string $token): JsonResponse
     {
-        $this->enforceThrottle('itinerary-link-accept:'.request()->user()->id, 'invite_accept_throttle', '10,1');
-
         $itinerary = $this->invitations->acceptLink($token, request()->user());
 
         return response()->json([
             'data' => ['itinerary_id' => $itinerary->id],
             'message' => 'You joined the trip.',
         ]);
-    }
-
-    private function enforceThrottle(string $key, string $configKey, string $default): void
-    {
-        $throttle = (string) config('lakbai.sharing.'.$configKey, $default);
-        [$max, $decay] = array_map('intval', explode(',', $throttle));
-
-        RateLimiter::hit($key, $decay * 60);
-
-        if (RateLimiter::tooManyAttempts($key, $max)) {
-            abort(429, 'Too many attempts. Please try again later.');
-        }
     }
 }

@@ -13,14 +13,15 @@ interface StopCardProps {
   item: ItineraryItem;
   sequence: number;
   busy?: boolean;
+  canEdit?: boolean;
   onToggleStatus: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onFocus?: () => void;
 }
 
-export function StopCard({ item, sequence, busy = false, onToggleStatus, onEdit, onDelete, onFocus }: StopCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+export function StopCard({ item, sequence, busy = false, canEdit = true, onToggleStatus, onEdit, onDelete, onFocus }: StopCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: !canEdit });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -54,7 +55,7 @@ export function StopCard({ item, sequence, busy = false, onToggleStatus, onEdit,
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onEdit} className="min-w-0 text-left" title={`Edit ${item.title}`}>
+            <button type="button" onClick={canEdit ? onEdit : onFocus} className="min-w-0 text-left" title={canEdit ? `Edit ${item.title}` : `Show ${item.title} on map`}>
               <span className={cn("block truncate text-sm font-semibold", isSkipped ? "text-ink-600 line-through" : "text-ink-900")}>
                 {item.title}
               </span>
@@ -93,19 +94,6 @@ export function StopCard({ item, sequence, busy = false, onToggleStatus, onEdit,
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
-            onClick={onToggleStatus}
-            disabled={busy}
-            aria-label={isDone ? `Mark ${item.title} as planned` : `Mark ${item.title} as done`}
-            title={isDone ? "Mark as planned" : "Mark as done"}
-            className={cn(
-              "rounded-lg p-1.5 transition-colors disabled:opacity-50",
-              isDone ? "text-mango-500 hover:bg-mango-400/15" : "text-ink-500 hover:bg-sand-100 hover:text-ink-900",
-            )}
-          >
-            <CheckIcon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
             onClick={onFocus}
             aria-label={`Show ${item.title} on map`}
             title="Show on map"
@@ -113,35 +101,52 @@ export function StopCard({ item, sequence, busy = false, onToggleStatus, onEdit,
           >
             <PinIcon className="h-5 w-5" />
           </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={`Edit ${item.title}`}
-            title="Edit stop"
-            className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-sand-100 hover:text-ink-900"
-          >
-            <PencilIcon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            aria-label={`Reorder ${item.title}`}
-            title="Drag to reorder"
-            className="cursor-grab touch-none rounded-lg p-1.5 text-ink-500 transition-colors select-none hover:bg-sand-100 hover:text-ink-900 active:cursor-grabbing"
-          >
-            <GripIcon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={busy}
-            aria-label={`Delete ${item.title}`}
-            title="Remove stop"
-            className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          >
-            <DeleteIcon />
-          </button>
+          {canEdit ? (
+            <>
+              <button
+                type="button"
+                onClick={onToggleStatus}
+                disabled={busy}
+                aria-label={isDone ? `Mark ${item.title} as planned` : `Mark ${item.title} as done`}
+                title={isDone ? "Mark as planned" : "Mark as done"}
+                className={cn(
+                  "rounded-lg p-1.5 transition-colors disabled:opacity-50",
+                  isDone ? "text-mango-500 hover:bg-mango-400/15" : "text-ink-500 hover:bg-sand-100 hover:text-ink-900",
+                )}
+              >
+                <CheckIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label={`Edit ${item.title}`}
+                title="Edit stop"
+                className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-sand-100 hover:text-ink-900"
+              >
+                <PencilIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                {...attributes}
+                {...listeners}
+                aria-label={`Reorder ${item.title}`}
+                title="Drag to reorder"
+                className="cursor-grab touch-none rounded-lg p-1.5 text-ink-500 transition-colors select-none hover:bg-sand-100 hover:text-ink-900 active:cursor-grabbing"
+              >
+                <GripIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={busy}
+                aria-label={`Delete ${item.title}`}
+                title="Remove stop"
+                className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+              >
+                <DeleteIcon />
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
     </li>

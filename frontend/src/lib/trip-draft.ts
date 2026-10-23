@@ -1,4 +1,4 @@
-import type { Destination } from "@/lib/types";
+import type { Destination, FriendUser, TripType } from "@/lib/types";
 import { toNumber } from "@/lib/format";
 
 export interface DraftItem {
@@ -16,6 +16,9 @@ export interface TripDraft {
   endDate: string;
   budget: string;
   noBudgetLimit: boolean;
+  tripType: TripType;
+  invitees: FriendUser[];
+  inviteRole: "editor" | "viewer";
   items: DraftItem[];
 }
 
@@ -31,6 +34,9 @@ export const emptyTripDraft = (): TripDraft => ({
   endDate: "",
   budget: "",
   noBudgetLimit: false,
+  tripType: "solo",
+  invitees: [],
+  inviteRole: "editor",
   items: [],
 });
 
@@ -40,6 +46,8 @@ export const hasDraftData = (draft: TripDraft): boolean =>
   draft.endDate !== "" ||
   draft.budget !== "" ||
   draft.noBudgetLimit ||
+  draft.tripType === "group" ||
+  draft.invitees.length > 0 ||
   draft.items.length > 0;
 
 export function persistDraft(draft: TripDraft, step: number): void {

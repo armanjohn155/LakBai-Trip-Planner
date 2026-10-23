@@ -112,7 +112,7 @@ class GpxExporter extends AbstractItineraryExporter
             $parts[] = $item->notes;
         }
 
-        if ($item->estimated_budget !== null) {
+        if ($item->budgetVisible && $item->estimated_budget !== null) {
             $parts[] = 'Budget: PHP '.$item->estimated_budget;
         }
 

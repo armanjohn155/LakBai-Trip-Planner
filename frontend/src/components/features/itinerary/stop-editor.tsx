@@ -6,7 +6,7 @@ import { InlineError } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { STOP_CATEGORIES, STOP_STATUS_LABEL, STOP_STATUSES } from "@/components/features/itinerary/itinerary-constants";
-import { apiError, deleteItineraryItem, updateItineraryItem } from "@/lib/api";
+import { apiConflict, apiError, deleteItineraryItem, updateItineraryItem } from "@/lib/api";
 import type { Destination, Itinerary, ItineraryItem } from "@/lib/types";
 
 interface StopEditorProps {
@@ -16,6 +16,7 @@ interface StopEditorProps {
   destinations: Destination[];
   onClose: () => void;
   onSaved: () => Promise<void> | void;
+  onConflict?: (conflict: { message: string; itinerary: Itinerary }) => void;
 }
 
 interface FormState {
@@ -69,7 +70,7 @@ function initialState(item: ItineraryItem | null, destinations: Destination[]): 
   };
 }
 
-export function StopEditor({ open, itinerary, item, destinations, onClose, onSaved }: StopEditorProps) {
+export function StopEditor({ open, itinerary, item, destinations, onClose, onSaved, onConflict }: StopEditorProps) {
   const [form, setForm] = useState<FormState>(() => initialState(item, destinations));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -119,11 +120,13 @@ export function StopEditor({ open, itinerary, item, destinations, onClose, onSav
             status: form.status as ItineraryItem["status"],
           };
 
-      await updateItineraryItem(itinerary.id, item.id, payload);
+      await updateItineraryItem(itinerary.id, item.id, { ...payload, base_version: itinerary.version });
       await onSaved();
       onClose();
     } catch (submitError) {
-      setError(apiError(submitError));
+      const stale = apiConflict(submitError);
+      if (stale && onConflict) onConflict({ message: stale.message, itinerary: stale.itinerary });
+      else setError(apiError(submitError));
     } finally {
       setSaving(false);
     }
@@ -133,11 +136,13 @@ export function StopEditor({ open, itinerary, item, destinations, onClose, onSav
     setError(null);
     setDeleting(true);
     try {
-      await deleteItineraryItem(itinerary.id, item.id);
+      await deleteItineraryItem(itinerary.id, item.id, itinerary.version);
       await onSaved();
       onClose();
     } catch (deleteError) {
-      setError(apiError(deleteError));
+      const stale = apiConflict(deleteError);
+      if (stale && onConflict) onConflict({ message: stale.message, itinerary: stale.itinerary });
+      else setError(apiError(deleteError));
     } finally {
       setDeleting(false);
     }

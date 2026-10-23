@@ -49,6 +49,12 @@ class ItineraryExportController extends Controller
 
         $itinerary->load(['items.destination' => fn ($query) => $query->withTrashed()]);
 
+        // Viewers may only see budgets when the owner explicitly shares them.
+        // Exports must follow the same rule as the API projection.
+        $role = $itinerary->roleFor($request->user());
+        $itinerary->budgetVisible = $role !== Itinerary::ROLE_VIEWER || (bool) $itinerary->share_budget;
+        $itinerary->items->each(fn ($item) => $item->budgetVisible = $itinerary->budgetVisible);
+
         return $this->exporters[$format]->download($itinerary);
     }
 }

@@ -1,7 +1,8 @@
+import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { CalendarIcon } from "@/components/icons";
+import { CalendarIcon, FriendsIcon } from "@/components/icons";
 import { InlineError } from "@/components/ui/feedback";
 import { cn } from "@/lib/cn";
 import { formatMoney, pluralise, toNumber } from "@/lib/format";
@@ -36,6 +37,40 @@ export function ReviewStep({ draft, dayCount, onBack, onCreate, submitting, erro
             <CalendarIcon className="h-4 w-4" />
             {formatDateShort(draft.startDate)} → {formatDateShort(draft.endDate)} · {pluralise(dayCount, "day")}
           </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-lagoon-900 text-sand-50">
+              <FriendsIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-ink-900">
+                {draft.tripType === "group" ? "Group trip" : "Solo trip"}
+              </p>
+              <p className="mt-0.5 text-sm text-ink-600">
+                {draft.tripType === "group"
+                  ? draft.invitees.length > 0
+                    ? `${draft.invitees.length} ${draft.invitees.length === 1 ? "friend" : "friends"} will get an invite as ${draft.inviteRole === "editor" ? "editors" : "viewers"}.`
+                    : "You can invite friends from the planner after creating this trip."
+                  : "Only you can open and edit this planner."}
+              </p>
+            </div>
+          </div>
+          {draft.tripType === "group" && draft.invitees.length > 0 ? (
+            <div className="flex -space-x-2">
+              {draft.invitees.slice(0, 5).map((friend) => (
+                <Avatar key={friend.id} name={friend.name} src={friend.avatar_url ?? null} className="h-8 w-8 text-xs ring-white" />
+              ))}
+              {draft.invitees.length > 5 ? (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sand-200 text-xs font-semibold text-ink-700 ring-2 ring-white">
+                  +{draft.invitees.length - 5}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Card>
 

@@ -76,11 +76,20 @@ class TripInvitationService
             }
         }
 
+        // Re-inviting an existing accepted or pending member is a no-op rather
+        // than a duplicate notification.
+        $users = $users
+            ->reject(fn (User $user) => $this->isActiveMember($itinerary, $user))
+            ->values();
+
+        if ($users->isEmpty()) {
+            return $users;
+        }
+
         $maxMembers = (int) config('lakbai.sharing.max_members', 20);
         $current = $this->memberAndPendingCount($itinerary);
-        $newInvites = $users->filter(fn (User $user) => ! $this->isActiveMember($itinerary, $user))->count();
 
-        if ($current + $newInvites > $maxMembers) {
+        if ($current + $users->count() > $maxMembers) {
             throw ValidationException::withMessages([
                 'members' => "This trip has reached the member limit ({$maxMembers}).",
             ]);
@@ -88,10 +97,6 @@ class TripInvitationService
 
         DB::transaction(function () use ($itinerary, $actor, $users, $role) {
             foreach ($users as $user) {
-                if ($itinerary->acceptedMembers()->whereKey($user->id)->exists()) {
-                    continue;
-                }
-
                 $itinerary->members()->syncWithoutDetaching([
                     $user->id => [
                         'role' => $role,
@@ -111,7 +116,7 @@ class TripInvitationService
             ]);
         });
 
-        return $users->values();
+        return $users;
     }
 
     public function accept(Itinerary $itinerary, User $user): Itinerary
@@ -124,6 +129,12 @@ class TripInvitationService
 
             if ($member === null || $member->pivot->status !== Itinerary::STATUS_PENDING) {
                 abort(404, 'No pending invitation found for this trip.');
+            }
+
+            $itinerary->loadMissing('user');
+
+            if ($itinerary->user !== null && $this->friends->isBlockedBetween($itinerary->user, $user)) {
+                abort(403, 'You cannot join a trip shared by a user you have blocked or who has blocked you.');
             }
 
             $itinerary->members()->updateExistingPivot($user->id, [
@@ -307,6 +318,20 @@ class TripInvitationService
      */
     public function cancelPendingInvitesBetween(User $a, User $b): void
     {
+        $affected = DB::table('itinerary_user')
+            ->where('status', Itinerary::STATUS_PENDING)
+            ->where(function ($query) use ($a, $b) {
+                $query->where(function ($query) use ($a, $b) {
+                    $query->where('user_id', $a->id)
+                        ->whereIn('itinerary_id', DB::table('itineraries')->select('id')->where('user_id', $b->id));
+                })->orWhere(function ($query) use ($a, $b) {
+                    $query->where('user_id', $b->id)
+                        ->whereIn('itinerary_id', DB::table('itineraries')->select('id')->where('user_id', $a->id));
+                });
+            })
+            ->pluck('itinerary_id')
+            ->unique();
+
         DB::table('itinerary_user')
             ->where('status', Itinerary::STATUS_PENDING)
             ->where(function ($query) use ($a, $b) {
@@ -319,6 +344,8 @@ class TripInvitationService
                 });
             })
             ->delete();
+
+        Itinerary::query()->whereKey($affected)->get()->each(fn (Itinerary $itinerary) => $this->syncTripType($itinerary));
     }
 
     /**
@@ -378,7 +405,17 @@ class TripInvitationService
 
     public function acceptLink(string $rawToken, User $user): Itinerary
     {
-        return DB::transaction(function () use ($rawToken, $user) {
+        return $this->acceptToken($rawToken, $user, false);
+    }
+
+    /**
+     * Redeem an email or link token. Email invites additionally require the
+     * signed-in user's email to match, and every redemption is blocked when
+     * the owner and invitee have blocked each other.
+     */
+    public function acceptToken(string $rawToken, User $user, bool $enforceEmailMatch = true): Itinerary
+    {
+        return DB::transaction(function () use ($rawToken, $user, $enforceEmailMatch) {
             $invite = ItineraryInvite::query()
                 ->where('token', hash('sha256', $rawToken))
                 ->lockForUpdate()
@@ -389,13 +426,24 @@ class TripInvitationService
             }
 
             $itinerary = Itinerary::query()->whereKey($invite->itinerary_id)->lockForUpdate()->firstOrFail();
+            $itinerary->loadMissing('user');
 
             if ((int) $itinerary->user_id === (int) $user->id) {
-                abort(403, 'The owner cannot accept their own invite link.');
+                abort(403, 'The owner cannot accept their own invite.');
+            }
+
+            if ($enforceEmailMatch && $invite->type === 'email' && $invite->email !== null
+                && strtolower($invite->email) !== strtolower((string) $user->email)) {
+                abort(403, 'This invite was sent to a different email address.');
+            }
+
+            if ($itinerary->user !== null && $this->friends->isBlockedBetween($itinerary->user, $user)) {
+                abort(403, 'You cannot join a trip shared by a user you have blocked or who has blocked you.');
             }
 
             $existing = $itinerary->members()->whereKey($user->id)->first();
 
+            // Accepting twice is idempotent and must not consume another use.
             if ($existing !== null && $existing->pivot->status === Itinerary::STATUS_ACCEPTED) {
                 return $itinerary;
             }
@@ -414,8 +462,14 @@ class TripInvitationService
                     'joined_at' => now(),
                 ]);
             } else {
+                // Keep the stronger role when a pending targeted invite already
+                // grants more than the link being redeemed.
+                $role = $existing->pivot->status === Itinerary::STATUS_PENDING
+                    ? $this->strongerRole((string) $existing->pivot->role, $invite->role)
+                    : $invite->role;
+
                 $itinerary->members()->updateExistingPivot($user->id, [
-                    'role' => $invite->role,
+                    'role' => $role,
                     'status' => Itinerary::STATUS_ACCEPTED,
                     'responded_at' => now(),
                     'joined_at' => now(),
@@ -426,7 +480,12 @@ class TripInvitationService
 
             $this->syncTripType($itinerary);
             $this->activityLogger->recordChange($itinerary, 'member.joined', $user, $user);
-            event(new TripMemberJoinedViaLink($itinerary, $user, $invite->role));
+
+            if ($invite->type === 'email') {
+                event(new TripInviteAccepted($itinerary, $user, $invite->role));
+            } else {
+                event(new TripMemberJoinedViaLink($itinerary, $user, $invite->role));
+            }
 
             return $itinerary->fresh();
         });
@@ -473,5 +532,12 @@ class TripInvitationService
         }
 
         return $role;
+    }
+
+    private function strongerRole(string $a, string $b): string
+    {
+        return $a === Itinerary::ROLE_EDITOR || $b === Itinerary::ROLE_EDITOR
+            ? Itinerary::ROLE_EDITOR
+            : Itinerary::ROLE_VIEWER;
     }
 }

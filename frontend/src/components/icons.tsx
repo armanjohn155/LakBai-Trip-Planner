@@ -221,6 +221,17 @@ export function UserIcon({ className }: { className?: string }) {
   );
 }
 
+export function FriendsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19c.5-3 2.6-4.7 5.5-4.7s5 1.7 5.5 4.7" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 14.4c2.4.1 4.1 1.6 4.5 4.1" />
+    </svg>
+  );
+}
+
 export function ShieldIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">

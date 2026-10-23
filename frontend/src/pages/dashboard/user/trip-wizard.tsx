@@ -7,7 +7,7 @@ import { ItineraryStep } from "@/components/features/trip-wizard/itinerary-step"
 import { ReviewStep } from "@/components/features/trip-wizard/review-step";
 import { StepIndicator } from "@/components/features/trip-wizard/step-indicator";
 import { XIcon } from "@/components/icons";
-import { apiError, addItineraryItem, createItinerary, getDestinations } from "@/lib/api";
+import { apiError, addItineraryItem, createItinerary, getDestinations, getFriends } from "@/lib/api";
 import { toNumber } from "@/lib/format";
 import {
   clearDraft,
@@ -21,7 +21,7 @@ import {
   type DraftItem,
   type TripDraft,
 } from "@/lib/trip-draft";
-import type { Destination } from "@/lib/types";
+import type { Destination, FriendUser } from "@/lib/types";
 
 export default function TripWizardPage() {
   const navigate = useNavigate();
@@ -30,6 +30,8 @@ export default function TripWizardPage() {
   const [step, setStep] = useState(() => restored?.step ?? 1);
   const [maxStep, setMaxStep] = useState(() => restored?.step ?? 1);
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [friends, setFriends] = useState<FriendUser[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -47,6 +49,21 @@ export default function TripWizardPage() {
         if (!cancelled) setDestinations(page.data);
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFriends()
+      .then((data) => {
+        if (!cancelled) setFriends(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setFriendsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -132,11 +149,15 @@ export default function TripWizardPage() {
     try {
       const title = draft.title.trim() || suggestedDraftTitle(draft);
       const budget = draft.noBudgetLimit || draft.budget === "" ? null : toNumber(draft.budget);
+      const invitees = draft.tripType === "group" ? draft.invitees : [];
       const trip = await createItinerary({
         title,
         start_date: draft.startDate,
         end_date: draft.endDate,
         budget,
+        trip_type: draft.tripType,
+        invite_user_ids: invitees.map((friend) => friend.id),
+        role: draft.inviteRole,
       });
 
       const sortedItems = [...draft.items].sort((a, b) => a.dayIndex - b.dayIndex || a.order - b.order);
@@ -186,7 +207,13 @@ export default function TripWizardPage() {
       <StepIndicator current={step} maxStep={maxStep} onSelect={goToStep} />
 
       {step === 1 ? (
-        <DetailsStep draft={draft} onChange={updateDraft} onNext={goNextFromDetails} />
+        <DetailsStep
+          draft={draft}
+          friends={friends}
+          friendsLoading={friendsLoading}
+          onChange={updateDraft}
+          onNext={goNextFromDetails}
+        />
       ) : step === 2 ? (
         <ItineraryStep
           draft={draft}

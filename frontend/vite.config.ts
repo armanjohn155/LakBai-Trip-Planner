@@ -13,8 +13,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/storage': 'http://localhost:8080',
+      '/api': 'http://127.0.0.1:8000',
+      '/storage': 'http://127.0.0.1:8000',
     },
   },
 })

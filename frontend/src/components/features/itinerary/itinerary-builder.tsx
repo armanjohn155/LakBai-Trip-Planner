@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   DndContext,
   DragOverlay,
@@ -21,6 +21,7 @@ import { ExportMenu } from "@/components/features/itinerary/export-menu";
 import { ItineraryMap } from "@/components/features/itinerary/itinerary-map";
 import { StopCard } from "@/components/features/itinerary/stop-card";
 import { StopEditor } from "@/components/features/itinerary/stop-editor";
+import { ShareDialog } from "@/components/features/itinerary/share-dialog";
 import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
 import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
 import { Button } from "@/components/ui/button";
@@ -28,13 +29,16 @@ import { Card } from "@/components/ui/card";
 import { EmptyState, InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { LayersIcon, PlusIcon, RouteIcon, SlidersIcon } from "@/components/icons";
+import { ClockIcon, LayersIcon, PlusIcon, RouteIcon, ShareIcon, SlidersIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import {
+  apiConflict,
   apiError,
   deleteItineraryItem,
   getDestinations,
   getItinerary,
+  getItineraryActivities,
+  getItineraryChanges,
   getItineraryRouteEstimates,
   getItinerarySummary,
   reorderItineraryItems,
@@ -42,7 +46,7 @@ import {
   updateItineraryItem,
   type ReorderStop,
 } from "@/lib/api";
-import type { Destination, Itinerary, ItineraryItem, ItineraryRouteEstimate, ItineraryRouteLeg, ItinerarySummary } from "@/lib/types";
+import type { Destination, Itinerary, ItineraryActivity, ItineraryItem, ItineraryRouteEstimate, ItineraryRouteLeg, ItinerarySummary } from "@/lib/types";
 
 interface ItineraryBuilderProps {
   itineraryId: number;
@@ -68,6 +72,7 @@ function groupByDay(items: ItineraryItem[]): DayGroup[] {
 const DAY_COUNT = 30;
 
 export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: ItineraryBuilderProps) {
+  const navigate = useNavigate();
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [summary, setSummary] = useState<ItinerarySummary | null>(null);
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -83,6 +88,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [addOpen, setAddOpen] = useState(initialAddDestinationId != null);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [focusItemId, setFocusItemId] = useState<number | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [remote, setRemote] = useState<{ version: number; updatedBy: string | null; activities: ItineraryActivity[] } | null>(null);
+  const [conflict, setConflict] = useState<{ message: string; itinerary: Itinerary } | null>(null);
+  const [activities, setActivities] = useState<ItineraryActivity[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const versionRef = useRef(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -118,6 +130,61 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     };
   }, [refresh]);
 
+  useEffect(() => {
+    if (itinerary) {
+      versionRef.current = itinerary.version ?? 0;
+      if (remote && remote.version <= versionRef.current) setRemote(null);
+    }
+  }, [itinerary, remote]);
+
+  useEffect(() => {
+    if (!itinerary || itinerary.trip_type !== "group") return;
+
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const changes = await getItineraryChanges(itineraryId, versionRef.current);
+        if (cancelled || !changes.data.changed) return;
+        setRemote({
+          version: changes.data.version,
+          updatedBy: changes.data.updated_by,
+          activities: changes.data.activities,
+        });
+      } catch {
+        // Polling is best-effort; the next tick will retry.
+      }
+    };
+
+    const timer = window.setInterval(() => void check(), 25_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [itinerary, itineraryId]);
+
+  useEffect(() => {
+    if (!activityOpen) return;
+
+    let cancelled = false;
+    // Loading flag is set when the activity modal opens; the request follows immediately.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActivityLoading(true);
+    getItineraryActivities(itineraryId)
+      .then((page) => {
+        if (!cancelled) setActivities(page.data);
+      })
+      .catch((error) => {
+        if (!cancelled) setItemError(apiError(error));
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activityOpen, itineraryId]);
+
   const items = useMemo(() => itinerary?.items ?? [], [itinerary]);
   const groups = useMemo(() => groupByDay(items), [items]);
 
@@ -139,11 +206,18 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     setItemError(null);
     setBusyItem(item.id);
     try {
-      applyItinerary(await updateItineraryItem(itineraryId, item.id, { status: item.status === "done" ? "planned" : "done" }));
+      applyItinerary(
+        await updateItineraryItem(itineraryId, item.id, {
+          status: item.status === "done" ? "planned" : "done",
+          base_version: itinerary?.version,
+        }),
+      );
       const bud = await getItinerarySummary(itineraryId);
       setSummary(bud);
     } catch (error) {
-      setItemError(apiError(error));
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setItemError(apiError(error));
     } finally {
       setBusyItem(null);
     }
@@ -153,10 +227,12 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     setItemError(null);
     setBusyItem(item.id);
     try {
-      await deleteItineraryItem(itineraryId, item.id);
+      await deleteItineraryItem(itineraryId, item.id, itinerary?.version);
       await refresh();
     } catch (error) {
-      setItemError(apiError(error));
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setItemError(apiError(error));
     } finally {
       setBusyItem(null);
     }
@@ -182,10 +258,12 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     if (itinerary) applyItinerary({ ...itinerary, items: ordered });
 
     try {
-      applyItinerary(await reorderItineraryItems(itineraryId, stops));
+      applyItinerary(await reorderItineraryItems(itineraryId, stops, itinerary?.version));
     } catch (error) {
       if (previous) applyItinerary(previous);
-      setItemError(apiError(error));
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setItemError(apiError(error));
     }
   };
 
@@ -238,9 +316,15 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   };
 
   const handleSaveSettings = async (payload: SettingsPayload) => {
-    applyItinerary(await updateItinerary(itineraryId, payload));
+    applyItinerary(await updateItinerary(itineraryId, { ...payload, base_version: itinerary?.version }));
     const bud = await getItinerarySummary(itineraryId);
     setSummary(bud);
+  };
+
+  const handleLoadLatest = async () => {
+    setConflict(null);
+    setRemote(null);
+    await refresh().catch((error) => setItemError(apiError(error)));
   };
 
   if (loading) {
@@ -262,6 +346,9 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const maxDay = Math.max(...groups.map((group) => group.day), 1);
   const activeItem = activeId !== null ? items.find((item) => item.id === activeId) ?? null : null;
   const showEstimates = estimates?.enabled ?? false;
+  const canEdit = itinerary.my_role !== "viewer";
+  const isOwner = itinerary.my_role === "owner";
+  const isGroup = itinerary.trip_type === "group";
 
   return (
     <div className="space-y-6 pb-10 sm:pb-14">
@@ -270,39 +357,91 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           <Link to="/app/trips" className="text-sm font-semibold text-sea-500 hover:text-sea-600">
             ← My trips
           </Link>
-          <h1 className="mt-1 truncate font-display text-3xl font-semibold text-lagoon-900">{itinerary.title}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="truncate font-display text-3xl font-semibold text-lagoon-900">{itinerary.title}</h1>
+            {isGroup ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-surf-400/15 px-2.5 py-1 text-xs font-semibold text-sea-600">
+                <ShareIcon className="h-3.5 w-3.5" /> Group trip
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sand-200/80 px-2.5 py-1 text-xs font-semibold text-ink-600">
+                Solo
+              </span>
+            )}
+            {!canEdit ? (
+              <span className="rounded-full bg-mango-400/20 px-2.5 py-1 text-xs font-semibold text-ink-700">View only</span>
+            ) : null}
+          </div>
           <p className="mt-0.5 text-sm text-ink-600">
             {summary.item_count} stops · {summary.day_count} days
             {summary.total_duration_minutes > 0 ? ` · ${formatDuration(summary.total_duration_minutes)} planned` : ""}
+            {itinerary.member_count && itinerary.member_count > 1 ? ` · ${itinerary.member_count} travellers` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
-            <LayersIcon className="h-4 w-4" /> Templates
+          <Button variant="secondary" onClick={() => setActivityOpen(true)}>
+            <ClockIcon className="h-4 w-4" /> Activity
           </Button>
-          <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
-            <SlidersIcon className="h-4 w-4" /> Settings
-          </Button>
+          {canEdit ? (
+            <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
+              <LayersIcon className="h-4 w-4" /> Templates
+            </Button>
+          ) : null}
+          {canEdit ? (
+            <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
+              <SlidersIcon className="h-4 w-4" /> Settings
+            </Button>
+          ) : null}
           <ExportMenu itinerary={itinerary} onError={setItemError} />
+          {itinerary.my_role ? (
+            <Button onClick={() => setShareOpen(true)}>
+              <ShareIcon className="h-4 w-4" /> {isOwner ? "Share" : "Members"}
+            </Button>
+          ) : null}
         </div>
       </div>
 
       {itemError ? <InlineError message={itemError} /> : null}
+
+      {remote ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mango-400/15 px-4 py-3 ring-1 ring-inset ring-mango-400/30">
+          <p className="text-sm text-ink-800">
+            <span className="font-semibold">{remote.updatedBy ?? "Someone"}</span> updated this trip while you were
+            looking. Refresh to see the latest version.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setActivityOpen(true)}>
+              View activity
+            </Button>
+            <Button size="sm" onClick={() => void handleLoadLatest()}>
+              Refresh trip
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {!canEdit ? (
+        <p className="rounded-xl bg-sand-100/70 px-4 py-3 text-sm text-ink-600">
+          You have view-only access. You can still explore the map, open stops and export a copy.
+        </p>
+      ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="min-w-0 space-y-6">
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-2 pt-5 sm:px-6">
               <h2 className="font-display text-xl font-medium text-lagoon-900">Itinerary</h2>
-              <button
-                type="button"
-                onClick={() => setAddOpen((value) => !value)}
-                aria-expanded={addOpen}
-                className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
-              >
-                <PlusIcon className={cn("h-4 w-4 transition-transform", addOpen && "rotate-45")} />
-                Add a stop
-              </button>
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={() => setAddOpen((value) => !value)}
+                  aria-expanded={addOpen}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
+                >
+                  <PlusIcon className={cn("h-4 w-4 transition-transform", addOpen && "rotate-45")} />
+                  Add a stop
+                </button>
+              ) : null}
             </div>
 
             <div className="px-3 pt-1 pb-5 sm:px-4">
@@ -312,9 +451,11 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                     title="No stops yet"
                     detail="Add places from our destinations, or drop a custom stop anywhere in Cebu."
                     action={
-                      <Button onClick={() => setAddOpen(true)}>
-                        <PlusIcon className="h-4 w-4" /> Add your first stop
-                      </Button>
+                      canEdit ? (
+                        <Button onClick={() => setAddOpen(true)}>
+                          <PlusIcon className="h-4 w-4" /> Add your first stop
+                        </Button>
+                      ) : undefined
                     }
                   />
                 </div>
@@ -329,6 +470,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                         groupIndex={groupIndex}
                         busyItem={busyItem}
                         estimateEnabled={showEstimates}
+                        canEdit={canEdit}
                         travelByLeg={travelByLeg}
                         onToggleStatus={handleToggleStatus}
                         onEdit={setEditingItem}
@@ -351,7 +493,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             </div>
           </Card>
 
-          {addOpen ? (
+          {addOpen && canEdit ? (
             <div>
               <AddStopCard
                 itinerary={itinerary}
@@ -385,7 +527,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                   items={items}
                   activeItemId={focusItemId}
                   followActive
-                  onSelectItem={(item) => setEditingItem(item)}
+                  onSelectItem={(item) => (canEdit ? setEditingItem(item) : setFocusItemId(item.id))}
                   className="h-full w-full"
                 />
               )}
@@ -395,8 +537,60 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         </aside>
       </div>
 
+      <ShareDialog
+        open={shareOpen}
+        itinerary={itinerary}
+        onClose={() => setShareOpen(false)}
+        onChanged={refresh}
+        onLeft={() => navigate("/app/trips")}
+        onConflict={(fresh) => setConflict({ message: "This trip changed while you were updating it.", itinerary: fresh })}
+      />
+
+      <Modal
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        title="Trip activity"
+        description="Who changed what, and when."
+        size="md"
+      >
+        {activityLoading ? (
+          <p className="py-6 text-center text-sm text-ink-600">Loading activity...</p>
+        ) : activities.length === 0 && remote?.activities.length ? (
+          <ActivityList activities={remote.activities} />
+        ) : activities.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ink-600">
+            No activity yet. Edits, members and sharing changes will show up here.
+          </p>
+        ) : (
+          <ActivityList activities={activities} />
+        )}
+      </Modal>
+
+      <Modal
+        open={conflict !== null}
+        onClose={() => setConflict(null)}
+        title="This trip changed"
+        description="Your change was not saved because someone else updated the trip first."
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConflict(null)}>
+              Keep editing
+            </Button>
+            <Button onClick={() => void handleLoadLatest()}>Load latest version</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          {conflict?.message ?? "Refresh to get the newest stops and settings before trying again."}
+        </p>
+        <p className="mt-2 text-xs text-ink-500">
+          Your unsaved text stays in the editor until you close it, so you can copy it before refreshing.
+        </p>
+      </Modal>
+
       <StopEditor
-        open={editingItem !== null}
+        open={canEdit && editingItem !== null}
         itinerary={itinerary}
         item={editingItem}
         destinations={destinations}
@@ -405,6 +599,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           await refresh();
           setEditingItem(null);
         }}
+        onConflict={(stale) => setConflict({ message: stale.message, itinerary: stale.itinerary })}
       />
 
       <SettingsDialog
@@ -412,6 +607,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         itinerary={itinerary}
         onClose={() => setSettingsOpen(false)}
         onSave={handleSaveSettings}
+        onConflict={(stale) => setConflict({ message: stale.message, itinerary: stale.itinerary })}
       />
 
       <TemplatesDialog open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
@@ -425,6 +621,7 @@ interface DayColumnProps {
   groupIndex: number;
   busyItem: number | null;
   estimateEnabled: boolean;
+  canEdit: boolean;
   travelByLeg: Map<string, ItineraryRouteLeg>;
   onToggleStatus: (item: ItineraryItem) => void;
   onEdit: (item: ItineraryItem) => void;
@@ -432,7 +629,7 @@ interface DayColumnProps {
   onFocus: (id: number) => void;
 }
 
-function DayColumn({ group, groups, groupIndex, busyItem, estimateEnabled, travelByLeg, onToggleStatus, onEdit, onDelete, onFocus }: DayColumnProps) {
+function DayColumn({ group, groups, groupIndex, busyItem, estimateEnabled, canEdit, travelByLeg, onToggleStatus, onEdit, onDelete, onFocus }: DayColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `day-${group.day}` });
   const ids = group.items.map((item) => item.id);
 
@@ -461,6 +658,7 @@ function DayColumn({ group, groups, groupIndex, busyItem, estimateEnabled, trave
                   item={item}
                   sequence={offset + itemIndex + 1}
                   busy={busyItem === item.id}
+                  canEdit={canEdit}
                   onToggleStatus={() => onToggleStatus(item)}
                   onEdit={() => onEdit(item)}
                   onDelete={() => onDelete(item)}
@@ -499,6 +697,48 @@ function formatTravel(distanceM: number | null, durationS: number): string {
   return km ? `${km} · ~${minutes} min drive` : `~${minutes} min drive`;
 }
 
+const ACTIVITY_LABEL: Record<string, string> = {
+  created: "created this trip",
+  updated: "updated trip details",
+  item_added: "added a stop",
+  item_updated: "updated a stop",
+  item_removed: "removed a stop",
+  items_reordered: "reordered stops",
+  member_invited: "invited a traveller",
+  member_joined: "joined the trip",
+  member_removed: "removed a traveller",
+  member_left: "left the trip",
+  role_changed: "changed a member role",
+  ownership_transferred: "transferred ownership",
+  invite_link_created: "created a share link",
+  invite_link_revoked: "revoked a share link",
+  budget_visibility_changed: "changed budget visibility",
+  rsvp_updated: "updated their RSVP",
+};
+
+function ActivityList({ activities }: { activities: ItineraryActivity[] }) {
+  return (
+    <ol className="space-y-1">
+      {activities.map((activity) => (
+        <li key={activity.id} className="flex gap-3 rounded-xl px-2 py-2.5 hover:bg-sand-100/60">
+          <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lagoon-900 text-sand-50">
+            <ClockIcon className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink-800">
+              <span className="font-semibold">{activity.user ?? "Someone"}</span>{" "}
+              {ACTIVITY_LABEL[activity.action] ?? activity.action.replaceAll("_", " ")}
+            </p>
+            <p className="text-xs text-ink-500">
+              {activity.created_at ? new Date(activity.created_at).toLocaleString() : ""}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 interface SettingsPayload {
   title: string;
   description: string | null;
@@ -513,9 +753,10 @@ interface SettingsDialogProps {
   itinerary: Itinerary;
   onClose: () => void;
   onSave: (payload: SettingsPayload) => Promise<void>;
+  onConflict: (conflict: { message: string; itinerary: Itinerary }) => void;
 }
 
-function SettingsDialog({ open, itinerary, onClose, onSave }: SettingsDialogProps) {
+function SettingsDialog({ open, itinerary, onClose, onSave, onConflict }: SettingsDialogProps) {
   const [title, setTitle] = useState(itinerary.title);
   const [description, setDescription] = useState(itinerary.description ?? "");
   const [startDate, setStartDate] = useState(itinerary.start_date ?? "");
@@ -553,7 +794,9 @@ function SettingsDialog({ open, itinerary, onClose, onSave }: SettingsDialogProp
       });
       onClose();
     } catch (saveError) {
-      setError(apiError(saveError));
+      const stale = apiConflict(saveError);
+      if (stale) onConflict({ message: stale.message, itinerary: stale.itinerary });
+      else setError(apiError(saveError));
     } finally {
       setSaving(false);
     }

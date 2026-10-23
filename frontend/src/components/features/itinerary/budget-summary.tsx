@@ -6,6 +6,32 @@ import { formatDuration } from "@/components/features/itinerary/itinerary-consta
 import type { ItinerarySummary } from "@/lib/types";
 
 export function BudgetSummary({ summary }: { summary: ItinerarySummary }) {
+  const hidden = summary.total_budget === null && summary.breakdown_by_category.length === 0;
+
+  if (hidden) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="bg-lagoon-900 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-surf-300">Estimated total</p>
+          <p className="mt-1 font-display text-4xl font-semibold text-sand-50">Private</p>
+          <p className="mt-1 text-xs text-surf-300/80">
+            The owner has hidden budget details from viewers on this trip.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge tone="surf">{pluralise(summary.day_count, "day")}</Badge>
+            <Badge tone="mango">{pluralise(summary.item_count, "stop")}</Badge>
+            {summary.total_duration_minutes > 0 ? (
+              <Badge tone="neutral">{formatDuration(summary.total_duration_minutes)} planned</Badge>
+            ) : null}
+          </div>
+        </div>
+        <div className="p-5">
+          <p className="text-sm text-ink-600">Ask the owner to share the budget if you need it for planning.</p>
+        </div>
+      </Card>
+    );
+  }
+
   const maxCategory = Math.max(...summary.breakdown_by_category.map((entry) => entry.estimated_budget), 1);
   const total = toNumber(summary.total_budget);
   const limit = summary.budget_limit === null ? null : toNumber(summary.budget_limit);
@@ -51,7 +77,9 @@ export function BudgetSummary({ summary }: { summary: ItinerarySummary }) {
                     Day {day.day_number} · {pluralise(day.item_count, "stop")}
                     {day.duration_minutes > 0 ? ` · ${formatDuration(day.duration_minutes)}` : ""}
                   </span>
-                  <span className="font-medium text-ink-900">{formatMoney(day.estimated_budget)}</span>
+                  <span className="font-medium text-ink-900">
+                    {day.estimated_budget === null ? "—" : formatMoney(day.estimated_budget)}
+                  </span>
                 </li>
               ))}
             </ul>
