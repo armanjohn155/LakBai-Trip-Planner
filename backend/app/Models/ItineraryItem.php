@@ -55,15 +55,24 @@ class ItineraryItem extends Model
     /**
      * Scope implicit route binding to the itinerary resolved in the current
      * request so cross-itinerary items resolve as not found (404).
-     *
-     * @param  Builder  $query
+     * Allows access if the user is owner or a member of the itinerary.
      */
     public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        $itinerary = request()->route('itinerary');
+        $itinerary = request()?->route('itinerary');
+        $user = request()?->user();
 
-        return parent::resolveRouteBindingQuery($query, $value, $field)
-            ->when($itinerary !== null, fn (Builder $query) => $query->where('itinerary_id', $itinerary->id));
+        $query = parent::resolveRouteBindingQuery($query, $value, $field)
+            ->when($itinerary !== null, fn (Builder $q) => $q->where('itinerary_id', $itinerary->id));
+
+        if ($user === null || $itinerary === null) {
+            return $query;
+        }
+
+        return $query->whereHas('itinerary', function (Builder $it) use ($user) {
+            $it->where('user_id', $user->id)
+                ->orWhereHas('members', fn (Builder $m) => $m->where('users.id', $user->id));
+        });
     }
 
     public function itinerary(): BelongsTo

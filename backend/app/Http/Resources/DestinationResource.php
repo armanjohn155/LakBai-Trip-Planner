@@ -29,13 +29,28 @@ class DestinationResource extends JsonResource
             'rating' => $this->rating,
             'review_count' => $this->review_count,
             'lakbai_review_count' => $this->lakbai_review_count,
-            'image_url' => $this->image_url,
+            'image_url' => $this->resolveImageUrl($this->image_url),
             'best_time_to_visit' => $this->best_time_to_visit,
             'tips' => $this->tips,
             'deleted_at' => $this->deleted_at,
             'is_favorited' => $this->when($request->user() !== null, fn () => $this->favoritedBy->contains('id', $request->user()->id)),
             'user_visit_status' => $this->when($request->user() !== null, fn () => $this->visitStatusFor($request->user()->id)),
         ];
+    }
+
+    /**
+     * Uploaded images are stored as "/storage/..." relative paths; convert them
+     * to absolute URLs so clients on another origin (e.g. Vite on :5173) can
+     * load them. Seeded "/images/..." paths are served by the frontend itself
+     * and are returned unchanged.
+     */
+    private function resolveImageUrl(?string $imageUrl): ?string
+    {
+        if ($imageUrl === null || ! str_starts_with($imageUrl, '/storage/')) {
+            return $imageUrl;
+        }
+
+        return asset(ltrim($imageUrl, '/'));
     }
 
     /**

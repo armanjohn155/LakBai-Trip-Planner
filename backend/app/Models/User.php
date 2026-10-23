@@ -86,6 +86,7 @@ class User extends Authenticatable
         return $this->hasOne(UserSettings::class);
     }
 
+<<<<<<< HEAD
     public function sentFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'requester_id');
@@ -94,5 +95,12 @@ class User extends Authenticatable
     public function receivedFriendRequests(): HasMany
     {
         return $this->hasMany(Friendship::class, 'addressee_id');
+=======
+    public function sharedItineraries(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Itinerary::class, 'itinerary_user')
+            ->withPivot(['role', 'invited_by', 'joined_at'])
+            ->withTimestamps();
+>>>>>>> origin/main
     }
 }
