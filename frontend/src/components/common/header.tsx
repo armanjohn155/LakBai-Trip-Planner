@@ -84,9 +84,7 @@ export function Header() {
     <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <PinIcon className="h-5 w-5 text-surf-500" />
-          <span className="font-brand text-2xl leading-none text-lagoon-900">LAKBAI</span>
-          <span className="hidden text-xs text-ink-600 lg:inline">Manglakaw ta, Bai!</span>
+           <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-auto" />
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
