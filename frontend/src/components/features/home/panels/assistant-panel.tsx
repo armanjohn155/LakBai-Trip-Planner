@@ -7,7 +7,7 @@ export function AssistantPanel() {
   return (
     <div className="flex h-full w-full items-center justify-center">
       <div className="w-full max-w-md rounded-2xl border border-[#9CA3AF]/40 bg-white/85 p-8 text-center shadow-[0_8px_24px_rgba(30,42,74,0.08)] sm:p-10">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#E0F7F7] text-[#1E2A4A]">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full  text-[#1E2A4A]">
           <svg
             viewBox="0 0 24 24"
             className="h-6 w-6"
