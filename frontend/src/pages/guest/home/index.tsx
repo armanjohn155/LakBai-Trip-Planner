@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import { CardDataSection } from "@/components/features/home/card-data-section";
 import { DestinationsMapPanel } from "@/components/features/home/destinations-map-panel";
 import { FeatureSection } from "@/components/features/home/feature-section";
+import { LakbaiFeatures } from "@/components/features/home/lakbai-features";
 import { HomepageBannerSection } from "@/components/features/home/homepage-banner-section";
 import { ProfileSection } from "@/components/features/home/profile-section";
 import { InlineError } from "@/components/ui/feedback";
@@ -130,6 +131,8 @@ export default function HomePage() {
       />
 
       <FeatureSection />
+
+      <LakbaiFeatures />
 
       <CardDataSection
         destinations={visible}
