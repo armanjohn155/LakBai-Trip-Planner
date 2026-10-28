@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Destination;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\App;
 
 class DestinationSeeder extends Seeder
 {
@@ -12,14 +13,19 @@ class DestinationSeeder extends Seeder
 
     /**
      * Run the database seeds.
-     *
-     * The first twelve records are the curated destinations from the Cebu
-     * reference (kawasan-falls, whale sharks, sardine run, etc.). Their
-     * descriptive categories have been mapped onto the app's canonical
-     * category values so filters and card tones line up.
      */
     public function run(): void
     {
+        // Guard against running destructive operations in production
+        if (App::environment('production')) {
+            $adminCount = Destination::withTrashed()->where('source', 'admin')->count();
+            if ($adminCount > 0) {
+                $this->command?->warn("Refusing to run DestinationSeeder in production because {$adminCount} admin-created destination(s) exist.");
+                return;
+            }
+            $this->command?->warn('Running DestinationSeeder in production with no admin-created destinations.');
+        }
+
         $destinations = [
             [
                 'name' => 'Kawasan Falls',
@@ -369,10 +375,19 @@ class DestinationSeeder extends Seeder
         ];
 
         foreach ($destinations as $attributes) {
-            // forceFill because rating/review_count are intentionally excluded
-            // from mass assignment (they are system-managed fields).
-            $destination = Destination::firstOrNew(['name' => $attributes['name']]);
+            $existing = Destination::withTrashed()->where('name', $attributes['name'])->first();
+            if ($existing) {
+                if ($existing->source === 'admin' || $existing->created_by) {
+                    continue;
+                }
+                // Do not overwrite existing seeded rows (admin might have edited them)
+                continue;
+            }
+
+            $destination = new Destination();
             $destination->forceFill($attributes);
+            $destination->source = 'seeded';
+            $destination->created_by = null;
             $destination->save();
         }
     }

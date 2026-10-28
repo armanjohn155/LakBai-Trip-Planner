@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -38,8 +40,14 @@ class DestinationController extends Controller
                 $search = $request->string('search')->toString();
 
                 $query->where(function (Builder $inner) use ($search) {
-                    $inner->where('name', 'like', "%{$search}%")
-                        ->orWhere('municipality', 'like', "%{$search}%");
+                    $connection = $inner->getConnection()->getDriverName();
+                    if ($connection === 'pgsql') {
+                        $inner->where('name', 'ilike', "%{$search}%")
+                            ->orWhere('municipality', 'ilike', "%{$search}%");
+                    } else {
+                        $inner->where('name', 'like', "%{$search}%")
+                            ->orWhere('municipality', 'like', "%{$search}%");
+                    }
                 });
             })
             ->when($request->filled('category'), fn (Builder $query) => $query->where('category', $request->string('category')->toString()))
@@ -57,14 +65,62 @@ class DestinationController extends Controller
     {
         $data = $request->validated();
 
-        if ($request->hasFile('image')) {
-            $data['image_url'] = $this->storeUploadedImage($request->file('image'), $data['name']);
-        }
+        // Never accept source/created_by from request input
+        unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
 
+        // Handle multiple images
+        $gallery = [];
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                if (! is_array($file) && $file) {
+                    $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? 'destination');
+                }
+            }
+        }
+        unset($data['images'], $data['cover_index']);
+
+        // Handle single image (backward compatible)
+        if ($request->hasFile('image')) {
+            $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? 'destination');
+            $data['image_url'] = $imageUrl;
+            if (empty($gallery)) {
+                $gallery[] = $imageUrl;
+            }
+        }
         unset($data['image']);
 
-        $destination = new Destination($data);
-        $destination->save();
+        // Normalize arrays if they come as JSON strings (FormData)
+        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
+        foreach ($arrayFields as $field) {
+            if (array_key_exists($field, $data) && is_string($data[$field])) {
+                $decoded = json_decode($data[$field], true);
+                $data[$field] = is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        if (! empty($gallery)) {
+            // Ensure gallery has entries
+            if (empty($data['gallery']) || ! is_array($data['gallery'])) {
+                $data['gallery'] = $gallery;
+            } else {
+                // Merge? Prefer uploaded gallery if present
+                $data['gallery'] = array_values($data['gallery']);
+            }
+            if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
+                $data['image_url'] = $data['gallery'][0];
+            }
+        }
+
+        $destination = DB::transaction(function () use ($request, $data) {
+            $destination = new Destination($data);
+            $destination->source = 'admin';
+            $destination->created_by = $request->user()?->id;
+            $destination->save();
+
+            return $destination->fresh();
+        });
+
+        $this->clearDestinationCaches();
 
         return (new DestinationResource($destination))
             ->response()
@@ -86,15 +142,62 @@ class DestinationController extends Controller
     {
         $data = $request->validated();
 
+        // Never accept source/created_by/rating/review_count from request input
+        unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
+
+        $gallery = [];
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                if (! is_array($file) && $file) {
+                    $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? $destination->name);
+                }
+            }
+        }
+        unset($data['images'], $data['cover_index']);
+
         if ($request->hasFile('image')) {
-            $data['image_url'] = $this->storeUploadedImage($request->file('image'), $data['name'] ?? $destination->name);
+            $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? $destination->name);
+            $data['image_url'] = $imageUrl;
+            if (empty($gallery)) {
+                $gallery[] = $imageUrl;
+            }
             $this->removeUploadedImage($destination->image_url);
         }
-
         unset($data['image']);
 
-        $destination->fill($data);
-        $destination->save();
+        // Normalize arrays if they come as JSON strings
+        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
+        foreach ($arrayFields as $field) {
+            if (array_key_exists($field, $data) && is_string($data[$field])) {
+                $decoded = json_decode($data[$field], true);
+                $data[$field] = is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        if (! empty($gallery)) {
+            if (empty($data['gallery']) || ! is_array($data['gallery'])) {
+                $data['gallery'] = $gallery;
+            } else {
+                // Append new uploads? Or replace? We'll append uploaded files
+                $data['gallery'] = array_values(array_merge($data['gallery'], $gallery));
+                // Limit to 8
+                if (count($data['gallery']) > 8) {
+                    $data['gallery'] = array_slice($data['gallery'], 0, 8);
+                }
+            }
+            if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
+                $data['image_url'] = $data['gallery'][0];
+            }
+        }
+
+        $destination = DB::transaction(function () use ($data, $destination) {
+            $destination->fill($data);
+            $destination->save();
+
+            return $destination->fresh();
+        });
+
+        $this->clearDestinationCaches();
 
         return new DestinationResource($destination);
     }
@@ -105,9 +208,7 @@ class DestinationController extends Controller
     public function destroy(Destination $destination): Response
     {
         $destination->delete();
-
-        return response()->noContent();
-    }
+        $this->clearDestinationCaches()
 
     /**
      * Restore the specified soft-deleted destination.
@@ -115,6 +216,7 @@ class DestinationController extends Controller
     public function restore(Destination $destination): DestinationResource
     {
         $destination->restore();
+        $this->clearDestinationCaches();
 
         return new DestinationResource($destination->fresh());
     }
@@ -135,8 +237,19 @@ class DestinationController extends Controller
 
         $this->removeUploadedImage($destination->image_url);
         $destination->forceDelete();
+        $this->clearDestinationCaches();
 
         return response()->noContent();
+    }
+
+    private function clearDestinationCaches(): void
+    {
+        try {
+            Cache::forget('destinations:index');
+            Cache::forget('destinations:map');
+        } catch (\Throwable $e) {
+            // Ignore cache clearing failures
+        }
     }
 
     /**
@@ -155,7 +268,10 @@ class DestinationController extends Controller
      */
     private function removeUploadedImage(?string $imageUrl): void
     {
-        if ($imageUrl === null || ! str_starts_with($imageUrl, '/storage/destinations/')) {
+        if ($imageUrl === null || ! is_string($imageUrl)) {
+            return;
+        }
+        if (! str_starts_with($imageUrl, '/storage/destinations/')) {
             return;
         }
 

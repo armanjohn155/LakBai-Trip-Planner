@@ -35,8 +35,14 @@ class ReviewController extends Controller
                 $search = $request->string('search')->toString();
 
                 $query->where(function (Builder $inner) use ($search) {
-                    $inner->where('title', 'like', "%{$search}%")
-                        ->orWhere('body', 'like', "%{$search}%");
+                    $connection = $inner->getConnection()->getDriverName();
+                    if ($connection === 'pgsql') {
+                        $inner->where('title', 'ilike', "%{$search}%")
+                            ->orWhere('body', 'ilike', "%{$search}%");
+                    } else {
+                        $inner->where('title', 'like', "%{$search}%")
+                            ->orWhere('body', 'like', "%{$search}%");
+                    }
                 });
             })
             ->when($request->filled('destination_id'), fn (Builder $query) => $query->where('destination_id', $request->integer('destination_id')))

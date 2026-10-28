@@ -84,7 +84,12 @@ class ItineraryInviteController extends Controller
         if (($validated['type'] ?? null) === 'email') {
             $email = strtolower($validated['email']);
 
-            $invitee = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+            $connection = User::query()->getConnection()->getDriverName();
+            if ($connection === 'pgsql') {
+                $invitee = User::query()->whereRaw('lower(email) = lower(?)', [$email])->first();
+            } else {
+                $invitee = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+            }
             $owner = $itinerary->user;
 
             if ($owner === null || $email === strtolower((string) $owner->email)) {
@@ -117,7 +122,14 @@ class ItineraryInviteController extends Controller
                 ]);
             }
 
-            if ($itinerary->invites()->whereNull('revoked_at')->where('type', 'email')->whereRaw('LOWER(email) = ?', [$email])->exists()) {
+            $inviteQuery = $itinerary->invites()->whereNull('revoked_at')->where('type', 'email');
+            $connection = $inviteQuery->getConnection()->getDriverName();
+            if ($connection === 'pgsql') {
+                $exists = $inviteQuery->whereRaw('lower(email) = lower(?)', [$email])->exists();
+            } else {
+                $exists = $inviteQuery->whereRaw('LOWER(email) = ?', [$email])->exists();
+            }
+            if ($exists) {
                 throw ValidationException::withMessages([
                     'email' => 'A pending invite already exists for this email.',
                 ]);

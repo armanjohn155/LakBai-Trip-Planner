@@ -13,6 +13,7 @@ import { ProfileSummaryTab } from "@/components/features/profile/profile-summary
 import { SettingsTab } from "@/components/features/profile/settings-tab";
 import { TripsTab } from "@/components/features/profile/trips-tab";
 import { AuthProvider } from "@/hooks/use-auth";
+import { NotificationsProvider } from "@/hooks/use-notifications";
 import { FavoritesProvider } from "@/hooks/use-favorites";
 import InviteAcceptPage from "@/pages/invite/accept";
 import LoginPage from "@/pages/auth/login";
@@ -32,6 +33,8 @@ import HistoryPage from "@/pages/dashboard/user/history";
 import ItineraryPage from "@/pages/dashboard/user/itinerary";
 import ProfilePage from "@/pages/dashboard/user/profile";
 import MyReviewsPage from "@/pages/dashboard/user/reviews";
+import NotificationsPage from "@/pages/app/notifications/index";
+import NotificationPreferencesPage from "@/pages/app/profile/settings/notifications";
 import TripsPage from "@/pages/dashboard/user/trips";
 import TripWizardPage from "@/pages/dashboard/user/trip-wizard";
 import AboutPage from "@/pages/guest/about";
@@ -48,7 +51,8 @@ function DestinationDetailRedirect() {
 
 createRoot(document.getElementById("root")!).render(
   <AuthProvider>
-    <FavoritesProvider>
+    <NotificationsProvider>
+      <FavoritesProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<GuestLayout />}>
@@ -92,6 +96,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="friends" element={<FriendsPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="reviews" element={<MyReviewsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
             <Route path="profile" element={<ProfilePage />}>
               <Route index element={<ProfileSummaryTab />} />
               <Route path="trips" element={<TripsTab />} />
@@ -104,6 +110,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </FavoritesProvider>
+      </FavoritesProvider>
+    </NotificationsProvider>
   </AuthProvider>,
 );

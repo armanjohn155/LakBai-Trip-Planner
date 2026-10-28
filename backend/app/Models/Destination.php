@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -24,6 +25,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'image_url',
     'best_time_to_visit',
     'tips',
+    'source',
+    'created_by',
+    'highlights',
+    'entrance_fee_text',
+    'visit_duration',
+    'opening_hours',
+    'how_to_get_there',
+    'travel_tips',
+    'gallery',
 ])]
 class Destination extends Model
 {
@@ -85,6 +95,10 @@ class Destination extends Model
             'base_review_count' => 'integer',
             'lakbai_rating_avg' => 'decimal:2',
             'lakbai_review_count' => 'integer',
+            'highlights' => 'array',
+            'how_to_get_there' => 'array',
+            'travel_tips' => 'array',
+            'gallery' => 'array',
         ];
     }
 
@@ -108,12 +122,24 @@ class Destination extends Model
         return $this->belongsToMany(User::class, 'favorites')->withTimestamps();
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     public function scopeFilter(Builder $query, array $filters): Builder
     {
         return $query
             ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where('category', $category))
             ->when($filters['region'] ?? null, fn (Builder $query, string $region) => $query->where('region', $region))
-            ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query->where('name', 'like', "%{$search}%"))
+            ->when($filters['search'] ?? null, function (Builder $query, string $search) {
+                $connection = $query->getConnection()->getDriverName();
+                if ($connection === 'pgsql') {
+                    $query->where('name', 'ilike', "%{$search}%");
+                } else {
+                    $query->where('name', 'like', "%{$search}%");
+                }
+            })
             ->when($filters['min_price'] ?? null, fn (Builder $query, $min) => $query->where('estimated_cost', '>=', $min))
             ->when($filters['max_price'] ?? null, fn (Builder $query, $max) => $query->where('estimated_cost', '<=', $max));
     }

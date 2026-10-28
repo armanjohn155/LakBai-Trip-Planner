@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 
 import { Link, NavLink, useNavigate } from "react-router";
 
+import { NotificationBell } from "@/components/features/notifications/notification-bell";
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { getFriendRequests } from "@/lib/api";
@@ -85,14 +86,20 @@ export function Header() {
     <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-auto" />
+
+          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
+           
+
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           {user ? (
-            <AccountDropdown onSignOut={handleSignOut} />
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <AccountDropdown onSignOut={handleSignOut} />
+            </div>
           ) : (
             <>
               <Link to="/login" className="rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink-900">

@@ -2,7 +2,9 @@ import { api } from "@/lib/api";
 import type { Paginated } from "@/lib/types";
 import type { AppNotification, NotificationPreferences } from "@/lib/notification-types";
 
-export const getNotifications = async (params: { unread?: boolean; type?: string; per_page?: number } = {}) => {
+export const getNotifications = async (
+  params: { unread?: boolean; type?: string; group?: string; page?: number; per_page?: number } = {},
+) => {
   const { data } = await api.get<Paginated<AppNotification>>("/notifications", { params });
   return data;
 };

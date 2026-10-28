@@ -218,6 +218,34 @@ class AdminDestinationControllerTest extends TestCase
             ->assertJsonPath('data.review_count', 0);
     }
 
+    public function test_admin_created_destination_has_source_admin_and_created_by(): void
+    {
+        $admin = $this->admin();
+        $response = $this->actingAs($admin)
+            ->postJson('/api/admin/destinations', $this->validPayload(['name' => 'New Admin Spot']))
+            ->assertCreated();
+
+        $destination = Destination::findOrFail($response->json('data.id'));
+        $this->assertSame('admin', $destination->source);
+        $this->assertSame($admin->id, $destination->created_by);
+    }
+
+    public function test_request_cannot_set_source_or_created_by(): void
+    {
+        $admin = $this->admin();
+        $response = $this->actingAs($admin)
+            ->postJson('/api/admin/destinations', $this->validPayload([
+                'name' => 'Cannot Override',
+                'source' => 'seeded',
+                'created_by' => 999,
+            ]))
+            ->assertCreated();
+
+        $destination = Destination::findOrFail($response->json('data.id'));
+        $this->assertSame('admin', $destination->source);
+        $this->assertSame($admin->id, $destination->created_by);
+    }
+
     public function test_soft_deleted_destinations_are_hidden_from_public_endpoints(): void
     {
         $destination = Destination::factory()->create();

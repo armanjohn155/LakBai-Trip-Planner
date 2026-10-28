@@ -1,3 +1,5 @@
+import type { Region } from "@/lib/types";
+
 export const DESTINATION_CATEGORIES = [
   "Beach",
   "Waterfall",
@@ -8,9 +10,9 @@ export const DESTINATION_CATEGORIES = [
   "Diving & Water Activities",
   "Nature & Eco-Tourism",
   "Islands",
-] as const;
+];
 
-export const DESTINATION_REGIONS = ["Metro Cebu", "North Cebu", "South Cebu"] as const;
+export const DESTINATION_REGIONS: Region[] = ["Metro Cebu", "North Cebu", "South Cebu"];
 
 export const MUNICIPALITY_SUGGESTIONS = [
   "Cebu City",
@@ -19,24 +21,22 @@ export const MUNICIPALITY_SUGGESTIONS = [
   "Moalboal",
   "Oslob",
   "Dalaguete",
+  "Mactan",
   "Lapu-Lapu City",
-  "Mandaue City",
-  "Talisay City",
-  "Carcar City",
-  "Argao",
-  "Alcoy",
+  "Talisay",
+  "Carcar",
+  "Sibonga",
   "Santander",
-  "Aloguinsan",
-  "Toledo City",
-  "Balamban",
-  "Liloan",
-  "Consolacion",
-] as const;
+  "Daanbantayan",
+  "Madridejos",
+  "Santa Fe",
+];
 
-/** Rough bounding box around Cebu used to warn admins about stray coordinates. */
 export const CEBU_BOUNDS = {
   minLat: 9.4,
   maxLat: 11.4,
   minLng: 123.2,
   maxLng: 124.3,
-} as const;
+};
+
+export const TRANSPORT_MODES = ["Van", "Bus", "Jeepney", "Taxi", "Ferry", "Motorbike", "Walk", "Other"];

@@ -90,7 +90,12 @@ class FriendController extends Controller
         } else {
             $identifierLower = strtolower($identifier);
             if (str_contains($identifierLower, '@')) {
-                $addressee = User::query()->whereRaw('LOWER(email) = ?', [$identifierLower])->first();
+                $connection = User::query()->getConnection()->getDriverName();
+                if ($connection === 'pgsql') {
+                    $addressee = User::query()->whereRaw('lower(email) = lower(?)', [$identifierLower])->first();
+                } else {
+                    $addressee = User::query()->whereRaw('LOWER(email) = ?', [$identifierLower])->first();
+                }
             } else {
                 $addressee = User::query()->where('username', $identifierLower)->first();
             }
