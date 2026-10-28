@@ -85,11 +85,7 @@ export function Header() {
     <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-<<<<<<< HEAD
-          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
-=======
-           <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-auto" />
->>>>>>> ea559c9b315e3fa3fb212f6852d12ad0d5ab5b9e
+          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-auto" />
         </Link>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
