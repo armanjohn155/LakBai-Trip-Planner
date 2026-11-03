@@ -10,10 +10,8 @@ export type { IconAction } from "./icon-tabs";
 /**
  * Interactive icon quick-action row.
  *
- * First pass based on the Figma frame:
- *   - Five 86 × 73 icon buttons with 1px #9CA3AF borders and #1E2A4A icons
- *   - The tab row sits on the page's cream band (#F5F3EE); the cyan canvas
- *     (#E0F7F7) is the panel card below it.
+ * The tab row uses compact, labeled icon tiles on the cream band (#F5F3EE);
+ * the cyan canvas (#E0F7F7) is the preview card below it.
  *
  * The row is a horizontal track: the active tab is translated to the centre
  * of the viewport, and the viewport's edges fade so tabs can slide in/out.
@@ -30,23 +28,24 @@ interface IconButtonConfig {
 }
 
 // ── Design tokens ────────────────────────────────────────────────────────
-const BUTTON_WIDTH = 86;
-const BUTTON_HEIGHT = 73;
-const BUTTON_GAP = 45;
+const BUTTON_WIDTH = 130;
+const BUTTON_HEIGHT = 104;
+const BUTTON_GAP = 24;
+const ICON_TILE_SIZE = 52;
 
 const ICON_STEP = BUTTON_WIDTH + BUTTON_GAP;
 const ICON_ROW_WIDTH = 5 * BUTTON_WIDTH + 4 * BUTTON_GAP;
 
 // Desktop viewport wide enough to keep all five buttons visible while any tab
 // is centred; it shrinks with the container on smaller screens.
-const ICON_VIEWPORT_WIDTH = ICON_ROW_WIDTH + ICON_STEP * 2;
+const ICON_VIEWPORT_WIDTH = Math.min(ICON_ROW_WIDTH + ICON_STEP * 2, 1120);
 
 const ICON_COMPONENTS: Record<IconAction, Omit<IconButtonConfig, "action">> = {
   map: { label: "Map", Icon: MapPinnedIcon },
-  route: { label: "Route", Icon: RouteIcon },
-  pricing: { label: "Pricing", Icon: DollarIcon },
-  list: { label: "List", Icon: ListIcon },
-  assistant: { label: "Assistant", Icon: BotIcon },
+  route: { label: "Route optimization", Icon: RouteIcon },
+  pricing: { label: "Budgeting", Icon: DollarIcon },
+  list: { label: "Itinerary", Icon: ListIcon },
+  assistant: { label: "AI Assistant", Icon: BotIcon },
 };
 
 const ICON_BUTTONS: IconButtonConfig[] = ICON_ORDER.map((action) => ({
@@ -54,43 +53,12 @@ const ICON_BUTTONS: IconButtonConfig[] = ICON_ORDER.map((action) => ({
   ...ICON_COMPONENTS[action],
 }));
 
-// ── Placeholder actions ──────────────────────────────────────────────────
-// TODO: Replace each console.log with the real feature behaviour.
-function handleMap() {
-  console.log("[interactive-icon] map");
-}
-
-function handleRoute() {
-  console.log("[interactive-icon] route");
-}
-
-function handlePricing() {
-  console.log("[interactive-icon] pricing");
-}
-
-function handleList() {
-  console.log("[interactive-icon] list");
-}
-
-function handleAssistant() {
-  console.log("[interactive-icon] assistant");
-}
-
-const iconHandlers: Record<IconAction, () => void> = {
-  map: handleMap,
-  route: handleRoute,
-  pricing: handlePricing,
-  list: handleList,
-  assistant: handleAssistant,
-};
-
-/** One shared click handler: reads data-action, runs its placeholder, selects the tab. */
+/** One shared click handler selects the panel matching the clicked tab. */
 function handleIconClick(event: MouseEvent<HTMLButtonElement>, onSelect: (action: IconAction) => void) {
   const action = event.currentTarget.dataset.action as IconAction | undefined;
 
   if (!action) return;
 
-  iconHandlers[action]();
   onSelect(action);
 }
 
@@ -189,19 +157,24 @@ export function InteractiveIconSection({ value, onChange, panelId }: Interactive
                   onKeyDown={(event) => handleKeyDown(event, index)}
                   style={{ width: BUTTON_WIDTH, height: BUTTON_HEIGHT }}
                   className={cn(
-                    "inline-flex shrink-0 items-center justify-center rounded-md",
-                    "border bg-white text-[#1E2A4A]",
-                    "transition-[transform,box-shadow,border-color] duration-150 ease-out",
-                    isActive
-                      ? "border-[#1E2A4A] shadow-[0_4px_12px_rgba(30,42,74,0.12)]"
-                      : "border-[#9CA3AF]",
-                    "hover:-translate-y-0.5 hover:shadow-[0_6px_14px_rgba(30,42,74,0.18)]",
-                    "active:translate-y-px active:shadow-none",
+                    "group inline-flex shrink-0 flex-col items-center justify-start gap-2 rounded-xl bg-transparent px-1 py-1.5",
+                    "transition-colors duration-200",
+                    isActive ? "text-ink-900" : "text-ink-600 hover:text-ink-900",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E2A4A]",
-                    "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
                   )}
                 >
-                  <Icon className="h-6 w-6" />
+                  <span
+                    className={cn(
+                      "flex shrink-0 items-center justify-center rounded-xl border transition duration-200",
+                      isActive
+                        ? "border-[#111827] bg-[#111827] text-white shadow-[0_4px_12px_rgba(17,24,39,0.2)]"
+                        : "border-ink-900/10 bg-white text-ink-900 group-hover:border-ink-900/20",
+                    )}
+                    style={{ width: ICON_TILE_SIZE, height: ICON_TILE_SIZE }}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </span>
+                  <span className="max-w-full text-center text-sm leading-5 sm:text-base">{label}</span>
                 </button>
               );
             })}

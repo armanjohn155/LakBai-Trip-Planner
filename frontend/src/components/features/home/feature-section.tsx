@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
 
 import { cn } from "@/lib/cn";
@@ -33,12 +33,33 @@ const PANELS = ICON_ORDER.map((action) => ({ action, ...PANEL_DEFINITIONS[action
 
 export function FeatureSection() {
   const [active, setActive] = useState<IconAction>("route");
+  const [paused, setPaused] = useState(false);
 
   const activeIndex = Math.max(0, ICON_ORDER.indexOf(active));
   const activeTabId = `${PANEL_ID}-tab-${active}`;
 
+  useEffect(() => {
+    if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const timer = window.setInterval(() => {
+      setActive((current) => {
+        const index = ICON_ORDER.indexOf(current);
+        return ICON_ORDER[(index + 1) % ICON_ORDER.length];
+      });
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [paused]);
+
   return (
-    <>
+    <div
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
+      }}
+    >
       <InteractiveIconSection value={active} onChange={setActive} panelId={PANEL_ID} />
 
       <section aria-labelledby="feature-panels-heading" className="bg-[#F5F3EE] pb-16 sm:pb-20">
@@ -48,13 +69,7 @@ export function FeatureSection() {
           </h2>
 
           <div id={PANEL_ID} role="tabpanel" aria-labelledby={activeTabId} className="overflow-hidden">
-            {/*
-              Each slide is w-full + shrink-0, so the flex track stays one
-              viewport wide. translateX(-index * 100%) therefore means "move
-              forward by `index` whole panels" — skipping map → list glides
-              across all three positions in one 500ms move, instead of
-              stepping through the panels in between.
-            */}
+            {/* The panel track moves in sync with the active icon tab. */}
             <div
               className="flex transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
               style={{ transform: `translateX(-${activeIndex * 100}%)` }}
@@ -89,6 +104,6 @@ export function FeatureSection() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
