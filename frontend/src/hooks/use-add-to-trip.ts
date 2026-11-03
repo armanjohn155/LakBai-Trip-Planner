@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useAuth } from "@/hooks/use-auth";
 import { addItineraryItem, apiError, createItinerary, getItineraries } from "@/lib/api";
 import type { Destination, Itinerary } from "@/lib/types";
 
@@ -22,6 +23,8 @@ interface UseAddToTrip {
 }
 
 export function useAddToTrip(): UseAddToTrip {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [trips, setTrips] = useState<Itinerary[]>([]);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [busyTripId, setBusyTripId] = useState<number | null>(null);
@@ -32,7 +35,15 @@ export function useAddToTrip(): UseAddToTrip {
   const toastTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    if (userId === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTrips([]);
+      setTripsLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setTripsLoading(true);
     getItineraries()
       .then((list) => {
         if (!cancelled) setTrips(list);
@@ -44,7 +55,7 @@ export function useAddToTrip(): UseAddToTrip {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   useEffect(
     () => () => {

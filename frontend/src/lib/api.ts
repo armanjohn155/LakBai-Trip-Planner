@@ -6,9 +6,13 @@ const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://
 
 export const API_ORIGIN = new URL(API_URL, window.location.origin).origin;
 
+export const AUTH_UNAUTHORIZED_EVENT = "suroy:unauthorized";
+
 export const api = axios.create({
   baseURL: API_URL,
 });
+
+let redirectingToLogin = false;
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("suroy.token");
@@ -31,7 +35,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !error.config?.url?.includes("login")) {
       localStorage.removeItem("suroy.token");
       localStorage.removeItem("suroy.user");
-      if (window.location.pathname.startsWith("/app")) {
+      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+      const { pathname } = window.location;
+      if ((pathname.startsWith("/app") || pathname.startsWith("/admin")) && !redirectingToLogin) {
+        redirectingToLogin = true;
         window.location.assign("/login");
       }
     }
