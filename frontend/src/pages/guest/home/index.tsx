@@ -22,6 +22,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [filters, setFilters] = useState<DestinationFilters>(EMPTY_FILTERS);
@@ -35,7 +36,7 @@ export default function HomePage() {
     let cancelled = false;
     Promise.all([
       getDestinations({ per_page: 100 }),
-      user ? getItineraries().catch(() => []) : Promise.resolve([]),
+      userId !== null ? getItineraries().catch(() => []) : Promise.resolve([]),
     ])
       .then(([page, trips]) => {
         if (cancelled) return;
@@ -52,7 +53,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
 
   const visible = useMemo(() => {
     const search = filters.search?.trim().toLowerCase() ?? "";

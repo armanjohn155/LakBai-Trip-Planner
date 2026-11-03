@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
    can't reliably hot-swap this module. */
 /* eslint-disable react-refresh/only-export-components */
 
-import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/lib/api";
+import { AUTH_UNAUTHORIZED_EVENT, getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -43,9 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         localStorage.removeItem("suroy.token");
+        localStorage.removeItem("suroy.user");
         setUser(null);
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const clearSession = () => setUser(null);
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, clearSession);
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, clearSession);
   }, []);
 
   const persist = useCallback((store: { user: User; token: string }) => {

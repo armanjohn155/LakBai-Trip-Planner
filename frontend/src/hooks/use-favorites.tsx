@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
    can't reliably hot-swap this module. */
 /* eslint-disable react-refresh/only-export-components */
 
+import { useAuth } from "@/hooks/use-auth";
 import { addFavorite, getFavorites, removeFavorite } from "@/lib/api";
 import type { Destination } from "@/lib/types";
 
@@ -17,11 +18,21 @@ interface FavoritesContextValue {
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [favorites, setFavorites] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (userId === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFavorites([]);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
     getFavorites({ per_page: 100 })
       .then((page) => {
         if (!cancelled) setFavorites(page.data);
@@ -33,7 +44,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   const favoriteIds = useMemo(() => new Set(favorites.map((destination) => destination.id)), [favorites]);
 
