@@ -126,7 +126,7 @@ class VisitControllerTest extends TestCase
     public function test_stats_summarise_user_visits(): void
     {
         $user = User::factory()->create();
-        $destination = Destination::factory()->create(['region' => 'South Cebu']);
+        $destination = Destination::factory()->create(['region' => 'South Cebu: Southwest and Highlands']);
 
         Visit::factory()->verified()->create(['user_id' => $user->id, 'destination_id' => $destination->id]);
         Visit::factory()->create(['user_id' => $user->id, 'destination_id' => $destination->id]);

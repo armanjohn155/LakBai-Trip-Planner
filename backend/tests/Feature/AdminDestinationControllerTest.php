@@ -27,7 +27,7 @@ class AdminDestinationControllerTest extends TestCase
             'name' => 'Kawasan Falls',
             'description' => 'A three-stage cascade of turquoise water.',
             'category' => 'Waterfall',
-            'region' => 'South Cebu',
+            'region' => 'South Cebu: Southwest and Highlands',
             'municipality' => 'Badian',
             'latitude' => 9.8019444,
             'longitude' => 123.3738889,
@@ -82,11 +82,11 @@ class AdminDestinationControllerTest extends TestCase
 
     public function test_admin_index_filters_by_category_and_region(): void
     {
-        Destination::factory()->create(['name' => 'Kawasan Falls', 'category' => 'Waterfall', 'region' => 'South Cebu']);
-        Destination::factory()->create(['name' => 'Bantayan Beach', 'category' => 'Beach', 'region' => 'North Cebu']);
+        Destination::factory()->create(['name' => 'Kawasan Falls', 'category' => 'Waterfall', 'region' => 'South Cebu: Southwest and Highlands']);
+        Destination::factory()->create(['name' => 'Bantayan Beach', 'category' => 'Beach', 'region' => 'North Cebu Islands']);
 
         $this->actingAs($this->admin())
-            ->getJson('/api/admin/destinations?category=Waterfall&region=South Cebu')
+            ->getJson('/api/admin/destinations?category=Waterfall&region='.urlencode('South Cebu: Southwest and Highlands'))
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Kawasan Falls');
@@ -103,7 +103,7 @@ class AdminDestinationControllerTest extends TestCase
         $this->assertDatabaseHas('destinations', [
             'name' => 'Kawasan Falls',
             'category' => 'Waterfall',
-            'region' => 'South Cebu',
+            'region' => 'South Cebu: Southwest and Highlands',
         ]);
     }
 

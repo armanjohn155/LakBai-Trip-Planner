@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { DESTINATION_REGIONS } from "@/lib/destination-constants";
 import type { DestinationFilters, Region } from "@/lib/types";
-
-const REGIONS: Region[] = ["Metro Cebu", "North Cebu", "South Cebu"];
 
 interface QuickFiltersProps {
   filters: DestinationFilters;
@@ -33,7 +32,7 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
         emptyLabel="Any region"
         value={filters.region ?? ""}
         onChange={(event) => update({ region: event.target.value as Region | "" })}
-        options={REGIONS.map((region) => ({ value: region, label: region }))}
+        options={DESTINATION_REGIONS.map((region) => ({ value: region, label: region }))}
       />
       <Select
         name="category"

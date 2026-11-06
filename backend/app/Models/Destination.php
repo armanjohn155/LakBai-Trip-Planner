@@ -40,7 +40,15 @@ class Destination extends Model
     /** @use HasFactory<DestinationFactory> */
     use HasFactory, SoftDeletes;
 
-    public const REGIONS = ['Metro Cebu', 'North Cebu', 'South Cebu'];
+    public const REGIONS = [
+        'North Cebu Islands',
+        'South Cebu: Southwest and Highlands',
+        'Cebu City and Metro Cebu',
+        'West Cebu',
+        'North Cebu Mainland',
+        'South Cebu: Southeast and Southern Trip',
+        'Camotes and Cross Region Trip',
+    ];
 
     public const CATEGORIES = [
         'Beach',

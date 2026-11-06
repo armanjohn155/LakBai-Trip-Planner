@@ -12,7 +12,15 @@ export const DESTINATION_CATEGORIES = [
   "Islands",
 ];
 
-export const DESTINATION_REGIONS: Region[] = ["Metro Cebu", "North Cebu", "South Cebu"];
+export const DESTINATION_REGIONS: Region[] = [
+  "North Cebu Islands",
+  "South Cebu: Southwest and Highlands",
+  "Cebu City and Metro Cebu",
+  "West Cebu",
+  "North Cebu Mainland",
+  "South Cebu: Southeast and Southern Trip",
+  "Camotes and Cross Region Trip",
+];
 
 export const MUNICIPALITY_SUGGESTIONS = [
   "Cebu City",

@@ -155,28 +155,6 @@ export default function DestinationsPage() {
           <p className="mt-1 text-sm text-ink-600">Every stop, every spot — filter, sort, and pin your favorites.</p>
         </div>
 
-        <div className="w-full sm:w-80">
-          <label htmlFor="destination-search" className="block text-xs font-semibold uppercase tracking-wide text-ink-600">
-            Search
-          </label>
-          <div className="mt-1.5 flex">
-            <input
-              id="destination-search"
-              type="search"
-              value={filters.search}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Search destinations…"
-              className="h-11 w-full rounded-l-xl border border-r-0 border-line bg-white px-4 text-sm text-ink-900 placeholder:text-ink-600/50 focus:outline-none focus:ring-2 focus:ring-surf-400"
-            />
-            <button
-              type="button"
-              aria-label="Search"
-              className="flex h-11 w-12 shrink-0 items-center justify-center rounded-r-xl bg-surf-400 text-white transition-colors hover:bg-surf-300"
-            >
-              <SearchIcon className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* 2. Two-column body */}
@@ -257,6 +235,27 @@ export default function DestinationsPage() {
                 </button>
               </div>
             </div>
+            
+        <div className="w-full sm:w-80">
+        
+          <div className="mt-1.5 flex">
+            <input
+              id="destination-search"
+              type="search"
+              value={filters.search}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Search destinations…"
+              className="h-11 w-full rounded-l-xl border border-r-0 border-line bg-white px-4 text-sm text-ink-900 placeholder:text-ink-600/50 focus:outline-none focus:ring-2 focus:ring-surf-400"
+            />
+            <button
+              type="button"
+              aria-label="Search"
+              className="flex h-11 w-12 shrink-0 items-center justify-center rounded-r-xl bg-surf-400 text-white transition-colors hover:bg-surf-300"
+            >
+              <SearchIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
           </div>
 
           {/* 4c. Results */}

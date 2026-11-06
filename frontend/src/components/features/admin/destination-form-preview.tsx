@@ -12,21 +12,54 @@ import { Card } from "@/components/ui/card";
 import { toNumber } from "@/lib/format";
 import type { Destination } from "@/lib/types";
 
+type PreviewTransport = {
+  mode?: string;
+  route?: string;
+  duration?: string;
+  price_text?: string;
+};
+
+type PreviewGalleryItem = {
+  preview?: string;
+  url?: string;
+};
+
+interface PreviewValues {
+  name?: string;
+  description?: string;
+  category?: string;
+  region?: string;
+  municipality?: string | null;
+  latitude?: string;
+  longitude?: string;
+  estimated_cost?: string | null;
+  best_time_to_visit?: string | null;
+  tips?: string | null;
+  highlights?: string[];
+  entrance_fee_text?: string | null;
+  visit_duration?: string | null;
+  opening_hours?: string | null;
+  how_to_get_there?: PreviewTransport[];
+  travel_tips?: string[];
+  gallery?: string[];
+  galleryItems?: PreviewGalleryItem[];
+}
+
 interface PreviewProps {
-  values: any;
+  values: PreviewValues;
 }
 
 export function DestinationFormPreview({ values }: PreviewProps) {
   const destination: Destination = useMemo(() => {
     const gallery = values.galleryItems?.length
-      ? values.galleryItems.map((item: any) => item.preview || item.url).filter(Boolean)
+      ? values.galleryItems.map((item) => item.preview || item.url).filter(Boolean)
       : values.gallery || [];
     return {
       id: 0,
       name: values.name || "Destination name",
       description: values.description || "Description will appear here.",
       category: values.category || "Beach",
-      region: values.region || "Metro Cebu",
+      region: (values.region || "Cebu City and Metro Cebu") as Destination["region"],
       municipality: values.municipality || null,
       latitude: values.latitude || "10.3157",
       longitude: values.longitude || "123.8854",
@@ -52,7 +85,7 @@ export function DestinationFormPreview({ values }: PreviewProps) {
     ? destination.travel_tips
     : [destination.tips, ...facts.extra_tips].filter((tip): tip is string => Boolean(tip));
   const transport = destination.how_to_get_there?.length
-    ? destination.how_to_get_there.map((t: any) => ({
+    ? destination.how_to_get_there.map((t) => ({
         mode: t.mode || "",
         origin: t.route || "",
         duration: t.duration || "",

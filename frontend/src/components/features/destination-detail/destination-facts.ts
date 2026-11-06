@@ -413,8 +413,20 @@ export function galleryImages(destination: Destination): string[] {
 }
 
 const REGION_KEY = (destination: Destination): "Metro Cebu" | "North Cebu" | "South Cebu" => {
-  const region = destination.region;
-  return region === "Metro Cebu" || region === "North Cebu" || region === "South Cebu" ? region : "North Cebu";
+  switch (destination.region) {
+    case "Cebu City and Metro Cebu":
+      return "Metro Cebu";
+    case "North Cebu Islands":
+    case "North Cebu Mainland":
+    case "Camotes and Cross Region Trip":
+      return "North Cebu";
+    case "South Cebu: Southwest and Highlands":
+    case "South Cebu: Southeast and Southern Trip":
+    case "West Cebu":
+      return "South Cebu";
+    default:
+      return "North Cebu";
+  }
 };
 
 export function getDestinationFacts(destination: Destination): DestinationFacts {

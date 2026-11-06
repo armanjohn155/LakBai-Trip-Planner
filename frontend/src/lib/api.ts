@@ -2,7 +2,7 @@ import axios from "axios";
 
 import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://127.0.0.1:8000/api";
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
 export const API_ORIGIN = new URL(API_URL, window.location.origin).origin;
 

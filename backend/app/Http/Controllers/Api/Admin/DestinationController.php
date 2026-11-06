@@ -208,7 +208,10 @@ class DestinationController extends Controller
     public function destroy(Destination $destination): Response
     {
         $destination->delete();
-        $this->clearDestinationCaches()
+        $this->clearDestinationCaches();
+
+        return response()->noContent();
+    }
 
     /**
      * Restore the specified soft-deleted destination.

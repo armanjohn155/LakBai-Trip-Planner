@@ -77,7 +77,7 @@ export function TagInput({ label, value, onChange, placeholder, max = 12, maxLen
           }}
           onBlur={() => addTag(input)}
           placeholder={value.length === 0 ? placeholder : ""}
-          className="flex-1 min-w-[120px] bg-transparent px-1 py-1 text-sm text-ink-900 placeholder:text-ink-600/50 focus:outline-none"
+          className="flex-1 min-w-[120px] bg-transparent px-1 py-1 text-base text-ink-900 placeholder:text-ink-600/50 focus:outline-none"
         />
       </div>
       <div className="flex items-center justify-between text-xs text-ink-600">

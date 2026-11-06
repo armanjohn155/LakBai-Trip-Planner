@@ -57,7 +57,11 @@ class DestinationResource extends JsonResource
             'visit_duration' => $this->visit_duration,
             'opening_hours' => $this->opening_hours,
             'how_to_get_there' => is_array($this->how_to_get_there) ? array_values($this->how_to_get_there) : [],
-            'travel_tips' => is_array($this->travel_tips) ? array_values($this->travel_tips) : (is_string($this->tips) && $this->tips !== '' ? array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', $this->tips))))) : [],
+            'travel_tips' => is_array($this->travel_tips)
+    ? array_values($this->travel_tips)
+    : (is_string($this->tips) && $this->tips !== ''
+        ? array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', $this->tips))))
+        : []),
             'gallery' => $gallery,
         ];
     }

@@ -29,33 +29,27 @@ export default function AdminLayout() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <aside className="lg:w-56 lg:shrink-0">
-            <div className="glass rounded-2xl p-3">
-              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-ink-600">Admin</p>
-              <nav className="flex flex-col gap-1">
-                {adminNav.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      cn(
-                        "rounded-xl px-3 py-2 text-sm font-semibold transition-colors",
-                        isActive ? "bg-surf-400 text-white" : "text-ink-900 hover:bg-sand-100",
-                      )
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </nav>
-            </div>
-          </aside>
-          <div className="min-w-0 flex-1">
-            <Outlet />
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+        <nav aria-label="Admin" className="mb-6 -mx-1 overflow-x-auto pb-1">
+          <div className="flex min-w-max items-center gap-2 rounded-2xl bg-sand-100/60 p-1.5 ring-1 ring-line">
+            {adminNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={item.hint}
+                className={({ isActive }) =>
+                  cn(
+                    "whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-colors",
+                    isActive ? "bg-surf-400 text-white shadow-sm" : "text-ink-700 hover:bg-white/70",
+                  )
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </div>
-        </div>
+        </nav>
+        <Outlet />
       </main>
       <Footer />
     </div>

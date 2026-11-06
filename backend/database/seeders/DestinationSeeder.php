@@ -21,6 +21,7 @@ class DestinationSeeder extends Seeder
             $adminCount = Destination::withTrashed()->where('source', 'admin')->count();
             if ($adminCount > 0) {
                 $this->command?->warn("Refusing to run DestinationSeeder in production because {$adminCount} admin-created destination(s) exist.");
+
                 return;
             }
             $this->command?->warn('Running DestinationSeeder in production with no admin-created destinations.');
@@ -31,7 +32,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Kawasan Falls',
                 'description' => 'A three-stage cascade of turquoise water fed by mountain springs, popular for swimming and canyoneering.',
                 'category' => 'Waterfall',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southwest and Highlands',
                 'municipality' => 'Badian',
                 'latitude' => 9.8019444,
                 'longitude' => 123.3738889,
@@ -46,7 +47,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Oslob Whale Sharks (Tan-awan)',
                 'description' => 'Guided snorkeling/boat encounter with whale sharks ("butanding") in shallow coastal waters.',
                 'category' => 'Diving & Water Activities',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southeast and Southern Trip',
                 'municipality' => 'Oslob',
                 'latitude' => 9.4614,
                 'longitude' => 123.3833,
@@ -61,7 +62,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Moalboal (Sardine Run & Pescador Island)',
                 'description' => 'A massive, swirling sardine shoal just off the shore, plus reef and wall diving near Pescador Island.',
                 'category' => 'Diving & Water Activities',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southwest and Highlands',
                 'municipality' => 'Moalboal',
                 'latitude' => 9.95,
                 'longitude' => 123.3833,
@@ -76,7 +77,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Osmeña Peak',
                 'description' => 'Cebu\'s highest point, known for its "mini Chocolate Hills" grassy ridges and sunrise views.',
                 'category' => 'Mountains & Hiking',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southwest and Highlands',
                 'municipality' => 'Dalaguete',
                 'latitude' => 9.8167,
                 'longitude' => 123.4667,
@@ -91,7 +92,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Temple of Leah',
                 'description' => 'A Roman-inspired hilltop temple in Busay built as a tribute to a late wife, offering panoramic city views.',
                 'category' => 'Historical & Cultural',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City (Busay)',
                 'latitude' => 10.3667,
                 'longitude' => 123.85,
@@ -106,7 +107,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Sirao Flower Garden',
                 'description' => 'A hillside flower farm nicknamed "Little Amsterdam," known for its celosia and sunflower fields.',
                 'category' => 'Nature & Eco-Tourism',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City (Sirao)',
                 'latitude' => 10.3833,
                 'longitude' => 123.85,
@@ -121,7 +122,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Basilica del Santo Niño',
                 'description' => 'The oldest Roman Catholic church in the Philippines, housing the revered Santo Niño relic.',
                 'category' => 'Religious Sites',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.2939,
                 'longitude' => 123.9019,
@@ -136,7 +137,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Magellan\'s Cross',
                 'description' => 'A cross planted by Ferdinand Magellan in 1521, marking the arrival of Christianity in the Philippines.',
                 'category' => 'Historical & Cultural',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.2933,
                 'longitude' => 123.9019,
@@ -151,7 +152,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Bantayan Island',
                 'description' => 'A laid-back island known for white-sand beaches, sandbars, and sunset views.',
                 'category' => 'Islands',
-                'region' => 'North Cebu',
+                'region' => 'North Cebu Islands',
                 'municipality' => 'Bantayan',
                 'latitude' => 11.1667,
                 'longitude' => 123.7167,
@@ -166,7 +167,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Malapascua Island',
                 'description' => 'A small island famous for thresher shark diving at Monad Shoal and quiet white-sand beaches.',
                 'category' => 'Islands',
-                'region' => 'North Cebu',
+                'region' => 'North Cebu Islands',
                 'municipality' => 'Daanbantayan',
                 'latitude' => 11.3167,
                 'longitude' => 124.1167,
@@ -181,7 +182,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Camotes Islands',
                 'description' => 'A group of islands known for Santiago Bay\'s white sand, Lake Danao, and hidden lagoons/caves.',
                 'category' => 'Islands',
-                'region' => 'North Cebu',
+                'region' => 'Camotes and Cross Region Trip',
                 'municipality' => 'Camotes (Poro/San Francisco/Pilar/Tudela)',
                 'latitude' => 10.65,
                 'longitude' => 124.3667,
@@ -196,7 +197,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Simala Shrine (Monastery of the Holy Eucharist)',
                 'description' => 'A castle-like Marian shrine known for its intricate architecture and reported miracles.',
                 'category' => 'Religious Sites',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southeast and Southern Trip',
                 'municipality' => 'Sibonga',
                 'latitude' => 10.0333,
                 'longitude' => 123.6333,
@@ -211,7 +212,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Fort San Pedro',
                 'description' => 'A 16th-century military defense structure in the heart of Cebu City, full of Spanish colonial history.',
                 'category' => 'Historical & Cultural',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.2924876,
                 'longitude' => 123.9052983,
@@ -226,7 +227,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Tumalog Falls',
                 'description' => 'A wide, curtain-like waterfall near Oslob fed by mountain springs, set amid lush jungle.',
                 'category' => 'Waterfall',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southeast and Southern Trip',
                 'municipality' => 'Oslob',
                 'latitude' => 9.5075860,
                 'longitude' => 123.4300294,
@@ -241,7 +242,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Canyoneering at Badian',
                 'description' => 'Jump, swim, and rappel your way through the Badian canyon to Kawasan Falls with professional guides.',
                 'category' => 'Diving & Water Activities',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southwest and Highlands',
                 'municipality' => 'Badian',
                 'latitude' => 9.8165298,
                 'longitude' => 123.3602081,
@@ -256,7 +257,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Cebu Lechon (Zubuchon)',
                 'description' => 'Taste Cebu\'s legendary roasted pig at Zubuchon, one of the most celebrated lechon restaurants.',
                 'category' => 'Food & Restaurants',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.3210966,
                 'longitude' => 123.8930912,
@@ -271,7 +272,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Carbon Market',
                 'description' => 'Cebu\'s bustling public market offering local produce, dried fish, and authentic street food.',
                 'category' => 'Food & Restaurants',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.2908528,
                 'longitude' => 123.8964619,
@@ -286,7 +287,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Sumilon Island',
                 'description' => 'A private island resort with a shifting sandbar, clear waters, and vibrant marine life off Oslob.',
                 'category' => 'Islands',
-                'region' => 'South Cebu',
+                'region' => 'South Cebu: Southeast and Southern Trip',
                 'municipality' => 'Oslob',
                 'latitude' => 9.3263441,
                 'longitude' => 123.3833836,
@@ -301,7 +302,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Cebu Taoist Temple',
                 'description' => 'A scenic hillside temple in Cebu City offering gardens, tiers, and panoramic city views.',
                 'category' => 'Religious Sites',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cebu City',
                 'latitude' => 10.3385498,
                 'longitude' => 123.8697215,
@@ -316,7 +317,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Mactan Newtown Beach',
                 'description' => 'A modern beachfront complex in Lapu-Lapu City with cafes, shops, and sunset boardwalks.',
                 'category' => 'Beach',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Lapu-Lapu City',
                 'latitude' => 10.2608016,
                 'longitude' => 123.9728209,
@@ -331,7 +332,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Lantaw Native Restaurant',
                 'description' => 'A native-style floating restaurant built on stilts over the water in Cordova, known for grilled seafood and sunset views of Mactan.',
                 'category' => 'Food & Restaurants',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cordova',
                 'latitude' => 10.2544,
                 'longitude' => 123.9581,
@@ -346,7 +347,7 @@ class DestinationSeeder extends Seeder
                 'name' => 'Ten Thousand Roses Cebu',
                 'description' => 'A flower-filled photo garden in Cordova featuring thousands of preserved and real roses, popular for Instagram-worthy shots.',
                 'category' => 'Nature & Eco-Tourism',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cordova',
                 'latitude' => 10.2531,
                 'longitude' => 123.9494,
@@ -361,7 +362,7 @@ class DestinationSeeder extends Seeder
                 'name' => "Entoy's Bakasihan",
                 'description' => 'A well-known seafood restaurant in Cordova serving fresh catch grilled or cooked to order, right along the coast.',
                 'category' => 'Food & Restaurants',
-                'region' => 'Metro Cebu',
+                'region' => 'Cebu City and Metro Cebu',
                 'municipality' => 'Cordova',
                 'latitude' => 10.2478,
                 'longitude' => 123.9622,
@@ -380,11 +381,12 @@ class DestinationSeeder extends Seeder
                 if ($existing->source === 'admin' || $existing->created_by) {
                     continue;
                 }
+
                 // Do not overwrite existing seeded rows (admin might have edited them)
                 continue;
             }
 
-            $destination = new Destination();
+            $destination = new Destination;
             $destination->forceFill($attributes);
             $destination->source = 'seeded';
             $destination->created_by = null;

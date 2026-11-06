@@ -23,10 +23,10 @@ class DestinationControllerTest extends TestCase
 
     public function test_lists_destinations_filtered_by_region(): void
     {
-        $south = Destination::factory()->create(['region' => 'South Cebu', 'name' => 'Kawasan Falls']);
-        Destination::factory()->create(['region' => 'North Cebu', 'name' => 'Bantayan']);
+        $south = Destination::factory()->create(['region' => 'South Cebu: Southwest and Highlands', 'name' => 'Kawasan Falls']);
+        Destination::factory()->create(['region' => 'North Cebu Islands', 'name' => 'Bantayan']);
 
-        $this->getJson('/api/destinations?region=South Cebu')
+        $this->getJson('/api/destinations?region='.urlencode('South Cebu: Southwest and Highlands'))
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $south->id);
