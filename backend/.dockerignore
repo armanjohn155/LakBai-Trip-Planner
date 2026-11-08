@@ -19,6 +19,7 @@ node_modules
 vendor
 public/build
 public/hot
+public/storage
 public/fonts-manifest.dev.json
 database/database.sqlite
 *.log
