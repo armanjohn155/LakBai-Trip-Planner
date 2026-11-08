@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -5,8 +6,74 @@ import { formatMoney, pluralise, toNumber } from "@/lib/format";
 import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
 import type { ItinerarySummary } from "@/lib/types";
 
+export function isBudgetHidden(summary: ItinerarySummary): boolean {
+  return summary.total_budget === null && summary.breakdown_by_category.length === 0;
+}
+
+/** Per-day subtotals and the category breakdown, shared by the card and the panel footer. */
+export function BudgetDetails({ summary }: { summary: ItinerarySummary }) {
+  if (isBudgetHidden(summary)) {
+    return (
+      <p className="text-sm text-ink-600">
+        The owner has hidden budget details from viewers on this trip. Ask them to share the budget if you need it for
+        planning.
+      </p>
+    );
+  }
+
+  const maxCategory = Math.max(...summary.breakdown_by_category.map((entry) => entry.estimated_budget), 1);
+
+  return (
+    <div className="space-y-5">
+      {summary.days.length > 0 ? (
+        <div>
+          <p className="text-sm font-semibold text-ink-900">Per-day subtotals</p>
+          <ul className="mt-2 space-y-1.5">
+            {summary.days.map((day) => (
+              <li key={day.day_number} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-ink-600">
+                  Day {day.day_number} · {pluralise(day.item_count, "stop")}
+                  {day.duration_minutes > 0 ? ` · ${formatDuration(day.duration_minutes)}` : ""}
+                </span>
+                <span className="font-medium text-ink-900">
+                  {day.estimated_budget === null ? "—" : formatMoney(day.estimated_budget)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div>
+        <p className="text-sm font-semibold text-ink-900">Breakdown by category</p>
+        {summary.breakdown_by_category.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-600">Add stops to see a cost breakdown.</p>
+        ) : (
+          <ul className="mt-2 space-y-3">
+            {summary.breakdown_by_category.map((entry) => (
+              <li key={entry.category}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="font-medium text-ink-900">{entry.category}</span>
+                  <span className="text-ink-600">{formatMoney(entry.estimated_budget)}</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sand-100">
+                  <div
+                    className={cn("h-full rounded-full bg-surf-400")}
+                    style={{ width: `${(entry.estimated_budget / maxCategory) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <p className="text-xs text-ink-600">Per-stop estimates from our curated list, in pesos.</p>
+    </div>
+  );
+}
+
 export function BudgetSummary({ summary }: { summary: ItinerarySummary }) {
-  const hidden = summary.total_budget === null && summary.breakdown_by_category.length === 0;
+  const hidden = isBudgetHidden(summary);
 
   if (hidden) {
     return (
@@ -32,7 +99,6 @@ export function BudgetSummary({ summary }: { summary: ItinerarySummary }) {
     );
   }
 
-  const maxCategory = Math.max(...summary.breakdown_by_category.map((entry) => entry.estimated_budget), 1);
   const total = toNumber(summary.total_budget);
   const limit = summary.budget_limit === null ? null : toNumber(summary.budget_limit);
   const diff = limit === null ? null : total - limit;
@@ -66,50 +132,8 @@ export function BudgetSummary({ summary }: { summary: ItinerarySummary }) {
         </div>
       </div>
 
-      <div className="space-y-5 p-5">
-        {summary.days.length > 0 ? (
-          <div>
-            <p className="text-sm font-semibold text-ink-900">Per-day subtotals</p>
-            <ul className="mt-2 space-y-1.5">
-              {summary.days.map((day) => (
-                <li key={day.day_number} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-ink-600">
-                    Day {day.day_number} · {pluralise(day.item_count, "stop")}
-                    {day.duration_minutes > 0 ? ` · ${formatDuration(day.duration_minutes)}` : ""}
-                  </span>
-                  <span className="font-medium text-ink-900">
-                    {day.estimated_budget === null ? "—" : formatMoney(day.estimated_budget)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <div>
-          <p className="text-sm font-semibold text-ink-900">Breakdown by category</p>
-          {summary.breakdown_by_category.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-600">Add stops to see a cost breakdown.</p>
-          ) : (
-            <ul className="mt-2 space-y-3">
-              {summary.breakdown_by_category.map((entry) => (
-                <li key={entry.category}>
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="font-medium text-ink-900">{entry.category}</span>
-                    <span className="text-ink-600">{formatMoney(entry.estimated_budget)}</span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sand-100">
-                    <div
-                      className={cn("h-full rounded-full bg-surf-400")}
-                      style={{ width: `${(entry.estimated_budget / maxCategory) * 100}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <p className="text-xs text-ink-600">Per-stop estimates from our curated list, in pesos.</p>
+      <div className="p-5">
+        <BudgetDetails summary={summary} />
       </div>
     </Card>
   );

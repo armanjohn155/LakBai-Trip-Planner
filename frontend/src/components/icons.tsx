@@ -296,3 +296,24 @@ export function PencilIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function CarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M5 16.5h14M4 16.5v-3l1.8-4.2A2 2 0 0 1 7.6 8h8.8a2 2 0 0 1 1.8 1.3L20 13.5v3" />
+      <path d="M6.5 8.5l1-2.2A1.5 1.5 0 0 1 8.9 5.4h6.2a1.5 1.5 0 0 1 1.4.9l1 2.2" />
+      <circle cx="7.5" cy="16.5" r="1.6" />
+      <circle cx="16.5" cy="16.5" r="1.6" />
+    </svg>
+  );
+}
+
+export function MoreIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}

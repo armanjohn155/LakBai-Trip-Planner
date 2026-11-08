@@ -12,6 +12,8 @@ import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import type { Destination, Itinerary } from "@/lib/types";
 
+export type AddStopMode = "destination" | "custom";
+
 interface AddStopCardProps {
   itinerary: Itinerary;
   destinations: Destination[];
@@ -19,17 +21,38 @@ interface AddStopCardProps {
   defaultDay: number;
   initialDestinationId?: number | null;
   onAdded: () => Promise<void> | void;
+  /** Render without the outer card and without the small picker map (used inside the planner panel). */
+  embedded?: boolean;
+  /** Controlled mode (optional). Falls back to internal state when omitted. */
+  mode?: AddStopMode;
+  onModeChange?: (mode: AddStopMode) => void;
+  destinationId?: string;
+  onDestinationIdChange?: (id: string) => void;
+  pickedPoint?: { lat: number; lng: number } | null;
+  onPickedPointChange?: (point: { lat: number; lng: number } | null) => void;
 }
 
-type Mode = "destination" | "custom";
-
-export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, initialDestinationId = null, onAdded }: AddStopCardProps) {
-  const [mode, setMode] = useState<Mode>("destination");
+export function AddStopCard({
+  itinerary,
+  destinations,
+  dayOptions,
+  defaultDay,
+  initialDestinationId = null,
+  onAdded,
+  embedded = false,
+  mode: modeProp,
+  onModeChange,
+  destinationId: destinationIdProp,
+  onDestinationIdChange,
+  pickedPoint: pickedPointProp,
+  onPickedPointChange,
+}: AddStopCardProps) {
+  const [modeState, setModeState] = useState<AddStopMode>("destination");
   const [search, setSearch] = useState("");
-  const [destinationId, setDestinationId] = useState<string>(initialDestinationId ? String(initialDestinationId) : "");
+  const [destinationIdState, setDestinationIdState] = useState<string>(initialDestinationId ? String(initialDestinationId) : "");
   const [customTitle, setCustomTitle] = useState("");
   const [customCategory, setCustomCategory] = useState<string>("Other");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coordsState, setCoordsState] = useState<{ lat: number; lng: number } | null>(null);
   const [dayNumber, setDayNumber] = useState<string>(String(defaultDay));
   const [budget, setBudget] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -37,6 +60,25 @@ export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, i
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const mode = modeProp ?? modeState;
+  const destinationId = destinationIdProp ?? destinationIdState;
+  const coords = pickedPointProp !== undefined ? pickedPointProp : coordsState;
+
+  const setMode = (next: AddStopMode) => {
+    setModeState(next);
+    onModeChange?.(next);
+  };
+
+  const setDestinationId = (next: string) => {
+    setDestinationIdState(next);
+    onDestinationIdChange?.(next);
+  };
+
+  const setCoords = (next: { lat: number; lng: number } | null) => {
+    setCoordsState(next);
+    onPickedPointChange?.(next);
+  };
 
   const selected = useMemo(() => destinations.find((destination) => String(destination.id) === destinationId), [destinations, destinationId]);
 
@@ -56,6 +98,7 @@ export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, i
     setCustomTitle("");
     setCustomCategory("Other");
     setCoords(null);
+    setDayNumber(String(defaultDay));
     setBudget("");
     setStartTime("");
     setDuration("");
@@ -100,11 +143,11 @@ export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, i
 
   const canSubmit = mode === "custom" ? customTitle.trim().length > 0 : destinationId !== "";
 
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 px-5 pt-5">
+  const content = (
+    <>
+      <div className={cn("flex items-center gap-2", !embedded && "px-5 pt-5")}>
         <div className="inline-flex rounded-full bg-sand-100 p-0.5 text-sm font-semibold">
-          {(["destination", "custom"] as Mode[]).map((value) => (
+          {(["destination", "custom"] as AddStopMode[]).map((value) => (
             <button
               key={value}
               type="button"
@@ -120,21 +163,19 @@ export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, i
         </div>
       </div>
 
-      {mode === "destination" ? (
-        <div className="m-5 mb-0 h-48 overflow-hidden rounded-2xl">
-          <ItineraryMap
-            items={[]}
-            pickedPoint={null}
-            className="h-full w-full"
-          />
-        </div>
-      ) : (
-        <div className="m-5 mb-0 h-48 overflow-hidden rounded-2xl">
-          <ItineraryMap items={[]} pickedPoint={coords} onPickPoint={(lat, lng) => setCoords({ lat, lng })} className="h-full w-full" />
-        </div>
-      )}
+      {!embedded ? (
+        mode === "destination" ? (
+          <div className="m-5 mb-0 h-48 overflow-hidden rounded-2xl">
+            <ItineraryMap items={[]} pickedPoint={null} className="h-full w-full" />
+          </div>
+        ) : (
+          <div className="m-5 mb-0 h-48 overflow-hidden rounded-2xl">
+            <ItineraryMap items={[]} pickedPoint={coords} onPickPoint={(lat, lng) => setCoords({ lat, lng })} className="h-full w-full" />
+          </div>
+        )
+      ) : null}
 
-      <form onSubmit={handleSubmit} className="space-y-4 p-5">
+      <form onSubmit={handleSubmit} className={cn("space-y-4", embedded ? "pt-4" : "p-5")}>
         {mode === "destination" ? (
           <div className="space-y-2">
             <label className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 ring-1 ring-inset ring-line focus-within:ring-2 focus-within:ring-surf-400">
@@ -222,6 +263,10 @@ export function AddStopCard({ itinerary, destinations, dayOptions, defaultDay, i
           {adding ? "Adding…" : "Add stop"}
         </Button>
       </form>
-    </Card>
+    </>
   );
+
+  if (embedded) return <div>{content}</div>;
+
+  return <Card className="overflow-hidden">{content}</Card>;
 }

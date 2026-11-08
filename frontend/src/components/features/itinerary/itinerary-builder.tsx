@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { Link, useNavigate } from "react-router";
 import {
@@ -7,30 +7,33 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-import { AddStopCard } from "@/components/features/itinerary/add-stop-panel";
-import { BudgetSummary } from "@/components/features/itinerary/budget-summary";
-import { ExportMenu } from "@/components/features/itinerary/export-menu";
-import { ItineraryMap } from "@/components/features/itinerary/itinerary-map";
-import { StopCard } from "@/components/features/itinerary/stop-card";
-import { StopEditor } from "@/components/features/itinerary/stop-editor";
+import type { AddStopMode } from "@/components/features/itinerary/add-stop-panel";
 import { ShareDialog } from "@/components/features/itinerary/share-dialog";
+import { StopEditor } from "@/components/features/itinerary/stop-editor";
 import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
-import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
+import { TripMapCanvas } from "@/components/features/itinerary/trip-map-canvas";
+import { TripPanel, mobileSheetHeight, type MobileSnap } from "@/components/features/itinerary/trip-panel";
+import { formatTripDateRange } from "@/components/features/itinerary/itinerary-constants";
+import { dayColor } from "@/components/features/map/map-pin";
+import {
+  ArrowLeftIcon,
+  ClockIcon,
+  LayersIcon,
+  RouteIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { EmptyState, InlineError } from "@/components/ui/feedback";
+import { InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { ClockIcon, LayersIcon, PlusIcon, RouteIcon, ShareIcon, SlidersIcon } from "@/components/icons";
-import { cn } from "@/lib/cn";
+import { useMediaQuery, useViewportHeight } from "@/hooks/use-media-query";
+import { haversineMeters } from "@/lib/geo";
 import {
   apiConflict,
   apiError,
@@ -46,7 +49,15 @@ import {
   updateItineraryItem,
   type ReorderStop,
 } from "@/lib/api";
-import type { Destination, Itinerary, ItineraryActivity, ItineraryItem, ItineraryRouteEstimate, ItineraryRouteLeg, ItinerarySummary } from "@/lib/types";
+import type {
+  Destination,
+  Itinerary,
+  ItineraryActivity,
+  ItineraryItem,
+  ItineraryRouteEstimate,
+  ItineraryRouteLeg,
+  ItinerarySummary,
+} from "@/lib/types";
 
 interface ItineraryBuilderProps {
   itineraryId: number;
@@ -73,6 +84,10 @@ const DAY_COUNT = 30;
 
 export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: ItineraryBuilderProps) {
   const navigate = useNavigate();
+  const isMobile = !useMediaQuery("(min-width: 768px)");
+  const isWide = useMediaQuery("(min-width: 1024px)");
+  const viewportHeight = useViewportHeight();
+
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [summary, setSummary] = useState<ItinerarySummary | null>(null);
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -86,8 +101,10 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(initialAddDestinationId != null);
+  const [addMode, setAddMode] = useState<AddStopMode>("destination");
+  const [addDestinationId, setAddDestinationId] = useState(initialAddDestinationId != null ? String(initialAddDestinationId) : "");
+  const [addPickedPoint, setAddPickedPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
-  const [focusItemId, setFocusItemId] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [remote, setRemote] = useState<{ version: number; updatedBy: string | null; activities: ItineraryActivity[] } | null>(null);
@@ -96,8 +113,20 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [activityLoading, setActivityLoading] = useState(false);
   const versionRef = useRef(0);
 
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+  const [focus, setFocus] = useState<{ point: [number, number]; nonce: number } | null>(null);
+  const focusNonceRef = useRef(0);
+  const [scrollRequest, setScrollRequest] = useState<{ id: number; nonce: number } | null>(null);
+  const scrollNonceRef = useRef(0);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [panelHidden, setPanelHidden] = useState(false);
+  const [mobileSnap, setMobileSnap] = useState<MobileSnap>("half");
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: isMobile ? { delay: 160, tolerance: 8 } : { distance: 6 },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -128,6 +157,14 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     return () => {
       cancelled = true;
     };
+  }, [refresh]);
+
+  const retryLoad = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
+    refresh()
+      .catch((error) => setLoadError(apiError(error)))
+      .finally(() => setLoading(false));
   }, [refresh]);
 
   useEffect(() => {
@@ -197,6 +234,71 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     }
     return map;
   }, [estimates]);
+
+  const daySummaryByDay = useMemo(
+    () => new Map((summary?.days ?? []).map((day) => [day.day_number, day])),
+    [summary],
+  );
+
+  const totalDistanceM = useMemo(() => {
+    if (estimates?.enabled) {
+      const distances = estimates.days
+        .flatMap((day) => day.legs)
+        .map((leg) => leg.distance_m)
+        .filter((distance): distance is number => distance !== null);
+      if (distances.length > 0) return distances.reduce((total, distance) => total + distance, 0);
+    }
+
+    let total = 0;
+    let measured = false;
+    for (const group of groups) {
+      for (let index = 0; index < group.items.length - 1; index += 1) {
+        const distance = haversineMeters(group.items[index], group.items[index + 1]);
+        if (distance !== null) {
+          total += distance;
+          measured = true;
+        }
+      }
+    }
+    return measured ? total : null;
+  }, [estimates, groups]);
+
+  const mobileHeight = mobileSheetHeight(mobileSnap, viewportHeight);
+  const panelWidth = isWide ? 400 : 340;
+
+  const mapInsets = useMemo(() => {
+    if (isMobile) {
+      return { top: 92, right: 16, bottom: mobileHeight + 20, left: 16 };
+    }
+    return {
+      top: 96,
+      right: 24,
+      bottom: 32,
+      left: panelHidden ? 16 : panelWidth + 40,
+    };
+  }, [isMobile, mobileHeight, panelHidden, panelWidth]);
+
+  const focusItem = useCallback((item: ItineraryItem) => {
+    if (item.latitude === null || item.longitude === null) return;
+    focusNonceRef.current += 1;
+    setFocus({ point: [Number(item.latitude), Number(item.longitude)], nonce: focusNonceRef.current });
+  }, []);
+
+  const selectItem = useCallback(
+    (item: ItineraryItem) => {
+      setSelectedItemId(item.id);
+      focusItem(item);
+      if (isMobile) {
+        setMobileSnap("half");
+      } else {
+        setPanelHidden(false);
+        setPanelCollapsed(false);
+      }
+      scrollNonceRef.current += 1;
+      setScrollRequest({ id: item.id, nonce: scrollNonceRef.current });
+    },
+    [focusItem, isMobile],
+  );
 
   const applyItinerary = useCallback((next: Itinerary) => {
     setItinerary(next);
@@ -327,214 +429,241 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     await refresh().catch((error) => setItemError(apiError(error)));
   };
 
+  const handleOpenAdd = useCallback(() => {
+    setAddMode("destination");
+    setAddDestinationId("");
+    setAddPickedPoint(null);
+    setAddOpen(true);
+    if (isMobile) setMobileSnap("full");
+  }, [isMobile]);
+
+  const handleCloseAdd = () => setAddOpen(false);
+
+  const handleAddModeChange = (mode: AddStopMode) => {
+    setAddMode(mode);
+    if (mode === "destination") setAddPickedPoint(null);
+  };
+
+  const handleAddDestinationIdChange = (id: string) => {
+    setAddDestinationId(id);
+    const destination = destinations.find((entry) => String(entry.id) === id);
+    if (destination) {
+      focusNonceRef.current += 1;
+      setFocus({
+        point: [Number(destination.latitude), Number(destination.longitude)],
+        nonce: focusNonceRef.current,
+      });
+      if (isMobile) setMobileSnap("full");
+    }
+  };
+
+  const handleAddPickedPointChange = (point: { lat: number; lng: number } | null) => {
+    setAddPickedPoint(point);
+    if (point) {
+      focusNonceRef.current += 1;
+      setFocus({ point: [point.lat, point.lng], nonce: focusNonceRef.current });
+    }
+  };
+
+  const handleAdded = async () => {
+    setAddDestinationId("");
+    setAddPickedPoint(null);
+    await refresh();
+  };
+
   if (loading) {
-    return <p className="text-sm text-ink-600">Loading planner…</p>;
+    return <PlannerSkeleton isMobile={isMobile} />;
   }
 
   if (loadError || !itinerary || !summary) {
     return (
-      <div className="space-y-4">
-        <InlineError message={loadError ?? "This planner could not be loaded."} />
-        <Link to="/app/trips" className="text-sm font-semibold text-sea-500 hover:text-sea-600">
-          ← Back to my trips
-        </Link>
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-lagoon-950 px-6 text-center">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <h2 className="font-display text-xl font-semibold text-lagoon-900">This planner could not be loaded</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            {loadError ?? "The trip is missing or you no longer have access to it."}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Button onClick={retryLoad}>Try again</Button>
+            <Link
+              to="/app/trips"
+              className="rounded-full px-3 py-2 text-sm font-semibold text-sea-600 hover:bg-sand-100"
+            >
+              Back to my trips
+            </Link>
+          </div>
+        </div>
+        {loadError ? (
+          <div className="w-full max-w-md">
+            <InlineError message={loadError} />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   const dayOptions = Array.from({ length: DAY_COUNT }, (_, index) => index + 1);
-  const maxDay = Math.max(...groups.map((group) => group.day), 1);
+  const maxDay = Math.max(summary.day_count || 1, ...groups.map((group) => group.day), 1);
   const activeItem = activeId !== null ? items.find((item) => item.id === activeId) ?? null : null;
   const showEstimates = estimates?.enabled ?? false;
   const canEdit = itinerary.my_role !== "viewer";
   const isOwner = itinerary.my_role === "owner";
   const isGroup = itinerary.trip_type === "group";
+  const dateRange = formatTripDateRange(itinerary.start_date, itinerary.end_date);
+  const activeDestinationId = addDestinationId === "" ? null : Number(addDestinationId);
+  const showDestinationMarkers = addOpen && addMode === "destination";
+
+  const notice = remote ? (
+    <div className="rounded-xl bg-mango-400/15 px-3 py-2 ring-1 ring-inset ring-mango-400/30">
+      <p className="text-xs text-ink-800">
+        <span className="font-semibold">{remote.updatedBy ?? "Someone"}</span> updated this trip while you were looking.
+      </p>
+      <div className="mt-2 flex gap-1.5">
+        <Button size="sm" variant="secondary" onClick={() => setActivityOpen(true)}>
+          Activity
+        </Button>
+        <Button size="sm" onClick={() => void handleLoadLatest()}>
+          Refresh trip
+        </Button>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <div className="space-y-6 pb-10 sm:pb-14">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Link to="/app/trips" className="text-sm font-semibold text-sea-500 hover:text-sea-600">
-            ← My trips
-          </Link>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="truncate font-display text-3xl font-semibold text-lagoon-900">{itinerary.title}</h1>
-            {isGroup ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-surf-400/15 px-2.5 py-1 text-xs font-semibold text-sea-600">
-                <ShareIcon className="h-3.5 w-3.5" /> Group trip
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sand-200/80 px-2.5 py-1 text-xs font-semibold text-ink-600">
-                Solo
-              </span>
-            )}
-            {!canEdit ? (
-              <span className="rounded-full bg-mango-400/20 px-2.5 py-1 text-xs font-semibold text-ink-700">View only</span>
+    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="relative h-full w-full overflow-hidden bg-sand-100">
+        <TripMapCanvas
+          items={items}
+          activeItemId={selectedItemId}
+          hoveredItemId={hoveredItemId}
+          onSelectItem={selectItem}
+          onHoverItem={setHoveredItemId}
+          focusPoint={focus?.point ?? null}
+          focusNonce={focus?.nonce ?? 0}
+          pickMode={addOpen && addMode === "custom"}
+          pickedPoint={addPickedPoint}
+          onPickPoint={(lat, lng) => handleAddPickedPointChange({ lat, lng })}
+          destinationMarkers={showDestinationMarkers ? destinations : []}
+          activeDestinationId={activeDestinationId}
+          onSelectDestination={(destination) => handleAddDestinationIdChange(String(destination.id))}
+          onAddDestination={(destination) => handleAddDestinationIdChange(String(destination.id))}
+          insets={mapInsets}
+          fitKey={`${itinerary.version ?? 0}-${items.length}`}
+          bottomInset={isMobile ? mobileHeight : 0}
+        />
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[880] flex items-start justify-between gap-2 p-3 sm:p-4">
+          <div className="pointer-events-auto flex flex-col items-start gap-2">
+            <Link
+              to="/app/trips"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-lagoon-900 shadow-sm ring-1 ring-line/60 backdrop-blur hover:bg-white"
+            >
+              <ArrowLeftIcon className="h-3.5 w-3.5" /> My trips
+            </Link>
+            {!isMobile && panelHidden ? (
+              <button
+                type="button"
+                onClick={() => setPanelHidden(false)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-lagoon-900 shadow-lg ring-1 ring-line/60 transition-colors hover:bg-sand-50"
+              >
+                <LayersIcon className="h-4 w-4" /> Show trip
+              </button>
             ) : null}
           </div>
-          <p className="mt-0.5 text-sm text-ink-600">
-            {summary.item_count} stops · {summary.day_count} days
-            {summary.total_duration_minutes > 0 ? ` · ${formatDuration(summary.total_duration_minutes)} planned` : ""}
-            {itinerary.member_count && itinerary.member_count > 1 ? ` · ${itinerary.member_count} travellers` : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => setActivityOpen(true)}>
-            <ClockIcon className="h-4 w-4" /> Activity
-          </Button>
-          {canEdit ? (
-            <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
-              <LayersIcon className="h-4 w-4" /> Templates
-            </Button>
-          ) : null}
-          {canEdit ? (
-            <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
-              <SlidersIcon className="h-4 w-4" /> Settings
-            </Button>
-          ) : null}
-          <ExportMenu itinerary={itinerary} onError={setItemError} />
-          {itinerary.my_role ? (
-            <Button onClick={() => setShareOpen(true)}>
-              <ShareIcon className="h-4 w-4" /> {isOwner ? "Share" : "Members"}
-            </Button>
-          ) : null}
-        </div>
-      </div>
 
-      {itemError ? <InlineError message={itemError} /> : null}
-
-      {remote ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-mango-400/15 px-4 py-3 ring-1 ring-inset ring-mango-400/30">
-          <p className="text-sm text-ink-800">
-            <span className="font-semibold">{remote.updatedBy ?? "Someone"}</span> updated this trip while you were
-            looking. Refresh to see the latest version.
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setActivityOpen(true)}>
-              View activity
-            </Button>
-            <Button size="sm" onClick={() => void handleLoadLatest()}>
-              Refresh trip
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {!canEdit ? (
-        <p className="rounded-xl bg-sand-100/70 px-4 py-3 text-sm text-ink-600">
-          You have view-only access. You can still explore the map, open stops and export a copy.
-        </p>
-      ) : null}
-
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        <div className="min-w-0 space-y-6">
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-2 pt-5 sm:px-6">
-              <h2 className="font-display text-xl font-medium text-lagoon-900">Itinerary</h2>
-              {canEdit ? (
-                <button
-                  type="button"
-                  onClick={() => setAddOpen((value) => !value)}
-                  aria-expanded={addOpen}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
-                >
-                  <PlusIcon className={cn("h-4 w-4 transition-transform", addOpen && "rotate-45")} />
-                  Add a stop
-                </button>
+          <div className="pointer-events-auto flex max-w-[min(64vw,26rem)] flex-col items-end gap-1.5">
+            <div className="rounded-2xl bg-white/95 px-3.5 py-2 text-right shadow-sm ring-1 ring-line/60 backdrop-blur">
+              <h1 className="truncate font-display text-base font-semibold text-lagoon-900">{itinerary.title}</h1>
+              <p className="mt-0.5 flex flex-wrap items-center justify-end gap-x-1.5 text-[11px] text-ink-600">
+                {dateRange ? <span>{dateRange}</span> : null}
+                <span>{summary.day_count} days</span>
+                {isGroup && (itinerary.member_count ?? 0) > 0 ? (
+                  <span>{itinerary.member_count} travellers</span>
+                ) : null}
+              </p>
+              {groups.length > 0 ? (
+                <div className="mt-1 flex flex-wrap justify-end gap-x-2 gap-y-1">
+                  {groups.map((group) => (
+                    <span key={group.day} className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-600">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: dayColor(group.day) }}
+                        aria-hidden="true"
+                      />
+                      Day {group.day}
+                    </span>
+                  ))}
+                </div>
               ) : null}
             </div>
-
-            <div className="px-3 pt-1 pb-5 sm:px-4">
-              {items.length === 0 ? (
-                <div className="px-2">
-                  <EmptyState
-                    title="No stops yet"
-                    detail="Add places from our destinations, or drop a custom stop anywhere in Cebu."
-                    action={
-                      canEdit ? (
-                        <Button onClick={() => setAddOpen(true)}>
-                          <PlusIcon className="h-4 w-4" /> Add your first stop
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                </div>
-              ) : (
-                <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                  <div className="space-y-4">
-                    {groups.map((group, groupIndex) => (
-                      <DayColumn
-                        key={group.day}
-                        group={group}
-                        groups={groups}
-                        groupIndex={groupIndex}
-                        busyItem={busyItem}
-                        estimateEnabled={showEstimates}
-                        canEdit={canEdit}
-                        travelByLeg={travelByLeg}
-                        onToggleStatus={handleToggleStatus}
-                        onEdit={setEditingItem}
-                        onDelete={handleDeleteItem}
-                        onFocus={(id) => setFocusItemId(id)}
-                      />
-                    ))}
-                    <NewDayDrop day={groups.length === 0 ? 1 : groups[groups.length - 1].day + 1} />
-                  </div>
-
-                  <DragOverlay>
-                    {activeItem ? (
-                      <div className="glass rounded-xl p-3 opacity-95 shadow-xl">
-                        <p className="text-sm font-semibold text-ink-900">{activeItem.title}</p>
-                      </div>
-                    ) : null}
-                  </DragOverlay>
-                </DndContext>
-              )}
-            </div>
-          </Card>
-
-          {addOpen && canEdit ? (
-            <div>
-              <AddStopCard
-                itinerary={itinerary}
-                destinations={destinations}
-                dayOptions={dayOptions}
-                defaultDay={maxDay}
-                initialDestinationId={initialAddDestinationId}
-                onAdded={refresh}
-              />
-            </div>
-          ) : null}
-
-          <BudgetSummary summary={summary} />
+            {showEstimates ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-ink-600 shadow-sm ring-1 ring-line/60 backdrop-blur">
+                <RouteIcon className="h-3.5 w-3.5" /> Route estimates on
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <aside aria-label="Trip map" className="min-w-0 space-y-3 lg:sticky lg:top-24">
-          <Card className="overflow-hidden">
-            <h2 className="px-5 pt-5 font-display text-xl font-medium text-lagoon-900">Route map</h2>
-            {showEstimates ? (
-              <p className="px-5 pt-1 text-xs text-ink-600">
-                <RouteIcon className="mr-1 inline h-3.5 w-3.5" /> Travel estimates enabled — dashed lines link each day's stops.
-              </p>
-            ) : null}
-            <div className="m-5 h-[26rem] overflow-hidden rounded-2xl">
-              {items.length === 0 ? (
-                <div className="flex h-full items-center justify-center rounded-2xl bg-sand-50 text-sm text-ink-600">
-                  Stops will appear here as you add them.
-                </div>
-              ) : (
-                <ItineraryMap
-                  items={items}
-                  activeItemId={focusItemId}
-                  followActive
-                  onSelectItem={(item) => (canEdit ? setEditingItem(item) : setFocusItemId(item.id))}
-                  className="h-full w-full"
-                />
-              )}
+        <div className="pointer-events-none absolute inset-0 z-[900]">
+          <TripPanel
+            itinerary={itinerary}
+            summary={summary}
+            groups={groups}
+            maxDay={maxDay}
+            dayOptions={dayOptions}
+            destinations={destinations}
+            canEdit={canEdit}
+            isOwner={isOwner}
+            isGroup={isGroup}
+            busyItem={busyItem}
+            estimatesEnabled={showEstimates}
+            travelByLeg={travelByLeg}
+            daySummaryByDay={daySummaryByDay}
+            totalDistanceM={totalDistanceM}
+            selectedItemId={selectedItemId}
+            hoveredItemId={hoveredItemId}
+            scrollRequest={scrollRequest}
+            addOpen={addOpen}
+            addMode={addMode}
+            addDestinationId={addDestinationId}
+            addPickedPoint={addPickedPoint}
+            onOpenAdd={handleOpenAdd}
+            onCloseAdd={handleCloseAdd}
+            onAddModeChange={handleAddModeChange}
+            onAddDestinationIdChange={handleAddDestinationIdChange}
+            onAddPickedPointChange={handleAddPickedPointChange}
+            onAdded={handleAdded}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenActivity={() => setActivityOpen(true)}
+            onOpenTemplates={() => setTemplatesOpen(true)}
+            onOpenShare={() => setShareOpen(true)}
+            onExportError={setItemError}
+            itemError={itemError}
+            notice={notice}
+            collapsed={panelCollapsed}
+            hidden={panelHidden}
+            onToggleCollapse={() => setPanelCollapsed((value) => !value)}
+            onHide={() => setPanelHidden(true)}
+            isMobile={isMobile}
+            mobileSnap={mobileSnap}
+            mobileHeight={mobileHeight}
+            onMobileSnapChange={setMobileSnap}
+            onSelectItem={selectItem}
+            onHoverItem={setHoveredItemId}
+            onToggleStatus={handleToggleStatus}
+            onEditItem={setEditingItem}
+            onDeleteItem={handleDeleteItem}
+            onFocusItem={focusItem}
+          />
+        </div>
+
+        <DragOverlay>
+          {activeItem ? (
+            <div className="rounded-xl bg-white p-3 opacity-95 shadow-xl ring-1 ring-line/60">
+              <p className="text-sm font-semibold text-ink-900">{activeItem.title}</p>
             </div>
-            {destinations.length === 0 ? <p className="px-5 pb-5 text-xs text-ink-600">No destinations loaded.</p> : null}
-          </Card>
-        </aside>
+          ) : null}
+        </DragOverlay>
       </div>
 
       <ShareDialog
@@ -611,90 +740,22 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       />
 
       <TemplatesDialog open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
-    </div>
+    </DndContext>
   );
 }
 
-interface DayColumnProps {
-  group: DayGroup;
-  groups: DayGroup[];
-  groupIndex: number;
-  busyItem: number | null;
-  estimateEnabled: boolean;
-  canEdit: boolean;
-  travelByLeg: Map<string, ItineraryRouteLeg>;
-  onToggleStatus: (item: ItineraryItem) => void;
-  onEdit: (item: ItineraryItem) => void;
-  onDelete: (item: ItineraryItem) => void;
-  onFocus: (id: number) => void;
-}
-
-function DayColumn({ group, groups, groupIndex, busyItem, estimateEnabled, canEdit, travelByLeg, onToggleStatus, onEdit, onDelete, onFocus }: DayColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: `day-${group.day}` });
-  const ids = group.items.map((item) => item.id);
-
-  // Global sequence numbering across all days.
-  const offset = groups.slice(0, groupIndex).reduce((total, current) => total + current.items.length, 0);
-  const duration = group.items.reduce((total, item) => total + (item.duration_minutes ?? 0), 0);
-
+function PlannerSkeleton({ isMobile }: { isMobile: boolean }) {
   return (
-    <section ref={setNodeRef} className={cn("rounded-2xl transition-colors", isOver && "bg-surf-400/10 ring-2 ring-surf-400/40")}>
-      <header className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
-        <h3 className="font-display text-base font-semibold text-lagoon-900">Day {group.day}</h3>
-        <p className="text-xs text-ink-600">
-          {group.items.length} {group.items.length === 1 ? "stop" : "stops"}
-          {duration > 0 ? ` · ${formatDuration(duration)}` : ""}
-        </p>
-      </header>
-
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <ul className="space-y-3 px-1">
-          {group.items.map((item, itemIndex) => {
-            const next = group.items[itemIndex + 1];
-            const leg = next ? travelByLeg.get(`${item.id}-${next.id}`) : undefined;
-            return (
-              <Fragment key={item.id}>
-                <StopCard
-                  item={item}
-                  sequence={offset + itemIndex + 1}
-                  busy={busyItem === item.id}
-                  canEdit={canEdit}
-                  onToggleStatus={() => onToggleStatus(item)}
-                  onEdit={() => onEdit(item)}
-                  onDelete={() => onDelete(item)}
-                  onFocus={() => onFocus(item.id)}
-                />
-                {estimateEnabled && leg && leg.duration_s !== null ? (
-                  <li className="px-2 text-[11px] text-ink-500">↓ {formatTravel(leg.distance_m, leg.duration_s)}</li>
-                ) : null}
-              </Fragment>
-            );
-          })}
-        </ul>
-      </SortableContext>
-    </section>
-  );
-}
-
-function NewDayDrop({ day }: { day: number }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `day-${day}` });
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "rounded-2xl border border-dashed border-line px-3 py-3 text-center text-xs text-ink-500 transition-colors",
-        isOver && "border-surf-400 bg-surf-400/10 text-sea-600",
+    <div className="relative h-full w-full overflow-hidden bg-sand-100">
+      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-sand-200 via-sand-100 to-surf-400/30" />
+      <div className="absolute left-4 top-4 h-24 w-64 animate-pulse rounded-2xl bg-white/80 shadow-lg" />
+      {isMobile ? (
+        <div className="absolute inset-x-0 bottom-0 h-[56%] animate-pulse rounded-t-3xl bg-white/90 shadow-2xl" />
+      ) : (
+        <div className="absolute bottom-4 left-4 top-4 w-[400px] animate-pulse rounded-2xl bg-white/90 shadow-2xl" />
       )}
-    >
-      Drop here to add Day {day}
     </div>
   );
-}
-
-function formatTravel(distanceM: number | null, durationS: number): string {
-  const minutes = Math.max(1, Math.round(durationS / 60));
-  const km = distanceM !== null ? `${(distanceM / 1000).toFixed(1)} km` : null;
-  return km ? `${km} · ~${minutes} min drive` : `~${minutes} min drive`;
 }
 
 const ACTIVITY_LABEL: Record<string, string> = {

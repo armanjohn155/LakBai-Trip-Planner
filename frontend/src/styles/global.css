@@ -302,6 +302,27 @@
   fill: var(--color-mango-400);
 }
 
+/* Keep Leaflet's bottom controls clear of the floating trip sheet. */
+.trip-map-canvas .leaflet-bottom {
+  bottom: var(--trip-map-bottom, 0px);
+}
+
+.trip-map-canvas .leaflet-control-zoom {
+  margin-right: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px -8px rgba(7, 31, 37, 0.45);
+}
+
+.trip-map-canvas .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+}
+
+.trip-map-canvas .leaflet-popup-content {
+  margin: 10px 12px;
+}
+
 @keyframes ambient-drift {
   from {
     background-position: 12% 10%, 92% 30%, 80% 92%;

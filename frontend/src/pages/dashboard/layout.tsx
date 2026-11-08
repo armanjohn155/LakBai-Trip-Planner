@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const isPlanner = /^\/app\/trips\/[^/]+$/.test(location.pathname) && location.pathname !== "/app/trips/new";
 
   if (loading) {
     return <p className="px-6 py-16 text-sm text-ink-600">Checking your session…</p>;
@@ -17,12 +18,18 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={isPlanner ? "flex h-screen flex-col overflow-hidden" : "flex min-h-screen flex-col"}>
       <Header />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <main
+        className={
+          isPlanner
+            ? "min-h-0 flex-1"
+            : "mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10"
+        }
+      >
         <Outlet />
       </main>
-      <Footer />
+      {isPlanner ? null : <Footer />}
     </div>
   );
 }

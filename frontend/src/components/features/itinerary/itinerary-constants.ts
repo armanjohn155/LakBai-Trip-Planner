@@ -44,3 +44,38 @@ export function formatTimeRange(startTime: string | null | undefined, durationMi
   const endMinute = totalMinutes % 60;
   return `${start} – ${pad(endHour)}:${pad(endMinute)}`;
 }
+
+const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/** "Saturday, Oct 22, 2026" when the trip has a start date, else null. */
+export function formatDayHeading(startDate: string | null | undefined, dayNumber: number): string | null {
+  if (!startDate) return null;
+  const start = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const date = new Date(start);
+  date.setDate(date.getDate() + Math.max(dayNumber - 1, 0));
+  return weekdayFormatter.format(date);
+}
+
+/** A compact date range for the map overlay, e.g. "Oct 22 – Oct 24, 2026". */
+export function formatTripDateRange(startDate: string | null | undefined, endDate: string | null | undefined): string | null {
+  if (!startDate && !endDate) return null;
+  const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
+  const end = endDate ? new Date(`${endDate}T00:00:00`) : null;
+  const valid = (value: Date | null): value is Date => value !== null && !Number.isNaN(value.getTime());
+
+  if (valid(start) && valid(end)) {
+    const year = end.getFullYear();
+    return `${shortDateFormatter.format(start)} – ${shortDateFormatter.format(end)}, ${year}`;
+  }
+  if (valid(start)) return `${shortDateFormatter.format(start)}, ${start.getFullYear()}`;
+  if (valid(end)) return `${shortDateFormatter.format(end)}, ${end.getFullYear()}`;
+  return null;
+}

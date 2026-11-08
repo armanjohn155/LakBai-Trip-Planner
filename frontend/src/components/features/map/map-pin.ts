@@ -36,9 +36,9 @@ const numberedPinSvg = (label: number, color: string): string => `<svg width="30
     <text x="15" y="19.4" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#0b3038">${label}</text>
   </svg>`;
 
-export const createNumberedPin = (label: number, color: string): L.DivIcon =>
+export const createNumberedPin = (label: number, color: string, active = false): L.DivIcon =>
   L.divIcon({
-    className: "suroy-pin",
+    className: `suroy-pin${active ? " is-active" : ""}`,
     html: numberedPinSvg(label, color),
     iconSize: [30, 40],
     iconAnchor: [15, 38],
