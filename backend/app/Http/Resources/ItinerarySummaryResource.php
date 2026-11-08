@@ -35,7 +35,10 @@ class ItinerarySummaryResource extends JsonResource
                 'item_count' => $items->count(),
                 'day_count' => $items->pluck('day_number')->unique()->count(),
                 'total_duration_minutes' => (int) $items->sum('duration_minutes'),
-                'days' => $this->dayBreakdown()->map(fn (array $day) => [...$day, 'estimated_budget' => null])->all(),
+                'days' => array_map(
+                    fn (array $day): array => [...$day, 'estimated_budget' => null],
+                    $this->dayBreakdown(),
+                ),
                 'breakdown_by_category' => [],
             ];
         }
