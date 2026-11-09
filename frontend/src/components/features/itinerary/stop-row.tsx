@@ -18,6 +18,7 @@ interface StopRowProps {
   canEdit?: boolean;
   selected?: boolean;
   hovered?: boolean;
+  flash?: boolean;
   onSelect: () => void;
   onHover: (hovered: boolean) => void;
   onToggleStatus: () => void;
@@ -33,6 +34,7 @@ export function StopRow({
   canEdit = true,
   selected = false,
   hovered = false,
+  flash = false,
   onSelect,
   onHover,
   onToggleStatus,
@@ -112,6 +114,7 @@ export function StopRow({
             !selected && hovered && "bg-sand-50",
             isSkipped && "opacity-70",
             item.unavailable && "bg-mango-400/5",
+            flash && "stop-row-flash",
           )}
         >
           <div

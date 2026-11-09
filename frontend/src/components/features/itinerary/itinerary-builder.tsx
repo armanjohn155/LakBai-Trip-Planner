@@ -14,7 +14,13 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-import type { AddStopMode } from "@/components/features/itinerary/add-stop-panel";
+import {
+  AddStopPanel,
+  addStopSheetHeight,
+  type AddStopMobileSnap,
+  type AddStopMode,
+  type CustomStopInput,
+} from "@/components/features/itinerary/add-stop-panel";
 import { ShareDialog } from "@/components/features/itinerary/share-dialog";
 import { StopEditor } from "@/components/features/itinerary/stop-editor";
 import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
@@ -24,17 +30,20 @@ import { formatTripDateRange } from "@/components/features/itinerary/itinerary-c
 import { dayColor } from "@/components/features/map/map-pin";
 import {
   ArrowLeftIcon,
+  ChevronIcon,
   ClockIcon,
   LayersIcon,
+  PlusIcon,
   RouteIcon,
 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { useMediaQuery, useViewportHeight } from "@/hooks/use-media-query";
+import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
 import { haversineMeters } from "@/lib/geo";
 import {
+  addItineraryItem,
   apiConflict,
   apiError,
   deleteItineraryItem,
@@ -47,6 +56,7 @@ import {
   reorderItineraryItems,
   updateItinerary,
   updateItineraryItem,
+  type ItineraryItemPayload,
   type ReorderStop,
 } from "@/lib/api";
 import type {
@@ -80,12 +90,34 @@ function groupByDay(items: ItineraryItem[]): DayGroup[] {
   return groups;
 }
 
-const DAY_COUNT = 30;
+const TRIP_PANEL_KEY = "suroy.tripPanelWidth";
+const TRIP_PANEL_MIN = 440;
+const TRIP_PANEL_MAX = 720;
+const TRIP_PANEL_DEFAULT = 520;
+const TRIP_PANEL_TABLET = 420;
+const ADD_PANEL_TABLET = 360;
+
+function clampPanelWidth(value: number): number {
+  return Math.min(TRIP_PANEL_MAX, Math.max(TRIP_PANEL_MIN, Math.round(value)));
+}
+
+function readPanelWidth(): number {
+  try {
+    const stored = window.localStorage.getItem(TRIP_PANEL_KEY);
+    const value = stored === null ? Number.NaN : Number(stored);
+    if (Number.isFinite(value)) return clampPanelWidth(value);
+  } catch {
+    // Storage can be blocked in private mode; fall back to the default width.
+  }
+  return TRIP_PANEL_DEFAULT;
+}
 
 export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: ItineraryBuilderProps) {
   const navigate = useNavigate();
   const isMobile = !useMediaQuery("(min-width: 768px)");
-  const isWide = useMediaQuery("(min-width: 1024px)");
+  const isDesktop = useMediaQuery("(min-width: 1200px)");
+  const isTablet = !isMobile && !isDesktop;
+  const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
 
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
@@ -102,8 +134,23 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(initialAddDestinationId != null);
   const [addMode, setAddMode] = useState<AddStopMode>("destination");
-  const [addDestinationId, setAddDestinationId] = useState(initialAddDestinationId != null ? String(initialAddDestinationId) : "");
+  const [addSelectedDay, setAddSelectedDay] = useState(1);
+  const [addStartTime, setAddStartTime] = useState("");
+  const [addSearch, setAddSearch] = useState("");
+  const [addCategory, setAddCategory] = useState<string | null>(null);
+  const [hoveredDestinationId, setHoveredDestinationId] = useState<number | null>(null);
   const [addPickedPoint, setAddPickedPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSessionCount, setAddSessionCount] = useState(0);
+  const [addMobileSnap, setAddMobileSnap] = useState<AddStopMobileSnap>("half");
+  const [duplicateDestination, setDuplicateDestination] = useState<Destination | null>(null);
+  const [destinationsLoading, setDestinationsLoading] = useState(true);
+  const [destinationsError, setDestinationsError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [flashItemId, setFlashItemId] = useState<number | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -112,6 +159,11 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [activities, setActivities] = useState<ItineraryActivity[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const versionRef = useRef(0);
+  const toastTimerRef = useRef<number | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  const autoCollapsedRef = useRef(false);
+  const addingRef = useRef(false);
+  const initialDayAppliedRef = useRef(false);
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
@@ -123,6 +175,14 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [panelHidden, setPanelHidden] = useState(false);
   const [mobileSnap, setMobileSnap] = useState<MobileSnap>("half");
 
+  const effectivePanelWidth = isDesktop ? panelWidth : TRIP_PANEL_TABLET;
+  const addPanelWidth = isMobile
+    ? viewportWidth
+    : isTablet
+      ? ADD_PANEL_TABLET
+      : Math.round(Math.min(420, Math.max(360, viewportWidth * 0.32)));
+  const addMobileHeight = addStopSheetHeight(addMobileSnap, viewportHeight);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: isMobile ? { delay: 160, tolerance: 8 } : { distance: 6 },
@@ -131,17 +191,48 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   );
 
   const refresh = useCallback(async () => {
-    const [trip, bud, dests, routes] = await Promise.all([
+    const [trip, bud, routes] = await Promise.all([
       getItinerary(itineraryId),
       getItinerarySummary(itineraryId),
-      getDestinations({ per_page: 100 }),
       getItineraryRouteEstimates(itineraryId).catch(() => null),
     ]);
     setItinerary(trip);
     setSummary(bud);
-    setDestinations(dests.data);
+    setEstimates(routes);
+
+    // When opened from a destination card, default the add panel to the trip's last day.
+    if (initialAddDestinationId != null && !initialDayAppliedRef.current) {
+      initialDayAppliedRef.current = true;
+      const lastDay = Math.max(
+        bud.day_count || 1,
+        ...(trip.items ?? []).map((item) => item.day_number),
+        1,
+      );
+      setAddSelectedDay(lastDay);
+    }
+  }, [itineraryId, initialAddDestinationId]);
+
+  const refreshStats = useCallback(async () => {
+    const [bud, routes] = await Promise.all([
+      getItinerarySummary(itineraryId),
+      getItineraryRouteEstimates(itineraryId).catch(() => null),
+    ]);
+    setSummary(bud);
     setEstimates(routes);
   }, [itineraryId]);
+
+  const loadDestinations = useCallback(async () => {
+    setDestinationsLoading(true);
+    setDestinationsError(null);
+    try {
+      const dests = await getDestinations({ per_page: 100 });
+      setDestinations(dests.data);
+    } catch (error) {
+      setDestinationsError(apiError(error));
+    } finally {
+      setDestinationsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,10 +245,18 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    void loadDestinations();
     return () => {
       cancelled = true;
     };
-  }, [refresh]);
+  }, [refresh, loadDestinations]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+      if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   const retryLoad = useCallback(() => {
     setLoading(true);
@@ -165,7 +264,8 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     refresh()
       .catch((error) => setLoadError(apiError(error)))
       .finally(() => setLoading(false));
-  }, [refresh]);
+    void loadDestinations();
+  }, [refresh, loadDestinations]);
 
   useEffect(() => {
     if (itinerary) {
@@ -224,6 +324,9 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
 
   const items = useMemo(() => itinerary?.items ?? [], [itinerary]);
   const groups = useMemo(() => groupByDay(items), [items]);
+  const canEdit = itinerary !== null && itinerary.my_role !== "viewer";
+  const isOwner = itinerary?.my_role === "owner";
+  const isGroup = itinerary?.trip_type === "group";
 
   const travelByLeg = useMemo(() => {
     const map = new Map<string, ItineraryRouteLeg>();
@@ -264,19 +367,48 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   }, [estimates, groups]);
 
   const mobileHeight = mobileSheetHeight(mobileSnap, viewportHeight);
-  const panelWidth = isWide ? 400 : 340;
+  const maxDay = useMemo(
+    () => Math.max(summary?.day_count || 1, ...groups.map((group) => group.day), 1),
+    [summary, groups],
+  );
+
+  const filteredDestinations = useMemo(() => {
+    const term = addSearch.trim().toLowerCase();
+    return destinations.filter((destination) => {
+      if (addCategory !== null && destination.category !== addCategory) return false;
+      if (term === "") return true;
+      return [destination.name, destination.municipality, destination.region, destination.category]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toLowerCase().includes(term));
+    });
+  }, [destinations, addSearch, addCategory]);
+
+  const addedDestinationIds = useMemo(
+    () => new Set(items.map((item) => item.destination_id).filter((id): id is number => id !== null)),
+    [items],
+  );
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  const bottomSheetHeight = isMobile && addOpen ? Math.max(mobileHeight, addMobileHeight) : mobileHeight;
+  const leftMapInset = isMobile ? 16 : panelHidden || panelCollapsed ? 16 : effectivePanelWidth + 40;
+  const rightMapInset = isMobile ? 16 : addOpen ? addPanelWidth + 40 : 24;
 
   const mapInsets = useMemo(() => {
     if (isMobile) {
-      return { top: 92, right: 16, bottom: mobileHeight + 20, left: 16 };
+      return { top: 92, right: 16, bottom: bottomSheetHeight + 20, left: 16 };
     }
-    return {
-      top: 96,
-      right: 24,
-      bottom: 32,
-      left: panelHidden ? 16 : panelWidth + 40,
-    };
-  }, [isMobile, mobileHeight, panelHidden, panelWidth]);
+    return { top: 96, right: rightMapInset, bottom: 32, left: leftMapInset };
+  }, [isMobile, bottomSheetHeight, rightMapInset, leftMapInset]);
+
+  const visibleMapWidth = viewportWidth - (isMobile ? 32 : leftMapInset + rightMapInset);
+  const showLegend = !isMobile && groups.length > 0 && visibleMapWidth > 360;
+  const legendOffset = (leftMapInset - rightMapInset) / 2;
+  const zoomRightInset = !isMobile && addOpen ? addPanelWidth + 32 : 0;
 
   const focusItem = useCallback((item: ItineraryItem) => {
     if (item.latitude === null || item.longitude === null) return;
@@ -429,46 +561,228 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     await refresh().catch((error) => setItemError(apiError(error)));
   };
 
-  const handleOpenAdd = useCallback(() => {
-    setAddMode("destination");
-    setAddDestinationId("");
+  const handleCloseAdd = () => {
+    setAddOpen(false);
     setAddPickedPoint(null);
-    setAddOpen(true);
-    if (isMobile) setMobileSnap("full");
-  }, [isMobile]);
+    setAddError(null);
+    setHoveredDestinationId(null);
+    if (autoCollapsedRef.current) {
+      autoCollapsedRef.current = false;
+      setPanelCollapsed(false);
+    }
+  };
 
-  const handleCloseAdd = () => setAddOpen(false);
+  const handleOpenAdd = () => {
+    if (addOpen) {
+      handleCloseAdd();
+      return;
+    }
+    setAddMode("destination");
+    setAddPickedPoint(null);
+    setAddError(null);
+    setHoveredDestinationId(null);
+    setAddSearch("");
+    setAddCategory(null);
+    setAddStartTime("");
+    setAddSelectedDay(maxDay);
+    setAddOpen(true);
+    if (isMobile) setAddMobileSnap("half");
+    if (
+      isTablet &&
+      !panelHidden &&
+      !panelCollapsed &&
+      effectivePanelWidth + addPanelWidth > viewportWidth * 0.7
+    ) {
+      autoCollapsedRef.current = true;
+      setPanelCollapsed(true);
+    }
+  };
 
   const handleAddModeChange = (mode: AddStopMode) => {
     setAddMode(mode);
-    if (mode === "destination") setAddPickedPoint(null);
-  };
-
-  const handleAddDestinationIdChange = (id: string) => {
-    setAddDestinationId(id);
-    const destination = destinations.find((entry) => String(entry.id) === id);
-    if (destination) {
-      focusNonceRef.current += 1;
-      setFocus({
-        point: [Number(destination.latitude), Number(destination.longitude)],
-        nonce: focusNonceRef.current,
-      });
-      if (isMobile) setMobileSnap("full");
-    }
-  };
-
-  const handleAddPickedPointChange = (point: { lat: number; lng: number } | null) => {
-    setAddPickedPoint(point);
-    if (point) {
-      focusNonceRef.current += 1;
-      setFocus({ point: [point.lat, point.lng], nonce: focusNonceRef.current });
-    }
-  };
-
-  const handleAdded = async () => {
-    setAddDestinationId("");
     setAddPickedPoint(null);
-    await refresh();
+    setHoveredDestinationId(null);
+  };
+
+  const handlePickedPointChange = (point: { lat: number; lng: number } | null) => {
+    setAddPickedPoint(point);
+  };
+
+  const handleNewDay = () => {
+    setAddSelectedDay((current) => Math.max(current, maxDay) + 1);
+  };
+
+  const handlePanelResize = (width: number) => {
+    const next = clampPanelWidth(width);
+    setPanelWidth(next);
+    try {
+      window.localStorage.setItem(TRIP_PANEL_KEY, String(next));
+    } catch {
+      // Storage can be unavailable; the width still applies for this session.
+    }
+  };
+
+  const nextOrderForDay = (day: number): number => {
+    const dayItems = (itinerary?.items ?? []).filter((item) => item.day_number === day);
+    return dayItems.length === 0 ? 0 : Math.max(...dayItems.map((item) => item.order)) + 1;
+  };
+
+  const performAdd = async (
+    payload: ItineraryItemPayload,
+    optimistic: ItineraryItem,
+    successMessage: string,
+  ): Promise<boolean> => {
+    if (addingRef.current || !itinerary) return false;
+    addingRef.current = true;
+    setAdding(true);
+    setAddError(null);
+    setItemError(null);
+
+    const previous = itinerary;
+    applyItinerary({ ...previous, items: [...(previous.items ?? []), optimistic] });
+
+    try {
+      const next = await addItineraryItem(itineraryId, { ...payload, base_version: previous.version });
+      applyItinerary(next);
+
+      const added = (next.items ?? []).reduce<ItineraryItem | null>(
+        (newest, item) => (newest === null || item.id > newest.id ? item : newest),
+        null,
+      );
+
+      if (added) {
+        setSelectedItemId(added.id);
+        setFlashItemId(added.id);
+        if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = window.setTimeout(() => setFlashItemId(null), 1800);
+        scrollNonceRef.current += 1;
+        setScrollRequest({ id: added.id, nonce: scrollNonceRef.current });
+      }
+
+      setAddSessionCount((count) => count + 1);
+      setAddStartTime("");
+      if (payload.destination_id === null) setAddPickedPoint(null);
+      showToast(successMessage);
+      void refreshStats().catch(() => {
+        // Stats are best-effort; the stop itself is already saved.
+      });
+      return true;
+    } catch (error) {
+      applyItinerary(previous);
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setAddError(apiError(error));
+      return false;
+    } finally {
+      addingRef.current = false;
+      setAdding(false);
+    }
+  };
+
+  const addDestinationStop = (destination: Destination, skipDuplicateCheck = false) => {
+    if (!canEdit) return;
+    if (!skipDuplicateCheck && addedDestinationIds.has(destination.id)) {
+      setDuplicateDestination(destination);
+      return;
+    }
+
+    const day = addSelectedDay;
+    const order = nextOrderForDay(day);
+    const startTime = addStartTime === "" ? null : addStartTime;
+    const optimistic: ItineraryItem = {
+      id: -Date.now(),
+      itinerary_id: itineraryId,
+      destination_id: destination.id,
+      custom_title: null,
+      custom_latitude: null,
+      custom_longitude: null,
+      custom_address: null,
+      is_custom: false,
+      title: destination.name,
+      category: destination.category,
+      latitude: Number(destination.latitude),
+      longitude: Number(destination.longitude),
+      day_number: day,
+      order,
+      start_time: startTime,
+      duration_minutes: null,
+      estimated_budget: destination.estimated_cost,
+      notes: null,
+      visited: false,
+      status: "planned",
+      unavailable: false,
+      verified: true,
+      destination,
+    };
+
+    void performAdd(
+      {
+        destination_id: destination.id,
+        day_number: day,
+        order,
+        start_time: startTime,
+        duration_minutes: null,
+      },
+      optimistic,
+      `Added ${destination.name} to Day ${day}`,
+    );
+  };
+
+  const confirmAddAgain = () => {
+    const destination = duplicateDestination;
+    setDuplicateDestination(null);
+    if (destination) addDestinationStop(destination, true);
+  };
+
+  const addCustomStop = async (input: CustomStopInput): Promise<boolean> => {
+    if (!canEdit) return false;
+    const day = addSelectedDay;
+    const order = nextOrderForDay(day);
+    const startTime = input.startTime === "" ? null : input.startTime;
+    const duration = input.duration === "" ? null : Number(input.duration);
+    const budget = input.budget === "" ? null : Number(input.budget);
+    const optimistic: ItineraryItem = {
+      id: -Date.now(),
+      itinerary_id: itineraryId,
+      destination_id: null,
+      custom_title: input.title,
+      custom_latitude: input.latitude,
+      custom_longitude: input.longitude,
+      custom_address: input.address === "" ? null : input.address,
+      is_custom: true,
+      title: input.title,
+      category: input.category,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      day_number: day,
+      order,
+      start_time: startTime,
+      duration_minutes: duration,
+      estimated_budget: budget,
+      notes: null,
+      visited: false,
+      status: "planned",
+      unavailable: false,
+      verified: false,
+    };
+
+    return performAdd(
+      {
+        destination_id: null,
+        custom_title: input.title,
+        custom_latitude: input.latitude,
+        custom_longitude: input.longitude,
+        custom_address: input.address === "" ? null : input.address,
+        day_number: day,
+        order,
+        start_time: startTime,
+        duration_minutes: duration,
+        category: input.category,
+        estimated_budget: budget,
+      },
+      optimistic,
+      `Added ${input.title} to Day ${day}`,
+    );
   };
 
   if (loading) {
@@ -502,15 +816,9 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     );
   }
 
-  const dayOptions = Array.from({ length: DAY_COUNT }, (_, index) => index + 1);
-  const maxDay = Math.max(summary.day_count || 1, ...groups.map((group) => group.day), 1);
   const activeItem = activeId !== null ? items.find((item) => item.id === activeId) ?? null : null;
   const showEstimates = estimates?.enabled ?? false;
-  const canEdit = itinerary.my_role !== "viewer";
-  const isOwner = itinerary.my_role === "owner";
-  const isGroup = itinerary.trip_type === "group";
   const dateRange = formatTripDateRange(itinerary.start_date, itinerary.end_date);
-  const activeDestinationId = addDestinationId === "" ? null : Number(addDestinationId);
   const showDestinationMarkers = addOpen && addMode === "destination";
 
   const notice = remote ? (
@@ -542,14 +850,17 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           focusNonce={focus?.nonce ?? 0}
           pickMode={addOpen && addMode === "custom"}
           pickedPoint={addPickedPoint}
-          onPickPoint={(lat, lng) => handleAddPickedPointChange({ lat, lng })}
-          destinationMarkers={showDestinationMarkers ? destinations : []}
-          activeDestinationId={activeDestinationId}
-          onSelectDestination={(destination) => handleAddDestinationIdChange(String(destination.id))}
-          onAddDestination={(destination) => handleAddDestinationIdChange(String(destination.id))}
+          onPickPoint={(lat, lng) => handlePickedPointChange({ lat, lng })}
+          destinationMarkers={showDestinationMarkers ? filteredDestinations : []}
+          activeDestinationId={hoveredDestinationId}
+          hoveredDestinationId={hoveredDestinationId}
+          onSelectDestination={(destination) => setHoveredDestinationId(destination.id)}
+          onHoverDestination={setHoveredDestinationId}
+          onAddDestination={addDestinationStop}
           insets={mapInsets}
           fitKey={`${itinerary.version ?? 0}-${items.length}`}
-          bottomInset={isMobile ? mobileHeight : 0}
+          bottomInset={isMobile ? bottomSheetHeight : 0}
+          rightInset={zoomRightInset}
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[880] flex items-start justify-between gap-2 p-3 sm:p-4">
@@ -561,13 +872,25 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
               <ArrowLeftIcon className="h-3.5 w-3.5" /> My trips
             </Link>
             {!isMobile && panelHidden ? (
-              <button
-                type="button"
-                onClick={() => setPanelHidden(false)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-lagoon-900 shadow-lg ring-1 ring-line/60 transition-colors hover:bg-sand-50"
-              >
-                <LayersIcon className="h-4 w-4" /> Show trip
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setPanelHidden(false)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-lagoon-900 shadow-lg ring-1 ring-line/60 transition-colors hover:bg-sand-50"
+                >
+                  <LayersIcon className="h-4 w-4" /> Show trip
+                </button>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenAdd}
+                    aria-pressed={addOpen}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-surf-300"
+                  >
+                    <PlusIcon className="h-4 w-4" /> Add a stop
+                  </button>
+                ) : null}
+              </>
             ) : null}
           </div>
 
@@ -581,8 +904,43 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                   <span>{itinerary.member_count} travellers</span>
                 ) : null}
               </p>
-              {groups.length > 0 ? (
-                <div className="mt-1 flex flex-wrap justify-end gap-x-2 gap-y-1">
+            </div>
+            {showEstimates ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-ink-600 shadow-sm ring-1 ring-line/60 backdrop-blur">
+                <RouteIcon className="h-3.5 w-3.5" /> Route estimates on
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {showLegend ? (
+          <div
+            className="pointer-events-none absolute top-3 z-[881] flex flex-col items-center sm:top-4"
+            style={{ left: "50%", transform: `translateX(calc(-50% + ${legendOffset}px))` }}
+          >
+            <div className="pointer-events-auto max-w-[min(80vw,22rem)] overflow-hidden rounded-full bg-white/95 shadow-sm ring-1 ring-line/60 backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setLegendOpen((value) => !value)}
+                aria-expanded={legendOpen}
+                className="inline-flex h-8 items-center gap-1.5 px-3 text-[11px] font-semibold text-ink-600"
+              >
+                <span className="flex -space-x-1" aria-hidden="true">
+                  {groups.slice(0, 5).map((group) => (
+                    <span
+                      key={group.day}
+                      className="h-2.5 w-2.5 rounded-full ring-1 ring-white"
+                      style={{ backgroundColor: dayColor(group.day) }}
+                    />
+                  ))}
+                </span>
+                Legend
+                <ChevronIcon
+                  className={`h-3.5 w-3.5 transition-transform ${legendOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {legendOpen ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-line/60 px-3 py-2">
                   {groups.map((group) => (
                     <span key={group.day} className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-600">
                       <span
@@ -596,22 +954,14 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                 </div>
               ) : null}
             </div>
-            {showEstimates ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-ink-600 shadow-sm ring-1 ring-line/60 backdrop-blur">
-                <RouteIcon className="h-3.5 w-3.5" /> Route estimates on
-              </span>
-            ) : null}
           </div>
-        </div>
+        ) : null}
 
         <div className="pointer-events-none absolute inset-0 z-[900]">
           <TripPanel
             itinerary={itinerary}
             summary={summary}
             groups={groups}
-            maxDay={maxDay}
-            dayOptions={dayOptions}
-            destinations={destinations}
             canEdit={canEdit}
             isOwner={isOwner}
             isGroup={isGroup}
@@ -622,17 +972,10 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             totalDistanceM={totalDistanceM}
             selectedItemId={selectedItemId}
             hoveredItemId={hoveredItemId}
+            flashItemId={flashItemId}
             scrollRequest={scrollRequest}
             addOpen={addOpen}
-            addMode={addMode}
-            addDestinationId={addDestinationId}
-            addPickedPoint={addPickedPoint}
             onOpenAdd={handleOpenAdd}
-            onCloseAdd={handleCloseAdd}
-            onAddModeChange={handleAddModeChange}
-            onAddDestinationIdChange={handleAddDestinationIdChange}
-            onAddPickedPointChange={handleAddPickedPointChange}
-            onAdded={handleAdded}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
             onOpenTemplates={() => setTemplatesOpen(true)}
@@ -642,6 +985,9 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             notice={notice}
             collapsed={panelCollapsed}
             hidden={panelHidden}
+            width={effectivePanelWidth}
+            resizable={isDesktop}
+            onResize={handlePanelResize}
             onToggleCollapse={() => setPanelCollapsed((value) => !value)}
             onHide={() => setPanelHidden(true)}
             isMobile={isMobile}
@@ -655,7 +1001,64 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             onDeleteItem={handleDeleteItem}
             onFocusItem={focusItem}
           />
+
+          {canEdit && addOpen ? (
+            <AddStopPanel
+              isMobile={isMobile}
+              width={addPanelWidth}
+              destinations={destinations}
+              filteredDestinations={filteredDestinations}
+              destinationsLoading={destinationsLoading}
+              destinationsError={destinationsError}
+              addedDestinationIds={addedDestinationIds}
+              hoveredDestinationId={hoveredDestinationId}
+              mode={addMode}
+              selectedDay={addSelectedDay}
+              maxDay={maxDay}
+              startTime={addStartTime}
+              category={addCategory}
+              adding={adding}
+              addError={addError}
+              sessionCount={addSessionCount}
+              pickedPoint={addPickedPoint}
+              mobileSnap={addMobileSnap}
+              mobileHeight={addMobileHeight}
+              onClose={handleCloseAdd}
+              onRetryDestinations={() => void loadDestinations()}
+              onModeChange={handleAddModeChange}
+              onSelectedDayChange={setAddSelectedDay}
+              onNewDay={handleNewDay}
+              onStartTimeChange={setAddStartTime}
+              onCategoryChange={setAddCategory}
+              onSearchChange={setAddSearch}
+              onHoverDestination={setHoveredDestinationId}
+              onAddDestination={addDestinationStop}
+              onAddCustomStop={addCustomStop}
+              onMobileSnapChange={setAddMobileSnap}
+            />
+          ) : null}
         </div>
+
+        {toast ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute z-[1200]"
+            style={
+              isMobile
+                ? { left: "50%", top: 12, transform: "translateX(-50%)" }
+                : {
+                    left: "50%",
+                    bottom: 24,
+                    transform: `translateX(calc(-50% + ${legendOffset}px))`,
+                  }
+            }
+          >
+            <div className="rounded-full bg-lagoon-900 px-4 py-2 text-sm font-semibold text-sand-50 shadow-xl">
+              {toast}
+            </div>
+          </div>
+        ) : null}
 
         <DragOverlay>
           {activeItem ? (
@@ -674,6 +1077,27 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         onLeft={() => navigate("/app/trips")}
         onConflict={(fresh) => setConflict({ message: "This trip changed while you were updating it.", itinerary: fresh })}
       />
+
+      <Modal
+        open={duplicateDestination !== null}
+        onClose={() => setDuplicateDestination(null)}
+        title="Already in this trip"
+        description="Add the same destination a second time?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDuplicateDestination(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmAddAgain}>Add anyway</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          <span className="font-semibold text-ink-900">{duplicateDestination?.name}</span> is already a stop on this
+          trip. Add it again to Day {addSelectedDay}?
+        </p>
+      </Modal>
 
       <Modal
         open={activityOpen}
@@ -752,7 +1176,7 @@ function PlannerSkeleton({ isMobile }: { isMobile: boolean }) {
       {isMobile ? (
         <div className="absolute inset-x-0 bottom-0 h-[56%] animate-pulse rounded-t-3xl bg-white/90 shadow-2xl" />
       ) : (
-        <div className="absolute bottom-4 left-4 top-4 w-[400px] animate-pulse rounded-2xl bg-white/90 shadow-2xl" />
+        <div className="absolute bottom-4 left-4 top-4 w-[520px] animate-pulse rounded-2xl bg-white/90 shadow-2xl" />
       )}
     </div>
   );

@@ -25,6 +25,7 @@ interface DayCardProps {
   onToggleCollapse: () => void;
   selectedItemId: number | null;
   hoveredItemId: number | null;
+  flashItemId: number | null;
   onSelectItem: (item: ItineraryItem) => void;
   onHoverItem: (id: number | null) => void;
   onToggleStatus: (item: ItineraryItem) => void;
@@ -47,6 +48,7 @@ export function DayCard({
   onToggleCollapse,
   selectedItemId,
   hoveredItemId,
+  flashItemId,
   onSelectItem,
   onHoverItem,
   onToggleStatus,
@@ -99,6 +101,7 @@ export function DayCard({
                     canEdit={canEdit}
                     selected={selectedItemId === item.id}
                     hovered={hoveredItemId === item.id}
+                    flash={flashItemId === item.id}
                     onSelect={() => onSelectItem(item)}
                     onHover={(hovered) => onHoverItem(hovered ? item.id : null)}
                     onToggleStatus={() => onToggleStatus(item)}

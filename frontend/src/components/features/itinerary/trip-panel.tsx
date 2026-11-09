@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useDroppable } from "@dnd-kit/core";
 
-import { AddStopCard, type AddStopMode } from "@/components/features/itinerary/add-stop-panel";
 import { BudgetFooter } from "@/components/features/itinerary/budget-footer";
 import { isBudgetHidden } from "@/components/features/itinerary/budget-summary";
 import { DayCard } from "@/components/features/itinerary/day-card";
@@ -11,7 +10,6 @@ import { ExportMenu } from "@/components/features/itinerary/export-menu";
 import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import {
-  ArrowLeftIcon,
   ChevronIcon,
   ClockIcon,
   LayersIcon,
@@ -27,7 +25,6 @@ import { cn } from "@/lib/cn";
 import { formatDistance } from "@/lib/geo";
 import { formatMoney } from "@/lib/format";
 import type {
-  Destination,
   Itinerary,
   ItineraryItem,
   ItineraryRouteLeg,
@@ -55,9 +52,6 @@ interface TripPanelProps {
   itinerary: Itinerary;
   summary: ItinerarySummary;
   groups: DayGroup[];
-  maxDay: number;
-  dayOptions: number[];
-  destinations: Destination[];
   canEdit: boolean;
   isOwner: boolean;
   isGroup: boolean;
@@ -68,17 +62,10 @@ interface TripPanelProps {
   totalDistanceM: number | null;
   selectedItemId: number | null;
   hoveredItemId: number | null;
+  flashItemId: number | null;
   scrollRequest: { id: number; nonce: number } | null;
   addOpen: boolean;
-  addMode: AddStopMode;
-  addDestinationId: string;
-  addPickedPoint: { lat: number; lng: number } | null;
   onOpenAdd: () => void;
-  onCloseAdd: () => void;
-  onAddModeChange: (mode: AddStopMode) => void;
-  onAddDestinationIdChange: (id: string) => void;
-  onAddPickedPointChange: (point: { lat: number; lng: number } | null) => void;
-  onAdded: () => Promise<void> | void;
   onOpenSettings: () => void;
   onOpenActivity: () => void;
   onOpenTemplates: () => void;
@@ -88,6 +75,9 @@ interface TripPanelProps {
   notice?: ReactNode;
   collapsed: boolean;
   hidden: boolean;
+  width: number;
+  resizable: boolean;
+  onResize: (width: number) => void;
   onToggleCollapse: () => void;
   onHide: () => void;
   isMobile: boolean;
@@ -106,9 +96,6 @@ export function TripPanel({
   itinerary,
   summary,
   groups,
-  maxDay,
-  dayOptions,
-  destinations,
   canEdit,
   isOwner,
   isGroup,
@@ -119,17 +106,10 @@ export function TripPanel({
   totalDistanceM,
   selectedItemId,
   hoveredItemId,
+  flashItemId,
   scrollRequest,
   addOpen,
-  addMode,
-  addDestinationId,
-  addPickedPoint,
   onOpenAdd,
-  onCloseAdd,
-  onAddModeChange,
-  onAddDestinationIdChange,
-  onAddPickedPointChange,
-  onAdded,
   onOpenSettings,
   onOpenActivity,
   onOpenTemplates,
@@ -139,6 +119,9 @@ export function TripPanel({
   notice,
   collapsed,
   hidden,
+  width,
+  resizable,
+  onResize,
   onToggleCollapse,
   onHide,
   isMobile,
@@ -152,9 +135,9 @@ export function TripPanel({
   onDeleteItem,
   onFocusItem,
 }: TripPanelProps) {
-  const bodyRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number; moved: boolean } | null>(null);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(() => new Set());
   const [failedCover, setFailedCover] = useState<string | null>(null);
@@ -207,11 +190,6 @@ export function TripPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRequest?.nonce]);
 
-  useEffect(() => {
-    if (!addOpen) return;
-    bodyRef.current?.scrollTo({ top: 0 });
-  }, [addOpen]);
-
   if (hidden && !isMobile) return null;
 
   const toggleDay = (day: number) => {
@@ -248,18 +226,60 @@ export function TripPanel({
     onMobileSnapChange(nearest[0]);
   };
 
-  const sheetStyle = isMobile ? { height: `${dragHeight ?? mobileHeight}px` } : undefined;
+  const sheetStyle = isMobile
+    ? { height: `${dragHeight ?? mobileHeight}px` }
+    : { width: `${width}px` };
 
   const panelClasses = cn(
-    "pointer-events-auto absolute z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-line/60",
+    "group/panel pointer-events-auto absolute z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-line/60",
     isMobile
       ? "inset-x-0 bottom-0 rounded-t-3xl rounded-b-none transition-[height] duration-200 ease-out"
-      : "bottom-4 left-4 top-4 w-[400px] rounded-2xl md:w-[340px] lg:w-[400px]",
+      : "bottom-4 left-4 top-4 rounded-2xl",
     !isMobile && isCollapsed && "bottom-auto h-auto",
   );
 
   return (
     <aside aria-label="Trip panel" className={panelClasses} style={sheetStyle}>
+      {!isMobile && resizable && !isCollapsed ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize trip panel"
+          tabIndex={0}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            resizeRef.current = { startX: event.clientX, startWidth: width };
+          }}
+          onPointerMove={(event) => {
+            const resize = resizeRef.current;
+            if (!resize) return;
+            onResize(resize.startWidth + (event.clientX - resize.startX));
+          }}
+          onPointerUp={() => {
+            resizeRef.current = null;
+          }}
+          onPointerCancel={() => {
+            resizeRef.current = null;
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              onResize(width - 24);
+            } else if (event.key === "ArrowRight") {
+              event.preventDefault();
+              onResize(width + 24);
+            }
+          }}
+          className="absolute inset-y-2 right-0 z-10 flex w-2 cursor-col-resize touch-none items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
+        >
+          <span
+            className="h-10 w-1 rounded-full bg-line transition-colors hover:bg-surf-400/60 group-hover/panel:bg-surf-400/40"
+            aria-hidden="true"
+          />
+        </div>
+      ) : null}
+
       {isMobile ? (
         <button
           ref={handleRef}
@@ -313,6 +333,22 @@ export function TripPanel({
           </p>
         </div>
 
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={onOpenAdd}
+            aria-label="Add a stop"
+            title="Add a stop"
+            aria-pressed={addOpen}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
+              addOpen ? "bg-surf-400/15 text-sea-600" : "text-ink-500 hover:bg-sand-100 hover:text-ink-900",
+            )}
+          >
+            <PlusIcon className="h-4 w-4" />
+          </button>
+        ) : null}
+
         {!isMobile ? (
           <button
             type="button"
@@ -328,7 +364,7 @@ export function TripPanel({
 
       {isCollapsed ? null : (
         <>
-          <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="relative mx-3 mt-3 overflow-hidden rounded-2xl">
               <div className="relative h-28 bg-gradient-to-br from-lagoon-900 via-sea-600 to-surf-400">
                 {showCover ? (
@@ -400,7 +436,12 @@ export function TripPanel({
 
             <div className="flex gap-1.5 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {canEdit ? (
-                <Button size="sm" onClick={onOpenAdd} className="shrink-0">
+                <Button
+                  size="sm"
+                  onClick={onOpenAdd}
+                  aria-pressed={addOpen}
+                  className={cn("shrink-0", addOpen && "ring-2 ring-inset ring-white/50")}
+                >
                   <PlusIcon className="h-4 w-4" /> Add a stop
                 </Button>
               ) : null}
@@ -432,31 +473,7 @@ export function TripPanel({
               </p>
             ) : null}
 
-            {addOpen ? (
-              <div className="px-3 pb-4">
-                <button
-                  type="button"
-                  onClick={onCloseAdd}
-                  className="mb-1 inline-flex items-center gap-1.5 rounded-full px-2 py-1.5 text-xs font-semibold text-sea-600 transition-colors hover:bg-sand-100"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" /> Back to trip
-                </button>
-                <AddStopCard
-                  embedded
-                  itinerary={itinerary}
-                  destinations={destinations}
-                  dayOptions={dayOptions}
-                  defaultDay={maxDay}
-                  onAdded={onAdded}
-                  mode={addMode}
-                  onModeChange={onAddModeChange}
-                  destinationId={addDestinationId}
-                  onDestinationIdChange={onAddDestinationIdChange}
-                  pickedPoint={addPickedPoint}
-                  onPickedPointChange={onAddPickedPointChange}
-                />
-              </div>
-            ) : groups.length === 0 ? (
+            {groups.length === 0 ? (
               <div className="px-3 pb-4">
                 <EmptyState
                   title="Add your first stop"
@@ -488,6 +505,7 @@ export function TripPanel({
                     onToggleCollapse={() => toggleDay(group.day)}
                     selectedItemId={selectedItemId}
                     hoveredItemId={hoveredItemId}
+                    flashItemId={flashItemId}
                     onSelectItem={onSelectItem}
                     onHoverItem={onHoverItem}
                     onToggleStatus={onToggleStatus}

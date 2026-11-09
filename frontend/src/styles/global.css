@@ -307,6 +307,17 @@
   bottom: var(--trip-map-bottom, 0px);
 }
 
+/* Keep the zoom controls clear of the floating add-stop panel. */
+.trip-map-canvas .leaflet-right {
+  right: var(--trip-map-right, 0px);
+}
+
+/* Crosshair while placing a custom stop on the map. */
+.trip-map-pick .leaflet-container,
+.trip-map-pick .leaflet-container.leaflet-grab {
+  cursor: crosshair;
+}
+
 .trip-map-canvas .leaflet-control-zoom {
   margin-right: 12px;
   margin-bottom: 12px;
@@ -321,6 +332,55 @@
 
 .trip-map-canvas .leaflet-popup-content {
   margin: 10px 12px;
+}
+
+/* Brief highlight on a stop that was just added from the add-stop panel. */
+.stop-row-flash {
+  animation: stop-row-flash 1.7s ease-out;
+}
+
+@keyframes stop-row-flash {
+  0% {
+    background-color: rgb(246 176 30 / 0.32);
+    box-shadow: inset 0 0 0 1px rgb(246 176 30 / 0.55);
+  }
+  70% {
+    background-color: rgb(246 176 30 / 0.16);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+.add-panel-enter {
+  animation: add-panel-enter 180ms ease-out;
+}
+
+@keyframes add-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.add-sheet-enter {
+  animation: add-sheet-enter 200ms ease-out;
+}
+
+@keyframes add-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes ambient-drift {

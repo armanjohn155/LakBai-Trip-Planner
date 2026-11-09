@@ -35,3 +35,21 @@ export function useViewportHeight(): number {
     () => 900,
   );
 }
+
+/** Current viewport width, used to size the planner panels without a layout effect. */
+export function useViewportWidth(): number {
+  const subscribe = useCallback((onChange: () => void) => {
+    window.addEventListener("resize", onChange);
+    window.addEventListener("orientationchange", onChange);
+    return () => {
+      window.removeEventListener("resize", onChange);
+      window.removeEventListener("orientationchange", onChange);
+    };
+  }, []);
+
+  return useSyncExternalStore(
+    subscribe,
+    () => window.innerWidth,
+    () => 1440,
+  );
+}

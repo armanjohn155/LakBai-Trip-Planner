@@ -31,11 +31,14 @@ interface TripMapCanvasProps {
   onPickPoint?: (lat: number, lng: number) => void;
   destinationMarkers?: Destination[];
   activeDestinationId?: number | null;
+  hoveredDestinationId?: number | null;
   onSelectDestination?: (destination: Destination) => void;
+  onHoverDestination?: (id: number | null) => void;
   onAddDestination?: (destination: Destination) => void;
   insets: MapInsets;
   fitKey?: string | number;
   bottomInset?: number;
+  rightInset?: number;
   interactive?: boolean;
   className?: string;
 }
@@ -152,11 +155,14 @@ export function TripMapCanvas({
   onPickPoint,
   destinationMarkers = [],
   activeDestinationId = null,
+  hoveredDestinationId = null,
   onSelectDestination,
+  onHoverDestination,
   onAddDestination,
   insets,
   fitKey,
   bottomInset = 0,
+  rightInset = 0,
   interactive = true,
   className,
 }: TripMapCanvasProps) {
@@ -188,10 +194,16 @@ export function TripMapCanvas({
       .filter((path) => path.points.length > 1);
   }, [located]);
 
-  const style = { "--trip-map-bottom": `${bottomInset}px` } as CSSProperties;
+  const style = {
+    "--trip-map-bottom": `${bottomInset}px`,
+    "--trip-map-right": `${rightInset}px`,
+  } as CSSProperties;
 
   return (
-    <div className={["trip-map-canvas absolute inset-0", className].filter(Boolean).join(" ")} style={style}>
+    <div
+      className={["trip-map-canvas absolute inset-0", pickMode && "trip-map-pick", className].filter(Boolean).join(" ")}
+      style={style}
+    >
       <MapContainer
         center={CEBU_CENTER}
         zoom={9}
@@ -256,18 +268,27 @@ export function TripMapCanvas({
 
         {destinationMarkers.map((destination) => {
           const handleAdd = onAddDestination ?? onSelectDestination;
+          const highlighted = destination.id === activeDestinationId || destination.id === hoveredDestinationId;
           return (
             <Marker
               key={`destination-${destination.id}`}
               position={[Number(destination.latitude), Number(destination.longitude)]}
-              icon={createPinIcon(destination.id === activeDestinationId)}
-              zIndexOffset={-200}
-              eventHandlers={{ click: () => onSelectDestination?.(destination) }}
+              icon={createPinIcon(highlighted)}
+              zIndexOffset={highlighted ? 900 : -200}
+              eventHandlers={{
+                click: () => onSelectDestination?.(destination),
+                mouseover: () => onHoverDestination?.(destination.id),
+                mouseout: () => onHoverDestination?.(null),
+              }}
             >
-              <Popup closeButton={false} maxWidth={230} autoPan={false}>
+              <Popup closeButton={false} maxWidth={240} autoPan={false}>
                 <div className="space-y-1.5">
                   <p className="text-sm font-semibold text-lagoon-900">{destination.name}</p>
-                  <p className="text-xs text-ink-600">{destination.municipality ?? destination.region}</p>
+                  <p className="text-xs text-ink-600">
+                    {destination.category}
+                    {destination.municipality ? ` · ${destination.municipality}` : ""}
+                  </p>
+                  <p className="text-xs font-semibold text-sea-600">{formatMoney(destination.estimated_cost)}</p>
                   {handleAdd ? (
                     <button
                       type="button"
@@ -284,9 +305,20 @@ export function TripMapCanvas({
         })}
 
         {pickedPoint ? (
-          <Marker position={[pickedPoint.lat, pickedPoint.lng]} icon={createPinIcon(true)} zIndexOffset={1200}>
+          <Marker
+            position={[pickedPoint.lat, pickedPoint.lng]}
+            icon={createPinIcon(true)}
+            zIndexOffset={1200}
+            draggable={interactive}
+            eventHandlers={{
+              dragend: (event) => {
+                const point = (event.target as L.Marker).getLatLng();
+                onPickPoint?.(point.lat, point.lng);
+              },
+            }}
+          >
             <Popup closeButton={false} maxWidth={200} autoPan={false}>
-              <p className="text-xs text-ink-600">New custom stop</p>
+              <p className="text-xs text-ink-600">Drag to fine-tune, or click the map to move this pin.</p>
             </Popup>
           </Marker>
         ) : null}
