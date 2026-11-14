@@ -7,7 +7,10 @@ import { BudgetFooter } from "@/components/features/itinerary/budget-footer";
 import { isBudgetHidden } from "@/components/features/itinerary/budget-summary";
 import { DayCard } from "@/components/features/itinerary/day-card";
 import { ExportMenu } from "@/components/features/itinerary/export-menu";
-import { formatDuration } from "@/components/features/itinerary/itinerary-constants";
+import {
+  LIFECYCLE_LABEL,
+  formatDuration,
+} from "@/components/features/itinerary/itinerary-constants";
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import {
   ChevronIcon,
@@ -15,6 +18,7 @@ import {
   LayersIcon,
   PencilIcon,
   PlusIcon,
+  RouteIcon,
   ShareIcon,
   SlidersIcon,
   XIcon,
@@ -30,6 +34,7 @@ import type {
   ItineraryRouteLeg,
   ItinerarySummary,
   ItinerarySummaryDay,
+  TripLifecycleStatus,
 } from "@/lib/types";
 
 export type MobileSnap = "peek" | "half" | "full";
@@ -64,6 +69,17 @@ interface TripPanelProps {
   hoveredItemId: number | null;
   flashItemId: number | null;
   scrollRequest: { id: number; nonce: number } | null;
+  lifecycle: TripLifecycleStatus;
+  nextStopId: number | null;
+  livePosition: { lat: number; lng: number } | null;
+  markingItemId: number | null;
+  startBusy: boolean;
+  trackingActive: boolean;
+  onStartTrip: () => void;
+  onMarkVisited: (item: ItineraryItem) => void;
+  onSkipStop: (item: ItineraryItem) => void;
+  onUndoStop: (item: ItineraryItem) => void;
+  canUndoStop: (item: ItineraryItem) => boolean;
   addOpen: boolean;
   onOpenAdd: () => void;
   onOpenSettings: () => void;
@@ -108,6 +124,17 @@ export function TripPanel({
   hoveredItemId,
   flashItemId,
   scrollRequest,
+  lifecycle,
+  nextStopId,
+  livePosition,
+  markingItemId,
+  startBusy,
+  trackingActive,
+  onStartTrip,
+  onMarkVisited,
+  onSkipStop,
+  onUndoStop,
+  canUndoStop,
   addOpen,
   onOpenAdd,
   onOpenSettings,
@@ -150,6 +177,14 @@ export function TripPanel({
   const showCover = cover !== null && failedCover !== cover;
   const budgetHidden = isBudgetHidden(summary);
   const isCollapsed = !isMobile && collapsed;
+  const ongoing = lifecycle === "active" || lifecycle === "paused";
+  const lifecycleDot: Record<TripLifecycleStatus, string> = {
+    planned: "bg-white/60",
+    active: "bg-emerald-400",
+    paused: "bg-mango-400",
+    completed: "bg-sea-300",
+    cancelled: "bg-white/40",
+  };
 
   const memberAvatars = (itinerary.members ?? []).slice(0, 4);
   const extraMembers = Math.max((itinerary.member_count ?? itinerary.members?.length ?? 0) - memberAvatars.length, 0);
@@ -337,11 +372,12 @@ export function TripPanel({
           <button
             type="button"
             onClick={onOpenAdd}
-            aria-label="Add a stop"
-            title="Add a stop"
+            disabled={ongoing}
+            aria-label={ongoing ? "Pause or finish the trip to add stops" : "Add a stop"}
+            title={ongoing ? "Pause or finish the trip to add stops" : "Add a stop"}
             aria-pressed={addOpen}
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40",
               addOpen ? "bg-surf-400/15 text-sea-600" : "text-ink-500 hover:bg-sand-100 hover:text-ink-900",
             )}
           >
@@ -400,7 +436,7 @@ export function TripPanel({
                       ) : null}
                     </div>
 
-                    <div className="mt-1.5 flex items-center gap-1.5">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {isGroup ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
                           <ShareIcon className="h-3 w-3" /> Group
@@ -410,6 +446,11 @@ export function TripPanel({
                           Solo
                         </span>
                       )}
+
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        <span className={cn("h-1.5 w-1.5 rounded-full", lifecycleDot[lifecycle])} aria-hidden="true" />
+                        {LIFECYCLE_LABEL[lifecycle]}
+                      </span>
 
                       {isGroup && memberAvatars.length > 0 ? (
                         <span className="flex items-center">
@@ -435,11 +476,19 @@ export function TripPanel({
             </div>
 
             <div className="flex gap-1.5 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {canEdit && lifecycle === "planned" ? (
+                <Button size="sm" onClick={onStartTrip} disabled={startBusy || summary.item_count === 0} className="shrink-0">
+                  <RouteIcon className="h-4 w-4" /> {startBusy ? "Starting..." : "Start trip"}
+                </Button>
+              ) : null}
               {canEdit ? (
                 <Button
                   size="sm"
+                  variant={lifecycle === "planned" ? "secondary" : "primary"}
                   onClick={onOpenAdd}
+                  disabled={ongoing}
                   aria-pressed={addOpen}
+                  title={ongoing ? "Pause or finish the trip to add stops" : undefined}
                   className={cn("shrink-0", addOpen && "ring-2 ring-inset ring-white/50")}
                 >
                   <PlusIcon className="h-4 w-4" /> Add a stop
@@ -506,6 +555,15 @@ export function TripPanel({
                     selectedItemId={selectedItemId}
                     hoveredItemId={hoveredItemId}
                     flashItemId={flashItemId}
+                    lifecycle={lifecycle}
+                    nextStopId={nextStopId}
+                    livePosition={livePosition}
+                    markingItemId={markingItemId}
+                    trackingActive={trackingActive}
+                    canUndoStop={canUndoStop}
+                    onMarkVisited={onMarkVisited}
+                    onSkipStop={onSkipStop}
+                    onUndoStop={onUndoStop}
                     onSelectItem={onSelectItem}
                     onHoverItem={onHoverItem}
                     onToggleStatus={onToggleStatus}

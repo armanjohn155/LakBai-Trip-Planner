@@ -1,0 +1,177 @@
+import { useEffect, useState } from "react";
+
+import { ClockIcon, PinIcon, RouteIcon } from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
+import { formatDistance } from "@/lib/geo";
+import type { TripLifecycleStatus, TripTrackingSummary } from "@/lib/types";
+
+interface TripLiveBarProps {
+  lifecycle: TripLifecycleStatus;
+  summary: TripTrackingSummary | null;
+  startedAt?: string | null;
+  totalPausedSeconds?: number;
+  isMobile: boolean;
+  bottomOffset: number;
+  centerOffset: number;
+  busy?: boolean;
+  message?: string | null;
+  wakeLockNotice?: string | null;
+  pendingCount?: number;
+  canFinish?: boolean;
+  following?: boolean;
+  onToggleFollow?: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onFinish: () => void;
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+export function TripLiveBar({
+  lifecycle,
+  summary,
+  startedAt = null,
+  totalPausedSeconds = 0,
+  isMobile,
+  bottomOffset,
+  centerOffset,
+  busy = false,
+  message,
+  wakeLockNotice,
+  pendingCount = 0,
+  canFinish = false,
+  following = false,
+  onToggleFollow,
+  onPause,
+  onResume,
+  onFinish,
+}: TripLiveBarProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (lifecycle !== "active") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [lifecycle]);
+
+  if (lifecycle !== "active" && lifecycle !== "paused") return null;
+
+  const startedAtMs = startedAt !== null ? new Date(startedAt).getTime() : Number.NaN;
+  const elapsed =
+    lifecycle === "active" && Number.isFinite(startedAtMs)
+      ? Math.max(0, (now - startedAtMs) / 1_000 - Math.max(0, totalPausedSeconds))
+      : summary?.elapsed_seconds ?? 0;
+  const distance = summary?.distance_m ?? 0;
+  const nextStop = summary?.next_stop ?? null;
+  const nextDistance = nextStop?.distance_m != null ? formatDistance(nextStop.distance_m) : null;
+  const isPaused = lifecycle === "paused";
+
+  const notice = message ?? wakeLockNotice ?? (pendingCount > 0 ? `${pendingCount} location updates queued` : null);
+
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute left-1/2 z-[890] w-[min(94vw,42rem)] -translate-x-1/2",
+        isMobile ? "" : "top-3 sm:top-4",
+      )}
+      style={
+        isMobile
+          ? { bottom: bottomOffset + 12 }
+          : { left: `calc(50% + ${centerOffset}px)` }
+      }
+    >
+      <div className="pointer-events-auto overflow-hidden rounded-2xl bg-white/95 shadow-xl ring-1 ring-line/60 backdrop-blur">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2">
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-lagoon-900">
+            <span
+              className={cn(
+                "relative flex h-2.5 w-2.5 rounded-full",
+                isPaused ? "bg-mango-500" : "bg-emerald-500",
+              )}
+              aria-hidden="true"
+            >
+              {!isPaused ? <span className="trip-live-dot absolute inset-0 rounded-full bg-emerald-500" /> : null}
+            </span>
+            {isPaused ? "Paused" : "Live"}
+          </span>
+
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-700" title="Elapsed time">
+            <ClockIcon className="h-3.5 w-3.5 text-ink-500" /> {formatElapsed(elapsed)}
+          </span>
+
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-700" title="Distance travelled">
+            <RouteIcon className="h-3.5 w-3.5 text-ink-500" /> {(distance / 1000).toFixed(1)} km
+          </span>
+
+          {nextStop ? (
+            <span
+              className="inline-flex min-w-0 items-center gap-1 text-[11px] font-medium text-ink-700"
+              title={`Next: ${nextStop.title}`}
+            >
+              <PinIcon className="h-3.5 w-3.5 shrink-0 text-sea-600" />
+              <span className="max-w-[9rem] truncate">{nextStop.title}</span>
+              {nextDistance ? <span className="shrink-0 text-ink-500">· {nextDistance}</span> : null}
+            </span>
+          ) : (
+            <span className="text-[11px] font-medium text-ink-500">No stops remaining</span>
+          )}
+
+          {onToggleFollow ? (
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              aria-pressed={following}
+              className={cn(
+                "hidden rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors sm:inline-flex",
+                following ? "bg-surf-400/15 text-sea-600" : "text-ink-500 hover:bg-sand-100",
+              )}
+            >
+              Follow me
+            </button>
+          ) : null}
+
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {isPaused ? (
+              <Button size="sm" onClick={onResume} disabled={busy}>
+                Resume
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={onPause} disabled={busy}>
+                Pause
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant={canFinish ? "dark" : "secondary"}
+              onClick={onFinish}
+              disabled={busy}
+              title={canFinish ? "Every stop is handled - finish the trip" : "Finish early"}
+            >
+              Finish
+            </Button>
+          </div>
+        </div>
+
+        {notice ? (
+          <p
+            className={cn(
+              "border-t border-line/50 px-3 py-1 text-[10px] font-medium",
+              isPaused ? "bg-mango-400/10 text-ink-700" : "bg-sand-50 text-ink-600",
+            )}
+            role="status"
+          >
+            {notice}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}

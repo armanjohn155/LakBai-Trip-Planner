@@ -23,6 +23,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'is_template',
     'template_key',
     'trip_type',
+    'lifecycle_status',
+    'started_at',
+    'paused_at',
+    'completed_at',
+    'total_paused_seconds',
+    'distance_m',
+    'moving_seconds',
+    'started_by',
     'version',
     'updated_by',
     'share_budget',
@@ -48,7 +56,58 @@ class Itinerary extends Model
             'is_template' => 'boolean',
             'version' => 'integer',
             'share_budget' => 'boolean',
+            'started_at' => 'datetime',
+            'paused_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'total_paused_seconds' => 'integer',
+            'distance_m' => 'integer',
+            'moving_seconds' => 'integer',
         ];
+    }
+
+    public const LIFECYCLE_PLANNED = 'planned';
+
+    public const LIFECYCLE_ACTIVE = 'active';
+
+    public const LIFECYCLE_PAUSED = 'paused';
+
+    public const LIFECYCLE_COMPLETED = 'completed';
+
+    public const LIFECYCLE_CANCELLED = 'cancelled';
+
+    public const LIFECYCLE_STATUSES = [
+        self::LIFECYCLE_PLANNED,
+        self::LIFECYCLE_ACTIVE,
+        self::LIFECYCLE_PAUSED,
+        self::LIFECYCLE_COMPLETED,
+        self::LIFECYCLE_CANCELLED,
+    ];
+
+    /**
+     * A trip is "ongoing" while it can still be paused, resumed or finished.
+     */
+    public function isOngoing(): bool
+    {
+        return in_array($this->lifecycle_status ?? self::LIFECYCLE_PLANNED, [
+            self::LIFECYCLE_ACTIVE,
+            self::LIFECYCLE_PAUSED,
+        ], true);
+    }
+
+    /**
+     * A trip can be finished when every stop is done or skipped.
+     */
+    public function canFinish(): bool
+    {
+        if (! $this->relationLoaded('items')) {
+            $this->load('items');
+        }
+
+        if ($this->items->isEmpty()) {
+            return false;
+        }
+
+        return $this->items->every(fn (ItineraryItem $item) => in_array($item->status, ['done', 'skipped'], true));
     }
 
     /**
@@ -124,6 +183,16 @@ class Itinerary extends Model
         return $this->hasMany(ItineraryItem::class)
             ->orderBy('day_number')
             ->orderBy('order');
+    }
+
+    public function trackingSessions(): HasMany
+    {
+        return $this->hasMany(TrackingSession::class);
+    }
+
+    public function startedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'started_by');
     }
 
     /**

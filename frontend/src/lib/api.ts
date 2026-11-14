@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
+import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, TrackingBatchResult, TrackingPointPayload, TripTrackingSummary, TripTransitionResult, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
@@ -303,6 +303,99 @@ export const reorderItineraryItems = async (itineraryId: number, stops: ReorderS
   const { data } = await api.put<{ data: Itinerary }>(`/itineraries/${itineraryId}/items/reorder`, baseVersion ? { stops, base_version: baseVersion } : { stops });
   return data.data;
 };
+
+export interface StopActionResponse {
+  data: Itinerary;
+  stop: ItineraryItem;
+  tracking: TripTrackingSummary;
+  can_review?: boolean;
+  visit?: Visit | null;
+  distance_m?: number | null;
+  radius_m?: number | null;
+}
+
+const stopAction = async (
+  itineraryId: number,
+  itemId: number,
+  action: "arrive" | "complete" | "skip" | "undo",
+  payload: Record<string, unknown> = {},
+): Promise<StopActionResponse> => {
+  const { data } = await api.post<StopActionResponse>(`/itineraries/${itineraryId}/stops/${itemId}/${action}`, payload);
+  return data;
+};
+
+export const getTripTracking = async (itineraryId: number) => {
+  const { data } = await api.get<{ data: TripTrackingSummary }>(`/itineraries/${itineraryId}/tracking`);
+  return data.data;
+};
+
+const tripTransition = async (
+  itineraryId: number,
+  action: "start" | "pause" | "resume" | "stop",
+  baseVersion?: number,
+): Promise<TripTransitionResult> => {
+  const { data } = await api.post<{ data: Itinerary; tracking: TripTrackingSummary }>(
+    `/itineraries/${itineraryId}/tracking/${action}`,
+    baseVersion === undefined ? {} : { base_version: baseVersion },
+  );
+  return { itinerary: data.data, tracking: data.tracking };
+};
+
+export const startTrip = (itineraryId: number, baseVersion?: number) =>
+  tripTransition(itineraryId, "start", baseVersion);
+
+export const pauseTrip = (itineraryId: number, baseVersion?: number) =>
+  tripTransition(itineraryId, "pause", baseVersion);
+
+export const resumeTrip = (itineraryId: number, baseVersion?: number) =>
+  tripTransition(itineraryId, "resume", baseVersion);
+
+export const finishTrip = (itineraryId: number, baseVersion?: number) =>
+  tripTransition(itineraryId, "stop", baseVersion);
+
+export const cancelTrip = async (itineraryId: number, baseVersion?: number): Promise<TripTransitionResult> => {
+  const { data } = await api.post<{ data: Itinerary; tracking: TripTrackingSummary }>(
+    `/itineraries/${itineraryId}/lifecycle/cancel`,
+    baseVersion === undefined ? {} : { base_version: baseVersion },
+  );
+  return { itinerary: data.data, tracking: data.tracking };
+};
+
+export const rescheduleTrip = async (
+  itineraryId: number,
+  payload: { strategy: "shift"; minutes: number } | { strategy: "move_day"; day_number: number },
+  baseVersion?: number,
+): Promise<TripTransitionResult> => {
+  const { data } = await api.post<{ data: Itinerary; tracking: TripTrackingSummary }>(
+    `/itineraries/${itineraryId}/lifecycle/reschedule`,
+    baseVersion === undefined ? payload : { ...payload, base_version: baseVersion },
+  );
+  return { itinerary: data.data, tracking: data.tracking };
+};
+
+export const sendTrackingPoints = async (itineraryId: number, points: TrackingPointPayload[]) => {
+  const { data } = await api.post<{ data: TrackingBatchResult }>(`/itineraries/${itineraryId}/tracking/points`, {
+    points,
+  });
+  return data.data;
+};
+
+export const arriveAtStop = (itineraryId: number, itemId: number, baseVersion?: number) =>
+  stopAction(itineraryId, itemId, "arrive", baseVersion === undefined ? {} : { base_version: baseVersion });
+
+export const completeStop = (
+  itineraryId: number,
+  itemId: number,
+  position: { latitude: number; longitude: number; accuracy: number },
+  baseVersion?: number,
+) => stopAction(itineraryId, itemId, "complete", baseVersion === undefined ? position : { ...position, base_version: baseVersion });
+
+export const skipStop = (itineraryId: number, itemId: number, baseVersion?: number) =>
+  stopAction(itineraryId, itemId, "skip", baseVersion === undefined ? {} : { base_version: baseVersion });
+
+export const undoStop = (itineraryId: number, itemId: number, baseVersion?: number) =>
+  stopAction(itineraryId, itemId, "undo", baseVersion === undefined ? {} : { base_version: baseVersion });
+
 
 export const getItineraryTemplates = async () => {
   const { data } = await api.get<{ data: ItineraryTemplate[] }>("/itinerary-templates");

@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['prefix' => 'api', 'middleware' => ['auth:sanctum']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
@@ -27,6 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('invite-links:prune')->daily();
         $schedule->command('notifications:prune')->daily();
         $schedule->command('trips:notify-starting-soon')->dailyAt('08:00');
+        $schedule->command('trips:expire-stale')->hourly();
+        $schedule->command('tracking:prune')->daily();
+        $schedule->command('tracking:stop-stale-sharing')->everyTenMinutes();
+        $schedule->command('tracking:sweep-presence')->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import type { CSSProperties } from "react";
 
 import L from "leaflet";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 
 import { createNumberedPin, createPinIcon, dayColor } from "@/components/features/map/map-pin";
 import { formatMoney } from "@/lib/format";
@@ -10,6 +10,17 @@ import { formatTimeRange } from "@/components/features/itinerary/itinerary-const
 import type { Destination, ItineraryItem } from "@/lib/types";
 
 const CEBU_CENTER: [number, number] = [10.2, 123.6];
+
+export interface LiveMapPosition {
+  lat: number;
+  lng: number;
+  accuracy: number | null;
+}
+
+export interface LiveMapPoint {
+  lat: number;
+  lng: number;
+}
 
 export interface MapInsets {
   top: number;
@@ -41,6 +52,10 @@ interface TripMapCanvasProps {
   rightInset?: number;
   interactive?: boolean;
   className?: string;
+  livePosition?: LiveMapPosition | null;
+  traveledPath?: LiveMapPoint[];
+  nextStopPoint?: [number, number] | null;
+  following?: boolean;
 }
 
 function FitToStops({ points, insets, fitKey }: { points: [number, number][]; insets: MapInsets; fitKey?: string | number }) {
@@ -142,6 +157,17 @@ function ClickToPick({ onPickPoint }: { onPickPoint: (lat: number, lng: number) 
   return null;
 }
 
+function FollowPosition({ point, following }: { point: [number, number] | null; following: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!point || !following) return;
+    map.panTo(point, { animate: true, duration: 0.6 });
+  }, [point, following, map]);
+
+  return null;
+}
+
 export function TripMapCanvas({
   items,
   activeItemId = null,
@@ -165,6 +191,10 @@ export function TripMapCanvas({
   rightInset = 0,
   interactive = true,
   className,
+  livePosition = null,
+  traveledPath = [],
+  nextStopPoint = null,
+  following = false,
 }: TripMapCanvasProps) {
   const located = useMemo(() => items.filter((item) => item.latitude !== null && item.longitude !== null), [items]);
   const points = useMemo(
@@ -194,6 +224,25 @@ export function TripMapCanvas({
       .filter((path) => path.points.length > 1);
   }, [located]);
 
+  const livePoint = useMemo<[number, number] | null>(
+    () => (livePosition ? [livePosition.lat, livePosition.lng] : null),
+    [livePosition],
+  );
+  const traveledPositions = useMemo(
+    () => traveledPath.map((point) => [point.lat, point.lng] as [number, number]),
+    [traveledPath],
+  );
+  const liveIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: "trip-live-marker",
+        html: '<span class="trip-live-marker__pulse"></span><span class="trip-live-marker__dot"></span>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      }),
+    [],
+  );
+
   const style = {
     "--trip-map-bottom": `${bottomInset}px`,
     "--trip-map-right": `${rightInset}px`,
@@ -221,6 +270,7 @@ export function TripMapCanvas({
         <FitToStops points={points} insets={insets} fitKey={fitKey} />
         <ResizeWatcher />
         <PanToFocus point={focusPoint} nonce={focusNonce} insets={insets} />
+        <FollowPosition point={livePoint} following={following} />
         {pickMode && onPickPoint ? <ClickToPick onPickPoint={onPickPoint} /> : null}
         <ZoomControl position="bottomright" />
 
@@ -231,6 +281,31 @@ export function TripMapCanvas({
             pathOptions={{ color: dayColor(path.day), weight: 4, opacity: 0.8, dashArray: "7 9" }}
           />
         ))}
+
+        {livePoint && livePosition?.accuracy != null && livePosition.accuracy > 0 ? (
+          <Circle
+            center={livePoint}
+            radius={Math.max(livePosition.accuracy, 5)}
+            pathOptions={{ color: "#0284c7", weight: 1, opacity: 0.5, fillColor: "#38bdf8", fillOpacity: 0.1 }}
+          />
+        ) : null}
+
+        {traveledPositions.length > 1 ? (
+          <>
+            <Polyline positions={traveledPositions} pathOptions={{ color: "#ffffff", weight: 8, opacity: 0.85 }} />
+            <Polyline
+              positions={traveledPositions}
+              pathOptions={{ color: "#0369a1", weight: 4, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
+            />
+          </>
+        ) : null}
+
+        {livePoint && nextStopPoint ? (
+          <Polyline
+            positions={[livePoint, nextStopPoint]}
+            pathOptions={{ color: "#0f766e", weight: 3, opacity: 0.8, dashArray: "2 9" }}
+          />
+        ) : null}
 
         {located.map((item) => {
           const label = sequence.get(item.id) ?? item.order;
@@ -303,6 +378,10 @@ export function TripMapCanvas({
             </Marker>
           );
         })}
+
+        {livePoint ? (
+          <Marker position={livePoint} icon={liveIcon} zIndexOffset={2000} interactive={false} />
+        ) : null}
 
         {pickedPoint ? (
           <Marker

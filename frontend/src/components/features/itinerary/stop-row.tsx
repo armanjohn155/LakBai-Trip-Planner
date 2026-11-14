@@ -4,11 +4,13 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { DeleteIcon } from "@/components/features/itinerary/trip-card";
-import { CheckIcon, ClockIcon, GripIcon, MoreIcon, PencilIcon, PinIcon } from "@/components/icons";
+import { CheckIcon, ClockIcon, GripIcon, MoreIcon, PencilIcon, PinIcon, RouteIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { formatDistance, haversineMeters } from "@/lib/geo";
 import { formatMoney } from "@/lib/format";
-import type { ItineraryItem } from "@/lib/types";
+import type { ItineraryItem, TripLifecycleStatus } from "@/lib/types";
 import { formatDuration, formatTimeRange } from "@/components/features/itinerary/itinerary-constants";
 
 interface StopRowProps {
@@ -19,12 +21,21 @@ interface StopRowProps {
   selected?: boolean;
   hovered?: boolean;
   flash?: boolean;
+  lifecycle?: TripLifecycleStatus;
+  isNext?: boolean;
+  livePosition?: { lat: number; lng: number } | null;
+  marking?: boolean;
+  trackingActive?: boolean;
+  canUndo?: boolean;
   onSelect: () => void;
   onHover: (hovered: boolean) => void;
   onToggleStatus: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onFocus: () => void;
+  onMarkVisited?: () => void;
+  onSkipStop?: () => void;
+  onUndoStop?: () => void;
 }
 
 export function StopRow({
@@ -35,17 +46,27 @@ export function StopRow({
   selected = false,
   hovered = false,
   flash = false,
+  lifecycle = "planned",
+  isNext = false,
+  livePosition = null,
+  marking = false,
+  trackingActive = false,
+  canUndo = false,
   onSelect,
   onHover,
   onToggleStatus,
   onEdit,
   onDelete,
   onFocus,
+  onMarkVisited,
+  onSkipStop,
+  onUndoStop,
 }: StopRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const ongoing = lifecycle === "active" || lifecycle === "paused";
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: !canEdit,
+    disabled: !canEdit || ongoing,
   });
 
   const style = {
@@ -56,8 +77,19 @@ export function StopRow({
   const time = formatTimeRange(item.start_time, item.duration_minutes);
   const isDone = item.status === "done";
   const isSkipped = item.status === "skipped";
+  const isArrived = item.status === "arrived";
   const location = item.destination?.municipality ?? item.custom_address ?? item.destination?.region ?? null;
   const image = item.destination?.image_url ?? null;
+  const radiusM = item.destination?.radius_m ?? 150;
+  const distanceM =
+    ongoing && livePosition
+      ? haversineMeters(
+          { latitude: livePosition.lat, longitude: livePosition.lng },
+          { latitude: item.latitude, longitude: item.longitude },
+        )
+      : null;
+  const near = distanceM !== null && distanceM <= radiusM;
+  const canManageLive = ongoing && (item.status === "planned" || isArrived);
 
   const actionButtonClass =
     "flex h-11 w-11 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-sand-100 hover:text-ink-900 disabled:opacity-50 sm:h-8 sm:w-8";
@@ -69,16 +101,18 @@ export function StopRow({
       </button>
       {canEdit ? (
         <>
-          <button
-            type="button"
-            onClick={onToggleStatus}
-            disabled={busy}
-            aria-label={isDone ? `Mark ${item.title} as planned` : `Mark ${item.title} as done`}
-            title={isDone ? "Mark as planned" : "Mark as done"}
-            className={cn(actionButtonClass, isDone && "text-mango-500 hover:bg-mango-400/15")}
-          >
-            <CheckIcon className="h-4 w-4" />
-          </button>
+          {!ongoing ? (
+            <button
+              type="button"
+              onClick={onToggleStatus}
+              disabled={busy}
+              aria-label={isDone ? `Mark ${item.title} as planned` : `Mark ${item.title} as done`}
+              title={isDone ? "Mark as planned" : "Mark as done"}
+              className={cn(actionButtonClass, isDone && "text-mango-500 hover:bg-mango-400/15")}
+            >
+              <CheckIcon className="h-4 w-4" />
+            </button>
+          ) : null}
           <button type="button" onClick={onEdit} aria-label={`Edit ${item.title}`} title="Edit stop" className={actionButtonClass}>
             <PencilIcon className="h-4 w-4" />
           </button>
@@ -148,8 +182,15 @@ export function StopRow({
                   </Badge>
                 ) : null}
                 {item.unavailable ? <Badge tone="mango">No longer available</Badge> : null}
-                {isDone ? <Badge tone="mango">Done</Badge> : null}
-                {isSkipped ? <Badge tone="neutral">Skipped</Badge> : null}
+                {isDone ? (
+                  <Badge tone="mango">Done</Badge>
+                ) : isSkipped ? (
+                  <Badge tone="neutral">Skipped</Badge>
+                ) : isArrived ? (
+                  <Badge tone="surf">Arrived</Badge>
+                ) : isNext && ongoing ? (
+                  <Badge tone="sea">Up next</Badge>
+                ) : null}
               </span>
 
               {location ? <span className="mt-0.5 block truncate text-xs text-ink-600">{location}</span> : null}
@@ -164,11 +205,51 @@ export function StopRow({
                 {item.estimated_budget != null ? (
                   <span className="font-semibold text-sea-600">{formatMoney(item.estimated_budget)}</span>
                 ) : null}
+                {distanceM !== null ? (
+                  <span className={cn("inline-flex items-center gap-1", near ? "font-semibold text-sea-600" : "text-ink-500")}>
+                    <RouteIcon className="h-3.5 w-3.5" /> {formatDistance(distanceM)} away
+                  </span>
+                ) : null}
               </span>
 
               {item.notes ? <span className="mt-1 line-clamp-2 block text-xs text-ink-600">{item.notes}</span> : null}
             </span>
           </div>
+
+          {canManageLive ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[3.75rem]">
+              {trackingActive ? (
+                <Button
+                  size="sm"
+                  variant={near ? "primary" : "secondary"}
+                  onClick={onMarkVisited}
+                  disabled={marking}
+                  title={
+                    near
+                      ? "Verify your location and mark this stop visited"
+                      : "Send your current location to the server for verification"
+                  }
+                >
+                  {marking ? "Checking..." : near ? "Mark visited" : "I'm here"}
+                </Button>
+              ) : (
+                <span className="text-[11px] font-medium text-ink-500">Resume the trip to mark stops visited.</span>
+              )}
+              <Button size="sm" variant="danger" onClick={onSkipStop} disabled={marking}>
+                Skip
+              </Button>
+              {near ? <span className="text-[10px] font-semibold text-sea-600">Inside {radiusM} m</span> : null}
+            </div>
+          ) : null}
+
+          {ongoing && (isDone || isSkipped) && canUndo && onUndoStop ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[3.75rem]">
+              <Button size="sm" variant="secondary" onClick={onUndoStop} disabled={marking}>
+                Undo
+              </Button>
+              <span className="text-[10px] text-ink-500">Undo within 10 minutes</span>
+            </div>
+          ) : null}
 
           <div className="absolute right-1 top-1 hidden items-center gap-0.5 rounded-full bg-white/95 p-0.5 shadow-sm ring-1 ring-line/60 sm:flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
             {actions}
@@ -207,7 +288,7 @@ export function StopRow({
           >
             {sequence}
           </span>
-          {canEdit ? (
+          {canEdit && !ongoing ? (
             <button
               type="button"
               ref={setActivatorNodeRef}

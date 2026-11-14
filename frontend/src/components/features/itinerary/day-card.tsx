@@ -8,7 +8,7 @@ import { StopRow } from "@/components/features/itinerary/stop-row";
 import { ChevronIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
-import type { ItineraryItem, ItineraryRouteLeg, ItinerarySummaryDay } from "@/lib/types";
+import type { ItineraryItem, ItineraryRouteLeg, ItinerarySummaryDay, TripLifecycleStatus } from "@/lib/types";
 import { formatDayHeading, formatDuration } from "@/components/features/itinerary/itinerary-constants";
 
 interface DayCardProps {
@@ -26,6 +26,15 @@ interface DayCardProps {
   selectedItemId: number | null;
   hoveredItemId: number | null;
   flashItemId: number | null;
+  lifecycle: TripLifecycleStatus;
+  nextStopId: number | null;
+  livePosition: { lat: number; lng: number } | null;
+  markingItemId: number | null;
+  trackingActive: boolean;
+  canUndoStop: (item: ItineraryItem) => boolean;
+  onMarkVisited: (item: ItineraryItem) => void;
+  onSkipStop: (item: ItineraryItem) => void;
+  onUndoStop: (item: ItineraryItem) => void;
   onSelectItem: (item: ItineraryItem) => void;
   onHoverItem: (id: number | null) => void;
   onToggleStatus: (item: ItineraryItem) => void;
@@ -49,6 +58,15 @@ export function DayCard({
   selectedItemId,
   hoveredItemId,
   flashItemId,
+  lifecycle,
+  nextStopId,
+  livePosition,
+  markingItemId,
+  trackingActive,
+  canUndoStop,
+  onMarkVisited,
+  onSkipStop,
+  onUndoStop,
   onSelectItem,
   onHoverItem,
   onToggleStatus,
@@ -102,6 +120,15 @@ export function DayCard({
                     selected={selectedItemId === item.id}
                     hovered={hoveredItemId === item.id}
                     flash={flashItemId === item.id}
+                    lifecycle={lifecycle}
+                    isNext={nextStopId === item.id}
+                    livePosition={livePosition}
+                    marking={markingItemId === item.id}
+                    trackingActive={trackingActive}
+                    canUndo={canUndoStop(item)}
+                    onMarkVisited={() => onMarkVisited(item)}
+                    onSkipStop={() => onSkipStop(item)}
+                    onUndoStop={() => onUndoStop(item)}
                     onSelect={() => onSelectItem(item)}
                     onHover={(hovered) => onHoverItem(hovered ? item.id : null)}
                     onToggleStatus={() => onToggleStatus(item)}

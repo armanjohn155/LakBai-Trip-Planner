@@ -132,4 +132,69 @@ return [
         'prune_read_days' => (int) env('LAKBAI_NOTIFICATION_PRUNE_READ_DAYS', 30),
         'prune_all_days' => (int) env('LAKBAI_NOTIFICATION_PRUNE_ALL_DAYS', 90),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Live Trip Tracking
+    |--------------------------------------------------------------------------
+    |
+    | Rules for solo live tracking. The client sends batches of raw positions;
+    | every filter below runs on the server. Change thresholds here, not in the
+    | mobile app, so web and future clients stay consistent.
+    |
+    */
+    'tracking' => [
+        // Reject points whose reported accuracy radius is worse than this.
+        'max_accuracy_m' => (int) env('LAKBAI_TRACKING_MAX_ACCURACY_M', 100),
+        // Reject a point timestamped further than this into the future.
+        'max_future_seconds' => (int) env('LAKBAI_TRACKING_MAX_FUTURE_SECONDS', 60),
+        // Reject a point older than this when it reaches the API.
+        'max_point_age_seconds' => (int) env('LAKBAI_TRACKING_MAX_POINT_AGE_SECONDS', 600),
+        // Reject a jump faster than this between two accepted points (km/h).
+        'max_jump_speed_kmh' => (float) env('LAKBAI_TRACKING_MAX_JUMP_SPEED_KMH', 200),
+        // Distances smaller than this are GPS jitter and are not accumulated.
+        'min_distance_m' => (float) env('LAKBAI_TRACKING_MIN_DISTANCE_M', 5),
+        // Gaps longer than this break the route; distance is not accumulated.
+        'max_gap_seconds' => (int) env('LAKBAI_TRACKING_MAX_GAP_SECONDS', 300),
+        // Persist at most one raw point per session per this many seconds.
+        'sample_seconds' => (int) env('LAKBAI_TRACKING_SAMPLE_SECONDS', 10),
+        // Maximum points accepted in one batch request.
+        'batch_max' => (int) env('LAKBAI_TRACKING_BATCH_MAX', 50),
+        // API throttle for the points endpoint (attempts, minutes).
+        'points_throttle' => env('LAKBAI_TRACKING_POINTS_THROTTLE', '30,1'),
+        // Default arrival radius when a stop has no destination radius.
+        'arrival_radius_m' => (int) env('LAKBAI_TRACKING_ARRIVAL_RADIUS_M', 150),
+        // Undo a completed stop within this many minutes.
+        'undo_minutes' => (int) env('LAKBAI_TRACKING_UNDO_MINUTES', 10),
+        // Auto-expire active trips with no point for this many hours.
+        'stale_active_hours' => (int) env('LAKBAI_TRACKING_STALE_ACTIVE_HOURS', 24),
+        // Auto-cancel paused trips after this many days.
+        'stale_paused_days' => (int) env('LAKBAI_TRACKING_STALE_PAUSED_DAYS', 7),
+        // Keep raw points this many days after completion, then prune.
+        'retention_days' => (int) env('LAKBAI_TRACKING_RETENTION_DAYS', 90),
+
+        // Group live tracking (opt-in, per traveller).
+        // A member position is broadcast at most once per this many seconds.
+        'group_broadcast_seconds' => (int) env('LAKBAI_TRACKING_GROUP_BROADCAST_SECONDS', 5),
+        // A member is "online" while their last shared ping is younger than this.
+        'group_online_seconds' => (int) env('LAKBAI_TRACKING_GROUP_ONLINE_SECONDS', 60),
+        // Cached latest position expires after this long without a ping.
+        'group_position_ttl_seconds' => (int) env('LAKBAI_TRACKING_GROUP_POSITION_TTL_SECONDS', 120),
+        // Sharing is automatically stopped after this many hours without a ping.
+        'group_stale_sharing_hours' => (int) env('LAKBAI_TRACKING_GROUP_STALE_SHARING_HOURS', 12),
+        // A "Meet here" pin expires after this many minutes.
+        'meetup_ttl_minutes' => (int) env('LAKBAI_TRACKING_MEETUP_TTL_MINUTES', 120),
+        // Client polling fallback when the WebSocket is unavailable.
+        'group_poll_seconds' => (int) env('LAKBAI_TRACKING_GROUP_POLL_SECONDS', 10),
+        // Never send more than one group arrival notification per trip per window.
+        'group_arrival_notify_minutes' => (int) env('LAKBAI_TRACKING_GROUP_ARRIVAL_NOTIFY_MINUTES', 30),
+        // Send in-app group arrival notifications at all.
+        'group_arrival_notify' => (bool) env('LAKBAI_TRACKING_GROUP_ARRIVAL_NOTIFY', true),
+        // API throttles for group reads/writes (attempts, minutes).
+        'group_read_throttle' => env('LAKBAI_TRACKING_GROUP_READ_THROTTLE', '120,1'),
+        'group_write_throttle' => env('LAKBAI_TRACKING_GROUP_WRITE_THROTTLE', '30,1'),
+        // Cache store for group positions. Null uses the app default (database),
+        // set to "redis" when a Redis cache is available.
+        'group_cache_store' => env('LAKBAI_TRACKING_GROUP_CACHE_STORE'),
+    ],
 ];

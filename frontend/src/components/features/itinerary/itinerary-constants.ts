@@ -1,4 +1,4 @@
-import type { ItineraryItemStatus } from "@/lib/types";
+import type { ItineraryItemStatus, TripLifecycleStatus } from "@/lib/types";
 import { DESTINATION_CATEGORIES } from "@/lib/destination-constants";
 
 /** Extra categories available only to custom (destination-less) stops. */
@@ -7,18 +7,36 @@ export const CUSTOM_STOP_CATEGORIES = ["Transport", "Accommodation", "Meal", "Ot
 /** Every category a stop may carry: destination categories + custom ones. */
 export const STOP_CATEGORIES: string[] = [...DESTINATION_CATEGORIES, ...CUSTOM_STOP_CATEGORIES];
 
-export const STOP_STATUSES: ItineraryItemStatus[] = ["planned", "done", "skipped"];
+export const STOP_STATUSES: ItineraryItemStatus[] = ["planned", "arrived", "done", "skipped"];
 
 export const STOP_STATUS_LABEL: Record<ItineraryItemStatus, string> = {
   planned: "Planned",
+  arrived: "Arrived",
   done: "Done",
   skipped: "Skipped",
 };
 
 export const STOP_STATUS_TONE: Record<ItineraryItemStatus, "surf" | "mango" | "neutral"> = {
   planned: "surf",
+  arrived: "surf",
   done: "mango",
   skipped: "neutral",
+};
+
+export const LIFECYCLE_LABEL: Record<TripLifecycleStatus, string> = {
+  planned: "Planned",
+  active: "Live",
+  paused: "Paused",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const LIFECYCLE_TONE: Record<TripLifecycleStatus, "surf" | "mango" | "sea" | "neutral"> = {
+  planned: "neutral",
+  active: "surf",
+  paused: "mango",
+  completed: "sea",
+  cancelled: "neutral",
 };
 
 export function formatDuration(minutes: number | null | undefined): string {

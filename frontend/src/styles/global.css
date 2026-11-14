@@ -383,6 +383,82 @@
   }
 }
 
+/* Live GPS marker: a solid dot inside a soft, repeating accuracy pulse. */
+.trip-live-marker {
+  background: transparent;
+  border: 0;
+}
+
+.trip-live-marker__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 14px;
+  width: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: #0284c7;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 10px rgb(2 132 199 / 0.55);
+}
+
+.trip-live-marker__pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 26px;
+  width: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: rgb(56 189 248 / 0.4);
+  animation: trip-live-pulse 2.4s ease-out infinite;
+}
+
+@keyframes trip-live-pulse {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.45);
+  }
+  70% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.9);
+  }
+}
+
+.trip-arrival-card {
+  animation: trip-arrival-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes trip-arrival-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.trip-summary-card {
+  animation: trip-summary-enter 240ms ease-out;
+}
+
+@keyframes trip-summary-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes ambient-drift {
   from {
     background-position: 12% 10%, 92% 30%, 80% 92%;

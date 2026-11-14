@@ -35,6 +35,8 @@ class NotificationType
 
     public const TRIP_STARTING_SOON = 'trip.starting_soon';
 
+    public const TRIP_MEMBER_ARRIVED = 'trip.member_arrived';
+
     public const REVIEW_HIDDEN = 'review.hidden';
 
     public const REVIEW_REPORTED = 'review.reported';
@@ -58,6 +60,7 @@ class NotificationType
             self::TRIP_ITINERARY_DELETED,
             self::TRIP_UPDATED,
             self::TRIP_STARTING_SOON,
+            self::TRIP_MEMBER_ARRIVED,
             self::REVIEW_HIDDEN,
             self::REVIEW_REPORTED,
         ];
@@ -115,6 +118,7 @@ class NotificationType
             self::TRIP_ITINERARY_DELETED => 'Deleted shared trips',
             self::TRIP_UPDATED => 'Shared trip changes',
             self::TRIP_STARTING_SOON => 'Trips starting soon',
+            self::TRIP_MEMBER_ARRIVED => 'Group members arriving',
             self::REVIEW_HIDDEN => 'Review moderation',
             self::REVIEW_REPORTED => 'Reported reviews (admin)',
             default => $type,

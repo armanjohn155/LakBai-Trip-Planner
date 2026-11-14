@@ -21,9 +21,14 @@ import {
   type AddStopMode,
   type CustomStopInput,
 } from "@/components/features/itinerary/add-stop-panel";
+import { TripArrivalPrompt, TripReviewCard } from "@/components/features/itinerary/arrival-prompt";
 import { ShareDialog } from "@/components/features/itinerary/share-dialog";
 import { StopEditor } from "@/components/features/itinerary/stop-editor";
 import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
+import { TripFinishDialog, TripSummaryCard } from "@/components/features/itinerary/trip-finish-dialog";
+import { TripLiveBar } from "@/components/features/itinerary/trip-live-bar";
+import { TripPauseSheet } from "@/components/features/itinerary/trip-pause-sheet";
+import { TripStartDialog } from "@/components/features/itinerary/trip-start-dialog";
 import { TripMapCanvas } from "@/components/features/itinerary/trip-map-canvas";
 import { TripPanel, mobileSheetHeight, type MobileSnap } from "@/components/features/itinerary/trip-panel";
 import { formatTripDateRange } from "@/components/features/itinerary/itinerary-constants";
@@ -40,20 +45,32 @@ import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useAuth } from "@/hooks/use-auth";
 import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
+import { useTripTracking, type LivePosition } from "@/hooks/use-trip-tracking";
 import { haversineMeters } from "@/lib/geo";
 import {
   addItineraryItem,
   apiConflict,
   apiError,
+  arriveAtStop,
+  completeStop,
   deleteItineraryItem,
+  finishTrip,
   getDestinations,
   getItinerary,
   getItineraryActivities,
   getItineraryChanges,
   getItineraryRouteEstimates,
   getItinerarySummary,
+  getTripTracking,
+  pauseTrip,
   reorderItineraryItems,
+  rescheduleTrip,
+  resumeTrip,
+  skipStop,
+  startTrip,
+  undoStop,
   updateItinerary,
   updateItineraryItem,
   type ItineraryItemPayload,
@@ -67,6 +84,7 @@ import type {
   ItineraryRouteEstimate,
   ItineraryRouteLeg,
   ItinerarySummary,
+  TripTrackingSummary,
 } from "@/lib/types";
 
 interface ItineraryBuilderProps {
@@ -112,8 +130,22 @@ function readPanelWidth(): number {
   return TRIP_PANEL_DEFAULT;
 }
 
+function positionErrorMessage(error: GeolocationPositionError): string {
+  if (error.code === error.PERMISSION_DENIED) {
+    return "Location permission is off. Enable it to verify this stop.";
+  }
+  if (error.code === error.TIMEOUT) {
+    return "Getting your location timed out. Try again in a moment.";
+  }
+  return "Your location is unavailable right now. Try again in a moment.";
+}
+
+const VERIFY_POSITION_MAX_AGE_MS = 30_000;
+const UNDO_WINDOW_MS = 10 * 60 * 1_000;
+
 export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: ItineraryBuilderProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMobile = !useMediaQuery("(min-width: 768px)");
   const isDesktop = useMediaQuery("(min-width: 1200px)");
   const isTablet = !isMobile && !isDesktop;
@@ -174,6 +206,27 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [panelHidden, setPanelHidden] = useState(false);
   const [mobileSnap, setMobileSnap] = useState<MobileSnap>("half");
+
+  const [tracking, setTracking] = useState<TripTrackingSummary | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [startOpen, setStartOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [finishOpen, setFinishOpen] = useState(false);
+  const [markingItemId, setMarkingItemId] = useState<number | null>(null);
+  const [arrivalStopId, setArrivalStopId] = useState<number | null>(null);
+  const [arrivalError, setArrivalError] = useState<string | null>(null);
+  const [reviewCard, setReviewCard] = useState<{ destinationId: number; name: string } | null>(null);
+  const [followMap, setFollowMap] = useState(true);
+  const [finished, setFinished] = useState<{ skipped: number } | null>(null);
+  const [summaryDismissed, setSummaryDismissed] = useState(false);
+
+  const positionRef = useRef<LivePosition | null>(null);
+  const itemsRef = useRef<ItineraryItem[]>([]);
+  const arrivalCandidateRef = useRef<{ id: number; since: number } | null>(null);
+  const arrivalTimerRef = useRef<number | null>(null);
+  const arrivalDismissedRef = useRef<Set<number>>(new Set());
+  const arrivedRecordedRef = useRef<Set<number>>(new Set());
 
   const effectivePanelWidth = isDesktop ? panelWidth : TRIP_PANEL_TABLET;
   const addPanelWidth = isMobile
@@ -327,6 +380,106 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const canEdit = itinerary !== null && itinerary.my_role !== "viewer";
   const isOwner = itinerary?.my_role === "owner";
   const isGroup = itinerary?.trip_type === "group";
+  const lifecycle = itinerary?.lifecycle_status ?? "planned";
+  const isOngoing = lifecycle === "active" || lifecycle === "paused";
+  const trackingEnabled =
+    !isGroup &&
+    lifecycle === "active" &&
+    canEdit &&
+    (itinerary?.started_by == null || itinerary.started_by === user?.id);
+
+  const liveTracking = useTripTracking({
+    itineraryId,
+    enabled: trackingEnabled,
+    onUploaded: (result) => {
+      setTracking((current) => (current === null ? current : { ...current, distance_m: result.distance_m }));
+    },
+  });
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    positionRef.current = liveTracking.position;
+  }, [liveTracking.position]);
+
+  useEffect(() => {
+    return () => {
+      if (arrivalTimerRef.current !== null) window.clearTimeout(arrivalTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOngoing) return;
+
+    let cancelled = false;
+    const load = () => {
+      getTripTracking(itineraryId)
+        .then((next) => {
+          if (!cancelled) setTracking(next);
+        })
+        .catch(() => {
+          // The live bar keeps its last known values; the next poll retries.
+        });
+    };
+
+    void load();
+    const timer = window.setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isOngoing, itineraryId]);
+
+  // A stop counts as "arrived" only after the traveller stays inside its
+  // radius for 15 continuous seconds. The server still verifies completion.
+  useEffect(() => {
+    const clearCandidate = () => {
+      arrivalCandidateRef.current = null;
+      if (arrivalTimerRef.current !== null) {
+        window.clearTimeout(arrivalTimerRef.current);
+        arrivalTimerRef.current = null;
+      }
+    };
+
+    const position = liveTracking.position;
+    if (!trackingEnabled || position === null) {
+      clearCandidate();
+      return;
+    }
+
+    let closest: { id: number; distance: number } | null = null;
+    for (const item of items) {
+      if (item.status !== "planned" && item.status !== "arrived") continue;
+      const distance = haversineMeters(
+        { latitude: position.lat, longitude: position.lng },
+        { latitude: item.latitude, longitude: item.longitude },
+      );
+      if (distance === null) continue;
+      const radius = item.destination?.radius_m ?? 150;
+      if (distance <= radius && (closest === null || distance < closest.distance)) {
+        closest = { id: item.id, distance };
+      }
+    }
+
+    if (closest === null || arrivalStopId !== null || arrivalDismissedRef.current.has(closest.id)) {
+      clearCandidate();
+      return;
+    }
+
+    if (arrivalCandidateRef.current?.id !== closest.id) {
+      clearCandidate();
+      const id = closest.id;
+      arrivalCandidateRef.current = { id, since: Date.now() };
+      arrivalTimerRef.current = window.setTimeout(() => {
+        if (arrivalCandidateRef.current?.id !== id) return;
+        arrivalTimerRef.current = null;
+        setArrivalError(null);
+        setArrivalStopId(id);
+      }, 15_000);
+    }
+  }, [trackingEnabled, liveTracking.position, items, arrivalStopId]);
 
   const travelByLeg = useMemo(() => {
     const map = new Map<string, ItineraryRouteLeg>();
@@ -573,6 +726,10 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   };
 
   const handleOpenAdd = () => {
+    if (isOngoing) {
+      showToast("Pause or finish the trip before adding stops.");
+      return;
+    }
     if (addOpen) {
       handleCloseAdd();
       return;
@@ -621,6 +778,293 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       // Storage can be unavailable; the width still applies for this session.
     }
   };
+
+  const resolveVerificationPosition = useCallback(async (): Promise<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  }> => {
+    const current = positionRef.current;
+    const age = current ? Date.now() - new Date(current.recordedAt).getTime() : Number.POSITIVE_INFINITY;
+    if (current && age <= VERIFY_POSITION_MAX_AGE_MS) {
+      return {
+        latitude: current.lat,
+        longitude: current.lng,
+        accuracy: Math.max(0, current.accuracy ?? 0),
+      };
+    }
+
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      throw new Error("This browser can't read your location, so this stop can't be verified.");
+    }
+
+    return await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (fix) =>
+          resolve({
+            latitude: fix.coords.latitude,
+            longitude: fix.coords.longitude,
+            accuracy: Math.max(0, fix.coords.accuracy),
+          }),
+        (geoError) => reject(new Error(positionErrorMessage(geoError))),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+      );
+    });
+  }, []);
+
+  const handleStartTrip = async () => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await startTrip(itineraryId, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setStartOpen(false);
+      if (addOpen) handleCloseAdd();
+      showToast("Trip started. Live tracking is on.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setStartOpen(false);
+        setConflict(stale);
+      } else {
+        setLifecycleError(apiError(error));
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handlePauseTrip = async () => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await pauseTrip(itineraryId, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setArrivalStopId(null);
+      setArrivalError(null);
+      setPauseOpen(true);
+      showToast("Trip paused. Location sharing stopped.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setItemError(apiError(error));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleResumeTrip = async () => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await resumeTrip(itineraryId, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setPauseOpen(false);
+      showToast("Trip resumed. Live tracking is on.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setPauseOpen(false);
+        setConflict(stale);
+      } else {
+        setLifecycleError(apiError(error));
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleOpenFinish = () => {
+    setLifecycleError(null);
+    setFinishOpen(true);
+  };
+
+  const handleFinishTrip = async () => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await finishTrip(itineraryId, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setFinishOpen(false);
+      setPauseOpen(false);
+      setArrivalStopId(null);
+      setArrivalError(null);
+      setReviewCard(null);
+      const skipped = (result.itinerary.items ?? []).filter((item) => item.status === "skipped").length;
+      setFinished({ skipped });
+      setSummaryDismissed(false);
+      showToast("Trip finished. Your route is saved.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setFinishOpen(false);
+        setConflict(stale);
+      } else {
+        setLifecycleError(apiError(error));
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleReschedule = async (payload: { strategy: "shift"; minutes: number } | { strategy: "move_day"; day_number: number }) => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await rescheduleTrip(itineraryId, payload, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setPauseOpen(false);
+      showToast("Remaining stops rescheduled.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setPauseOpen(false);
+        setConflict(stale);
+      } else {
+        setLifecycleError(apiError(error));
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleMarkVisited = async (item: ItineraryItem) => {
+    if (!itinerary || markingItemId !== null) return;
+    setMarkingItemId(item.id);
+    setItemError(null);
+    setArrivalError(null);
+    try {
+      const position = await resolveVerificationPosition();
+      const result = await completeStop(itineraryId, item.id, position, itinerary.version);
+      applyItinerary(result.data);
+      setTracking(result.tracking);
+      setArrivalStopId(null);
+      arrivalDismissedRef.current.delete(item.id);
+      const destinationId = result.visit?.destination_id ?? item.destination?.id ?? null;
+      if (result.can_review !== false && destinationId !== null) {
+        setReviewCard({
+          destinationId,
+          name: item.destination?.name ?? item.title,
+        });
+      }
+      showToast(`${item.title} marked visited.`);
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setArrivalStopId(null);
+        setConflict(stale);
+      } else {
+        const message = apiError(error);
+        if (arrivalStopId === item.id) setArrivalError(message);
+        else setItemError(message);
+      }
+    } finally {
+      setMarkingItemId(null);
+    }
+  };
+
+  const handleSkipStop = async (item: ItineraryItem) => {
+    if (!itinerary || markingItemId !== null) return;
+    setMarkingItemId(item.id);
+    setItemError(null);
+    setArrivalError(null);
+    try {
+      const result = await skipStop(itineraryId, item.id, itinerary.version);
+      applyItinerary(result.data);
+      setTracking(result.tracking);
+      setArrivalStopId(null);
+      arrivalDismissedRef.current.delete(item.id);
+      showToast(`${item.title} skipped.`);
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setArrivalStopId(null);
+        setConflict(stale);
+      } else {
+        const message = apiError(error);
+        if (arrivalStopId === item.id) setArrivalError(message);
+        else setItemError(message);
+      }
+    } finally {
+      setMarkingItemId(null);
+    }
+  };
+
+  const handleUndoStop = async (item: ItineraryItem) => {
+    if (!itinerary || markingItemId !== null) return;
+    setMarkingItemId(item.id);
+    setItemError(null);
+    try {
+      const result = await undoStop(itineraryId, item.id, itinerary.version);
+      applyItinerary(result.data);
+      setTracking(result.tracking);
+      showToast(`${item.title} restored.`);
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) setConflict(stale);
+      else setItemError(apiError(error));
+    } finally {
+      setMarkingItemId(null);
+    }
+  };
+
+  const canUndoStop = (item: ItineraryItem): boolean => {
+    if (lifecycle !== "active" && lifecycle !== "paused") return false;
+    if (item.status !== "done" && item.status !== "skipped") return false;
+    if (!item.completed_at) return false;
+    return Date.now() - new Date(item.completed_at).getTime() <= UNDO_WINDOW_MS;
+  };
+
+  const handleArrivalNotYet = (item: ItineraryItem) => {
+    arrivalDismissedRef.current.add(item.id);
+    setArrivalStopId(null);
+    setArrivalError(null);
+  };
+
+  // Record "arrived" once per stop when the arrival prompt appears. The server
+  // still verifies completion, so this is only an honest in-between state.
+  useEffect(() => {
+    if (arrivalStopId === null || itinerary === null) return;
+    if (arrivedRecordedRef.current.has(arrivalStopId)) return;
+
+    const item = (itinerary.items ?? []).find((entry) => entry.id === arrivalStopId);
+    if (!item) return;
+
+    arrivedRecordedRef.current.add(arrivalStopId);
+    if (item.status !== "planned") return;
+
+    let cancelled = false;
+    arriveAtStop(itineraryId, arrivalStopId, itinerary.version)
+      .then((result) => {
+        if (cancelled) return;
+        applyItinerary(result.data);
+        setTracking(result.tracking);
+      })
+      .catch(() => {
+        // Arrival is a hint; the completion action verifies proximity again.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [arrivalStopId, itinerary, itineraryId, applyItinerary]);
+
+  useEffect(() => {
+    if (lifecycle === "active") return;
+    // The prompt is only rendered while active; finished/paused handlers clear it too.
+    arrivalCandidateRef.current = null;
+    arrivalDismissedRef.current.clear();
+  }, [lifecycle]);
 
   const nextOrderForDay = (day: number): number => {
     const dayItems = (itinerary?.items ?? []).filter((item) => item.day_number === day);
@@ -837,6 +1281,31 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     </div>
   ) : null;
 
+  const livePosition = isOngoing && liveTracking.position
+    ? {
+        lat: liveTracking.position.lat,
+        lng: liveTracking.position.lng,
+        accuracy: liveTracking.position.accuracy,
+      }
+    : null;
+  const nextStopPoint: [number, number] | null =
+    lifecycle === "active" &&
+    tracking?.next_stop?.latitude != null &&
+    tracking.next_stop.longitude != null
+      ? [Number(tracking.next_stop.latitude), Number(tracking.next_stop.longitude)]
+      : null;
+  const remainingStops = items.filter((item) => item.status === "planned" || item.status === "arrived");
+  const visitedCount = items.filter((item) => item.status === "done").length;
+  const skippedCount = items.filter((item) => item.status === "skipped").length;
+  const arrivalItem = arrivalStopId !== null ? items.find((item) => item.id === arrivalStopId) ?? null : null;
+  const arrivalDistance =
+    arrivalItem && liveTracking.position
+      ? haversineMeters(
+          { latitude: liveTracking.position.lat, longitude: liveTracking.position.lng },
+          { latitude: arrivalItem.latitude, longitude: arrivalItem.longitude },
+        )
+      : null;
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="relative h-full w-full overflow-hidden bg-sand-100">
@@ -861,6 +1330,10 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           fitKey={`${itinerary.version ?? 0}-${items.length}`}
           bottomInset={isMobile ? bottomSheetHeight : 0}
           rightInset={zoomRightInset}
+          livePosition={livePosition}
+          traveledPath={isOngoing ? liveTracking.traveled : []}
+          nextStopPoint={nextStopPoint}
+          following={isOngoing && followMap}
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[880] flex items-start justify-between gap-2 p-3 sm:p-4">
@@ -884,8 +1357,10 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                   <button
                     type="button"
                     onClick={handleOpenAdd}
+                    disabled={isOngoing}
                     aria-pressed={addOpen}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-surf-300"
+                    title={isOngoing ? "Pause or finish the trip to add stops" : undefined}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-surf-300 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <PlusIcon className="h-4 w-4" /> Add a stop
                   </button>
@@ -974,6 +1449,17 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             hoveredItemId={hoveredItemId}
             flashItemId={flashItemId}
             scrollRequest={scrollRequest}
+            lifecycle={lifecycle}
+            nextStopId={tracking?.next_stop?.id ?? null}
+            livePosition={livePosition}
+            markingItemId={markingItemId}
+            startBusy={lifecycleBusy}
+            trackingActive={trackingEnabled}
+            onStartTrip={() => setStartOpen(true)}
+            onMarkVisited={(item) => void handleMarkVisited(item)}
+            onSkipStop={(item) => void handleSkipStop(item)}
+            onUndoStop={(item) => void handleUndoStop(item)}
+            canUndoStop={canUndoStop}
             addOpen={addOpen}
             onOpenAdd={handleOpenAdd}
             onOpenSettings={() => setSettingsOpen(true)}
@@ -1002,7 +1488,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             onFocusItem={focusItem}
           />
 
-          {canEdit && addOpen ? (
+          {canEdit && addOpen && !isOngoing ? (
             <AddStopPanel
               isMobile={isMobile}
               width={addPanelWidth}
@@ -1038,6 +1524,69 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             />
           ) : null}
         </div>
+
+        <TripLiveBar
+          lifecycle={lifecycle}
+          summary={tracking}
+          startedAt={itinerary.started_at}
+          totalPausedSeconds={itinerary.total_paused_seconds}
+          isMobile={isMobile}
+          bottomOffset={isMobile ? bottomSheetHeight : 0}
+          centerOffset={legendOffset}
+          busy={lifecycleBusy}
+          message={liveTracking.message}
+          wakeLockNotice={liveTracking.wakeLockNotice}
+          pendingCount={liveTracking.pendingCount}
+          canFinish={tracking?.can_finish ?? itinerary.can_finish ?? false}
+          following={followMap}
+          onToggleFollow={() => setFollowMap((value) => !value)}
+          onPause={() => void handlePauseTrip()}
+          onResume={() => void handleResumeTrip()}
+          onFinish={handleOpenFinish}
+        />
+
+        {arrivalItem && lifecycle === "active" ? (
+          <div
+            className="pointer-events-none absolute left-1/2 z-[895] -translate-x-1/2"
+            style={isMobile ? { bottom: bottomSheetHeight + 88 } : { top: 82 }}
+          >
+            <TripArrivalPrompt
+              item={arrivalItem}
+              distanceM={arrivalDistance}
+              busy={markingItemId === arrivalItem.id}
+              error={arrivalError}
+              onMarkVisited={() => void handleMarkVisited(arrivalItem)}
+              onNotYet={() => handleArrivalNotYet(arrivalItem)}
+              onSkip={() => void handleSkipStop(arrivalItem)}
+            />
+          </div>
+        ) : null}
+
+        {finished && !summaryDismissed ? (
+          <div
+            className="pointer-events-none absolute z-[894]"
+            style={isMobile ? { right: 12, bottom: bottomSheetHeight + 88 } : { right: 16, bottom: 16 }}
+          >
+            <TripSummaryCard
+              itinerary={{ ...itinerary, distance_m: tracking?.distance_m ?? itinerary.distance_m ?? 0 }}
+              visitedCount={visitedCount}
+              skippedCount={skippedCount}
+              elapsedSeconds={tracking?.elapsed_seconds ?? 0}
+              onDismiss={() => setSummaryDismissed(true)}
+            />
+          </div>
+        ) : reviewCard && isOngoing ? (
+          <div
+            className="pointer-events-none absolute z-[894]"
+            style={isMobile ? { right: 12, bottom: bottomSheetHeight + 88 } : { right: 16, bottom: 16 }}
+          >
+            <TripReviewCard
+              destinationId={reviewCard.destinationId}
+              destinationName={reviewCard.name}
+              onDismiss={() => setReviewCard(null)}
+            />
+          </div>
+        ) : null}
 
         {toast ? (
           <div
@@ -1076,6 +1625,42 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         onChanged={refresh}
         onLeft={() => navigate("/app/trips")}
         onConflict={(fresh) => setConflict({ message: "This trip changed while you were updating it.", itinerary: fresh })}
+      />
+
+      <TripStartDialog
+        open={startOpen}
+        itinerary={itinerary}
+        stopCount={items.length}
+        busy={lifecycleBusy}
+        error={lifecycleError}
+        onClose={() => setStartOpen(false)}
+        onConfirm={() => void handleStartTrip()}
+      />
+
+      <TripPauseSheet
+        open={pauseOpen}
+        remainingCount={remainingStops.length}
+        maxDay={summary.day_count}
+        busy={lifecycleBusy}
+        error={lifecycleError}
+        onClose={() => setPauseOpen(false)}
+        onShift={(minutes) => void handleReschedule({ strategy: "shift", minutes })}
+        onMoveDay={(day) => void handleReschedule({ strategy: "move_day", day_number: day })}
+        onFinish={() => {
+          setPauseOpen(false);
+          handleOpenFinish();
+        }}
+      />
+
+      <TripFinishDialog
+        open={finishOpen}
+        remaining={remainingStops}
+        visitedCount={visitedCount}
+        totalStops={items.length}
+        busy={lifecycleBusy}
+        error={lifecycleError}
+        onClose={() => setFinishOpen(false)}
+        onConfirm={() => void handleFinishTrip()}
       />
 
       <Modal

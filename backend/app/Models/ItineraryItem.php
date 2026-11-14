@@ -25,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'notes',
     'visited',
     'status',
+    'arrived_at',
+    'completed_at',
+    'visit_id',
     'updated_by',
 ])]
 class ItineraryItem extends Model
@@ -35,7 +38,7 @@ class ItineraryItem extends Model
     /** Request-scoped flag used by resources and exports; never persisted. */
     public bool $budgetVisible = true;
 
-    public const STATUSES = ['planned', 'done', 'skipped'];
+    public const STATUSES = ['planned', 'arrived', 'done', 'skipped'];
 
     /**
      * Custom (destination-less) categories, in addition to Destination::CATEGORIES.
@@ -52,6 +55,8 @@ class ItineraryItem extends Model
             'custom_latitude' => 'decimal:7',
             'custom_longitude' => 'decimal:7',
             'visited' => 'boolean',
+            'arrived_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -93,6 +98,11 @@ class ItineraryItem extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function visit(): BelongsTo
+    {
+        return $this->belongsTo(Visit::class);
     }
 
     /**

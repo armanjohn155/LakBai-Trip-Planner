@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Itinerary;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -20,7 +21,7 @@ class ItineraryResource extends JsonResource
         $role = $this->roleFor($user);
 
         // Viewers see budget values only when the owner shares them.
-        $canSeeBudget = $role !== null && ($role !== \App\Models\Itinerary::ROLE_VIEWER || (bool) $this->share_budget);
+        $canSeeBudget = $role !== null && ($role !== Itinerary::ROLE_VIEWER || (bool) $this->share_budget);
 
         $items = $this->whenLoaded('items');
 
@@ -46,12 +47,21 @@ class ItineraryResource extends JsonResource
             'cover_image_url' => $this->cover_image_url,
             'is_template' => (bool) $this->is_template,
             'template_key' => $this->template_key,
-            'trip_type' => $this->trip_type ?? \App\Models\Itinerary::TRIP_SOLO,
+            'trip_type' => $this->trip_type ?? Itinerary::TRIP_SOLO,
+            'lifecycle_status' => $this->lifecycle_status ?? Itinerary::LIFECYCLE_PLANNED,
+            'started_at' => $this->started_at?->toIso8601String(),
+            'paused_at' => $this->paused_at?->toIso8601String(),
+            'completed_at' => $this->completed_at?->toIso8601String(),
+            'total_paused_seconds' => (int) $this->total_paused_seconds,
+            'distance_m' => (int) $this->distance_m,
+            'moving_seconds' => (int) $this->moving_seconds,
+            'started_by' => $this->started_by,
+            'can_finish' => $this->canFinish(),
             'version' => (int) $this->version,
             'share_budget' => (bool) $this->share_budget,
             'my_role' => $role,
             'my_status' => $this->statusFor($user),
-            'is_shared' => $role !== null && $role !== \App\Models\Itinerary::ROLE_OWNER,
+            'is_shared' => $role !== null && $role !== Itinerary::ROLE_OWNER,
             'member_count' => $this->whenCounted('members', fn () => (int) $this->members_count),
             'owner' => [
                 'id' => $this->user_id,

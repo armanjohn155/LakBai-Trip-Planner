@@ -136,7 +136,7 @@ export interface DestinationFilters {
   max_price?: number | "";
 }
 
-export type ItineraryItemStatus = "planned" | "done" | "skipped";
+export type ItineraryItemStatus = "planned" | "arrived" | "done" | "skipped";
 
 export interface ItineraryItem {
   id: number;
@@ -159,6 +159,9 @@ export interface ItineraryItem {
   notes: string | null;
   visited: boolean;
   status: ItineraryItemStatus;
+  arrived_at?: string | null;
+  completed_at?: string | null;
+  visit_id?: number | null;
   unavailable: boolean;
   verified: boolean;
   updated_by?: number | null;
@@ -192,7 +195,61 @@ export interface ItineraryRouteEstimate {
   days: Array<{ day_number: number; legs: ItineraryRouteLeg[] }>;
 }
 
+export interface TrackingPosition {
+  lat: number;
+  lng: number;
+  accuracy_m?: number | null;
+  recorded_at?: string | null;
+}
+
+export interface TrackingNextStop {
+  id: number;
+  title: string;
+  day_number: number;
+  order: number;
+  latitude: number | null;
+  longitude: number | null;
+  status: ItineraryItemStatus;
+  distance_m: number | null;
+  bearing: number | null;
+}
+
+export interface TripTrackingSummary {
+  itinerary_id: number;
+  lifecycle_status: TripLifecycleStatus;
+  session_status: "active" | "paused" | "ended" | "inactive";
+  distance_m: number;
+  elapsed_seconds: number;
+  moving_seconds: number;
+  last_position: TrackingPosition | null;
+  next_stop: TrackingNextStop | null;
+  can_finish: boolean;
+  started_at: string | null;
+  paused_at: string | null;
+}
+
+export interface TrackingPointPayload {
+  lat: number;
+  lng: number;
+  accuracy: number | null;
+  speed?: number | null;
+  recorded_at: string;
+}
+
+export interface TrackingBatchResult {
+  accepted: number;
+  rejected: number;
+  distance_m: number;
+  session_status: string | null;
+}
+
+export interface TripTransitionResult {
+  itinerary: Itinerary;
+  tracking: TripTrackingSummary;
+}
+
 export type TripType = "solo" | "group";
+export type TripLifecycleStatus = "planned" | "active" | "paused" | "completed" | "cancelled";
 export type TripRole = "owner" | "editor" | "viewer";
 export type TripMemberStatus = "pending" | "accepted" | "declined";
 export type TripRsvp = "going" | "maybe" | "declined";
@@ -210,6 +267,15 @@ export interface Itinerary {
   is_template: boolean;
   template_key: string | null;
   trip_type: TripType;
+  lifecycle_status?: TripLifecycleStatus;
+  started_at?: string | null;
+  paused_at?: string | null;
+  completed_at?: string | null;
+  total_paused_seconds?: number;
+  distance_m?: number;
+  moving_seconds?: number;
+  started_by?: number | null;
+  can_finish?: boolean;
   day_count: number;
   item_count?: number;
   summary: ItineraryBudgetSummary;

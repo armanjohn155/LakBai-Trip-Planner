@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DestinationController;
 use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\FriendController;
+use App\Http\Controllers\Api\GroupTrackingController;
 use App\Http\Controllers\Api\InviteLinkController;
 use App\Http\Controllers\Api\ItineraryActivityController;
 use App\Http\Controllers\Api\ItineraryController;
@@ -24,6 +25,8 @@ use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ReviewReportController;
+use App\Http\Controllers\Api\TripStopController;
+use App\Http\Controllers\Api\TripTrackingController;
 use App\Http\Controllers\Api\VisitController;
 use App\Http\Controllers\Api\VisitHistoryController;
 use Illuminate\Support\Facades\Route;
@@ -119,6 +122,38 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/itineraries/{itinerary}/items/{item}', [ItineraryItemController::class, 'update'])
         ->scopeBindings();
     Route::delete('/itineraries/{itinerary}/items/{item}', [ItineraryItemController::class, 'destroy'])
+        ->scopeBindings();
+
+    // Solo live trip lifecycle and GPS tracking. All thresholds live in
+    // config/lakbai.php under "tracking"; the client never decides validity.
+    Route::get('/itineraries/{itinerary}/tracking', [TripTrackingController::class, 'show'])
+        ->middleware('throttle:60,1');
+    Route::post('/itineraries/{itinerary}/tracking/points', [TripTrackingController::class, 'points'])
+        ->middleware('throttle:'.config('lakbai.tracking.points_throttle', '30,1').',trip-tracking-points');
+
+    // Group live tracking. Sharing is opt-in per traveller; reads are scoped to
+    // accepted members and only reveal positions to members who also share.
+    Route::get('/itineraries/{itinerary}/tracking/group', [GroupTrackingController::class, 'show'])
+        ->middleware('throttle:'.config('lakbai.tracking.group_read_throttle', '120,1').',trip-group-read');
+    Route::patch('/itineraries/{itinerary}/tracking/sharing', [GroupTrackingController::class, 'sharing'])
+        ->middleware('throttle:'.config('lakbai.tracking.group_write_throttle', '30,1').',trip-group-write');
+    Route::post('/itineraries/{itinerary}/tracking/meetup', [GroupTrackingController::class, 'meetup'])
+        ->middleware('throttle:'.config('lakbai.tracking.group_write_throttle', '30,1').',trip-group-write');
+
+    Route::post('/itineraries/{itinerary}/tracking/{action}', [TripTrackingController::class, 'transition'])
+        ->whereIn('action', ['start', 'pause', 'resume', 'stop'])
+        ->middleware('throttle:60,1');
+    Route::post('/itineraries/{itinerary}/lifecycle/reschedule', [TripTrackingController::class, 'reschedule'])
+        ->middleware('throttle:60,1');
+    Route::post('/itineraries/{itinerary}/lifecycle/cancel', [TripTrackingController::class, 'cancel'])
+        ->middleware('throttle:60,1');
+    Route::post('/itineraries/{itinerary}/stops/{item}/arrive', [TripStopController::class, 'arrive'])
+        ->scopeBindings();
+    Route::post('/itineraries/{itinerary}/stops/{item}/complete', [TripStopController::class, 'complete'])
+        ->scopeBindings();
+    Route::post('/itineraries/{itinerary}/stops/{item}/skip', [TripStopController::class, 'skip'])
+        ->scopeBindings();
+    Route::post('/itineraries/{itinerary}/stops/{item}/undo', [TripStopController::class, 'undo'])
         ->scopeBindings();
 
     // Accept invite (auth required)
