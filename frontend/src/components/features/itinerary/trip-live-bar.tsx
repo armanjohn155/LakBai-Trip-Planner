@@ -19,11 +19,20 @@ interface TripLiveBarProps {
   wakeLockNotice?: string | null;
   pendingCount?: number;
   canFinish?: boolean;
+  canManage?: boolean;
   following?: boolean;
+  group?: TripLiveBarGroup | null;
   onToggleFollow?: () => void;
   onPause: () => void;
   onResume: () => void;
   onFinish: () => void;
+}
+
+export interface TripLiveBarGroup {
+  sharing: boolean;
+  sharingCount: number;
+  memberCount: number;
+  transport: "live" | "connecting" | "polling" | "off";
 }
 
 function formatElapsed(totalSeconds: number): string {
@@ -48,7 +57,9 @@ export function TripLiveBar({
   wakeLockNotice,
   pendingCount = 0,
   canFinish = false,
+  canManage = true,
   following = false,
+  group = null,
   onToggleFollow,
   onPause,
   onResume,
@@ -103,6 +114,51 @@ export function TripLiveBar({
             {isPaused ? "Paused" : "Live"}
           </span>
 
+          {group ? (
+            <>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  group.sharing ? "bg-emerald-50 text-emerald-700" : "bg-sand-100 text-ink-600",
+                )}
+                title={group.sharing ? "Accepted members can see your latest location" : "Your location is private"}
+              >
+                <span
+                  className={cn("h-1.5 w-1.5 rounded-full", group.sharing ? "bg-emerald-500" : "bg-ink-400")}
+                  aria-hidden="true"
+                />
+                {group.sharing ? `Sharing ${group.sharingCount}/${group.memberCount}` : "Not sharing"}
+              </span>
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-sand-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600"
+                title={
+                  group.transport === "live"
+                    ? "WebSocket updates are connected"
+                    : "Falling back to the 10-second polling endpoint"
+                }
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    group.transport === "live"
+                      ? "bg-emerald-500"
+                      : group.transport === "connecting"
+                        ? "bg-mango-500"
+                        : "bg-ink-400",
+                  )}
+                  aria-hidden="true"
+                />
+                {group.transport === "live"
+                  ? "Live updates"
+                  : group.transport === "connecting"
+                    ? "Connecting…"
+                    : group.transport === "polling"
+                      ? "Polling"
+                      : "Tracking off"}
+              </span>
+            </>
+          ) : null}
+
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-700" title="Elapsed time">
             <ClockIcon className="h-3.5 w-3.5 text-ink-500" /> {formatElapsed(elapsed)}
           </span>
@@ -139,24 +195,28 @@ export function TripLiveBar({
           ) : null}
 
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            {isPaused ? (
-              <Button size="sm" onClick={onResume} disabled={busy}>
-                Resume
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={onPause} disabled={busy}>
-                Pause
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant={canFinish ? "dark" : "secondary"}
-              onClick={onFinish}
-              disabled={busy}
-              title={canFinish ? "Every stop is handled - finish the trip" : "Finish early"}
-            >
-              Finish
-            </Button>
+            {canManage ? (
+              <>
+                {isPaused ? (
+                  <Button size="sm" onClick={onResume} disabled={busy}>
+                    Resume
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={onPause} disabled={busy}>
+                    Pause
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={canFinish ? "dark" : "secondary"}
+                  onClick={onFinish}
+                  disabled={busy}
+                  title={canFinish ? "Every stop is handled - finish the trip" : "Finish early"}
+                >
+                  Finish
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
 

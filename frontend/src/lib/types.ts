@@ -228,6 +228,45 @@ export interface TripTrackingSummary {
   paused_at: string | null;
 }
 
+export interface GroupTrackingMember {
+  user_id: number;
+  name: string;
+  avatar_url: string | null;
+  role: TripRole | null;
+  is_me: boolean;
+  sharing: boolean;
+  online: boolean | null;
+  last_seen_at: string | null;
+  position: TrackingPosition | null;
+  arrived_stop: { id: number; title: string; at: string | null } | null;
+}
+
+export interface GroupTrackingMeetup {
+  id: number;
+  lat: number;
+  lng: number;
+  note: string | null;
+  created_by: number;
+  created_by_name: string | null;
+  expires_at: string | null;
+}
+
+export interface GroupTrackingState {
+  itinerary_id: number;
+  lifecycle_status: TripLifecycleStatus;
+  group: true;
+  poll_seconds: number;
+  me: {
+    user_id: number;
+    role: TripRole | null;
+    sharing: boolean;
+    online: boolean;
+    position: TrackingPosition | null;
+  };
+  members: GroupTrackingMember[];
+  meetup: GroupTrackingMeetup | null;
+}
+
 export interface TrackingPointPayload {
   lat: number;
   lng: number;

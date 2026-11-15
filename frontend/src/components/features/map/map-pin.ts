@@ -43,3 +43,54 @@ export const createNumberedPin = (label: number, color: string, active = false):
     iconSize: [30, 40],
     iconAnchor: [15, 38],
   });
+
+const memberColors = ["#e11d48", "#7c3aed", "#0284c7", "#16a34a", "#d97706", "#db2777", "#4f46e5", "#0d9488", "#b45309", "#9333ea"];
+
+/** A stable, distinct colour per traveller so markers and the party list match. */
+export const memberColor = (userId: number): string =>
+  memberColors[Math.abs(Math.trunc(userId)) % memberColors.length];
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+
+const initials = (name: string): string => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts.slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase();
+};
+
+interface MemberPinOptions {
+  name: string;
+  color: string;
+  stale?: boolean;
+}
+
+/** Initials bubble for a sharing traveller; fades when their ping is stale. */
+export const createMemberPin = ({ name, color, stale = false }: MemberPinOptions): L.DivIcon =>
+  L.divIcon({
+    className: `trip-member-marker${stale ? " is-stale" : ""}`,
+    html: `<span class="trip-member-marker__dot" style="--member-color:${color}">${escapeHtml(initials(name))}</span><span class="trip-member-marker__label">${escapeHtml(name)}</span>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+
+/** Temporary "meet here" pin. */
+export const meetupPin = L.divIcon({
+  className: "trip-meetup-marker",
+  html: '<span class="trip-meetup-marker__pin">M</span><span class="trip-meetup-marker__label">Meet here</span>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});

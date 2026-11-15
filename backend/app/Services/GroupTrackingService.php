@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
+use App\Events\MeetupPinned;
 use App\Events\MemberArrived;
 use App\Events\MemberLocationUpdated;
 use App\Events\MemberPresenceChanged;
 use App\Events\MemberSharingChanged;
-use App\Events\MeetupPinned;
 use App\Models\Itinerary;
 use App\Models\ItineraryItem;
 use App\Models\ItineraryMeetup;
@@ -150,7 +150,7 @@ class GroupTrackingService
 
         $onlineSeconds = max(1, (int) config('lakbai.tracking.group_online_seconds', 60));
 
-        $members = $people->map(function (User $person) use ($itinerary, $sessions, $viewerSharing, $now, $onlineSeconds) {
+        $members = $people->map(function (User $person) use ($itinerary, $sessions, $viewer, $viewerSharing, $now, $onlineSeconds) {
             $session = $sessions->get($person->id);
             $sharing = $session instanceof TrackingSession;
             $position = $sharing ? $this->cache()->get($this->positionKey($itinerary->id, $person->id)) : null;
@@ -182,7 +182,7 @@ class GroupTrackingService
 
         $self = $members->firstWhere('user_id', (int) $viewer->id);
         $selfSession = $sessions->get($viewer->id);
-        $selfPosition = $self['position'] ?? null;
+        $selfPosition = is_array($self) ? ($self['position'] ?? null) : null;
 
         if ($selfPosition === null && $selfSession instanceof TrackingSession && $selfSession->last_lat !== null && $selfSession->last_lng !== null) {
             $selfPosition = [
@@ -204,7 +204,7 @@ class GroupTrackingService
                 'user_id' => (int) $viewer->id,
                 'role' => $itinerary->roleFor($viewer),
                 'sharing' => $viewerSharing,
-                'online' => $self['online'] ?? false,
+                'online' => is_array($self) ? ($self['online'] ?? false) : false,
                 'position' => $selfPosition,
             ],
             'members' => $members,
@@ -454,6 +454,29 @@ class GroupTrackingService
     }
 
     /**
+     * Run the presence sweep for every active group trip that still has
+     * members sharing. Returns the number of trips inspected.
+     */
+    public function sweepPresence(?Carbon $now = null): int
+    {
+        $now ??= Carbon::now();
+        $trips = 0;
+
+        Itinerary::query()
+            ->where('trip_type', Itinerary::TRIP_GROUP)
+            ->where('lifecycle_status', Itinerary::LIFECYCLE_ACTIVE)
+            ->whereHas('trackingSessions', fn ($query) => $query->active()->shared())
+            ->chunkById(100, function ($itineraries) use ($now, &$trips) {
+                foreach ($itineraries as $itinerary) {
+                    $this->syncPresence($itinerary, $now);
+                    $trips++;
+                }
+            });
+
+        return $trips;
+    }
+
+    /**
      * Auto-stop sharing for sessions without a ping in the configured window,
      * and prune expired meeting pins.
      */
@@ -467,7 +490,7 @@ class GroupTrackingService
             ->where('shared_with_group', true)
             ->whereIn('status', [TrackingSession::STATUS_ACTIVE, TrackingSession::STATUS_PAUSED])
             ->with(['itinerary', 'user'])
-            ->chunkById(100, function ($sessions) use ($cutoff, $now, &$stopped) {
+            ->chunkById(100, function ($sessions) use ($cutoff, &$stopped) {
                 foreach ($sessions as $session) {
                     $lastPing = $session->last_point_at ?? $session->started_at;
 

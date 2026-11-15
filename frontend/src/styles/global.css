@@ -478,3 +478,78 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Group live tracking: member initials bubble and temporary meeting pin. */
+.trip-member-marker,
+.trip-meetup-marker {
+  overflow: visible;
+  background: transparent;
+  border: 0;
+}
+
+.trip-member-marker__dot {
+  display: flex;
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--member-color, #0284c7);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgb(7 31 37 / 0.35);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition:
+    opacity 160ms ease,
+    filter 160ms ease;
+}
+
+.trip-member-marker__label,
+.trip-meetup-marker__label {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  max-width: 116px;
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(7 31 37 / 0.82);
+  padding: 1px 6px;
+  color: #f7f9f8;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-member-marker.is-stale .trip-member-marker__dot {
+  opacity: 0.45;
+  filter: grayscale(0.45);
+}
+
+.trip-member-marker.is-stale .trip-member-marker__label {
+  opacity: 0.6;
+}
+
+.trip-meetup-marker__pin {
+  display: flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--color-mango-400);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgb(7 31 37 / 0.4);
+  color: var(--color-lagoon-900);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trip-meetup-marker__label {
+  background: rgb(246 176 30 / 0.95);
+  color: var(--color-lagoon-900);
+}

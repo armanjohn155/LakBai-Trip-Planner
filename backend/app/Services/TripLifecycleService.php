@@ -378,6 +378,8 @@ class TripLifecycleService
 
         StopArrived::dispatch($itinerary, $actor, ['item_id' => $item->id]);
 
+        $this->group->memberArrived($itinerary, $item, $actor);
+
         return $item->refresh();
     }
 
@@ -640,6 +642,10 @@ class TripLifecycleService
                         'paused_at' => $now,
                     ])->saveQuietly();
 
+                    if ($this->group->isGroup($trip)) {
+                        $this->group->stopAllSharing($trip, 'expired');
+                    }
+
                     $paused++;
                 }
             });
@@ -658,6 +664,10 @@ class TripLifecycleService
                         'lifecycle_status' => Itinerary::LIFECYCLE_CANCELLED,
                         'paused_at' => null,
                     ])->saveQuietly();
+
+                    if ($this->group->isGroup($trip)) {
+                        $this->group->stopAllSharing($trip, 'expired');
+                    }
 
                     $cancelled++;
                 }

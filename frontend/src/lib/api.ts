@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, TrackingBatchResult, TrackingPointPayload, TripTrackingSummary, TripTransitionResult, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
+import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, GroupTrackingMeetup, GroupTrackingState, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, TrackingBatchResult, TrackingPointPayload, TripTrackingSummary, TripTransitionResult, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
@@ -326,6 +326,24 @@ const stopAction = async (
 
 export const getTripTracking = async (itineraryId: number) => {
   const { data } = await api.get<{ data: TripTrackingSummary }>(`/itineraries/${itineraryId}/tracking`);
+  return data.data;
+};
+
+export const getGroupTracking = async (itineraryId: number) => {
+  const { data } = await api.get<{ data: GroupTrackingState }>(`/itineraries/${itineraryId}/tracking/group`);
+  return data.data;
+};
+
+export const setGroupSharing = async (itineraryId: number, enabled: boolean) => {
+  const { data } = await api.patch<{ data: GroupTrackingState }>(`/itineraries/${itineraryId}/tracking/sharing`, { enabled });
+  return data.data;
+};
+
+export const pinGroupMeetup = async (
+  itineraryId: number,
+  payload: { lat: number; lng: number; note?: string | null },
+) => {
+  const { data } = await api.post<{ data: GroupTrackingMeetup }>(`/itineraries/${itineraryId}/tracking/meetup`, payload);
   return data.data;
 };
 

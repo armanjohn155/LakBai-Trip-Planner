@@ -22,6 +22,7 @@ import {
   type CustomStopInput,
 } from "@/components/features/itinerary/add-stop-panel";
 import { TripArrivalPrompt, TripReviewCard } from "@/components/features/itinerary/arrival-prompt";
+import { GroupPartyPanel } from "@/components/features/itinerary/group-party-panel";
 import { ShareDialog } from "@/components/features/itinerary/share-dialog";
 import { StopEditor } from "@/components/features/itinerary/stop-editor";
 import { TemplatesDialog } from "@/components/features/itinerary/templates-dialog";
@@ -46,6 +47,7 @@ import { InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/hooks/use-auth";
+import { useGroupTracking } from "@/hooks/use-group-tracking";
 import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
 import { useTripTracking, type LivePosition } from "@/hooks/use-trip-tracking";
 import { haversineMeters } from "@/lib/geo";
@@ -78,6 +80,7 @@ import {
 } from "@/lib/api";
 import type {
   Destination,
+  GroupTrackingMember,
   Itinerary,
   ItineraryActivity,
   ItineraryItem,
@@ -375,6 +378,12 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     };
   }, [activityOpen, itineraryId]);
 
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
   const items = useMemo(() => itinerary?.items ?? [], [itinerary]);
   const groups = useMemo(() => groupByDay(items), [items]);
   const canEdit = itinerary !== null && itinerary.my_role !== "viewer";
@@ -382,11 +391,28 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const isGroup = itinerary?.trip_type === "group";
   const lifecycle = itinerary?.lifecycle_status ?? "planned";
   const isOngoing = lifecycle === "active" || lifecycle === "paused";
+
+  const groupTracking = useGroupTracking({
+    itineraryId,
+    enabled: isGroup,
+    active: isGroup && lifecycle === "active",
+    onMemberArrived: (name, stopTitle) => showToast(`${name} arrived at ${stopTitle}.`),
+  });
+
+  const groupSharing = isGroup && groupTracking.sharing;
   const trackingEnabled =
-    !isGroup &&
     lifecycle === "active" &&
-    canEdit &&
-    (itinerary?.started_by == null || itinerary.started_by === user?.id);
+    (isGroup
+      ? groupSharing
+      : canEdit && (itinerary?.started_by == null || itinerary.started_by === user?.id));
+
+  const partyMembers = useMemo(
+    () =>
+      (groupTracking.state?.members ?? []).filter(
+        (member) => !member.is_me && member.position !== null,
+      ),
+    [groupTracking.state],
+  );
 
   const liveTracking = useTripTracking({
     itineraryId,
@@ -541,12 +567,6 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     [items],
   );
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
-  }, []);
-
   const bottomSheetHeight = isMobile && addOpen ? Math.max(mobileHeight, addMobileHeight) : mobileHeight;
   const leftMapInset = isMobile ? 16 : panelHidden || panelCollapsed ? 16 : effectivePanelWidth + 40;
   const rightMapInset = isMobile ? 16 : addOpen ? addPanelWidth + 40 : 24;
@@ -568,6 +588,50 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     focusNonceRef.current += 1;
     setFocus({ point: [Number(item.latitude), Number(item.longitude)], nonce: focusNonceRef.current });
   }, []);
+
+  const focusMember = useCallback(
+    (member: GroupTrackingMember) => {
+      if (member.position === null) return;
+      focusNonceRef.current += 1;
+      setFocus({ point: [member.position.lat, member.position.lng], nonce: focusNonceRef.current });
+      if (isMobile) {
+        setMobileSnap("half");
+      } else {
+        setPanelHidden(false);
+        setPanelCollapsed(false);
+      }
+      showToast(`Centered on ${member.name}.`);
+    },
+    [isMobile, showToast],
+  );
+
+  const focusMeetup = useCallback(() => {
+    const meetup = groupTracking.state?.meetup;
+    if (!meetup) return;
+    focusNonceRef.current += 1;
+    setFocus({ point: [meetup.lat, meetup.lng], nonce: focusNonceRef.current });
+    if (isMobile) {
+      setMobileSnap("half");
+    } else {
+      setPanelHidden(false);
+      setPanelCollapsed(false);
+    }
+  }, [groupTracking.state?.meetup, isMobile]);
+
+  const handlePinMeetup = useCallback(
+    async (note: string) => {
+      const position = liveTracking.position;
+      if (!position) {
+        showToast("Wait for your first GPS fix before dropping a pin.");
+        return false;
+      }
+
+      const meetup = await groupTracking.pinMeetup(position.lat, position.lng, note);
+      if (meetup !== null) showToast("Meeting pin dropped for the next 2 hours.");
+      return meetup !== null;
+    },
+    [groupTracking, liveTracking.position, showToast],
+  );
 
   const selectItem = useCallback(
     (item: ItineraryItem) => {
@@ -822,6 +886,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       setTracking(result.tracking);
       setStartOpen(false);
       if (addOpen) handleCloseAdd();
+      if (isGroup) void groupTracking.refresh();
       showToast("Trip started. Live tracking is on.");
     } catch (error) {
       const stale = apiConflict(error);
@@ -847,6 +912,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       setArrivalStopId(null);
       setArrivalError(null);
       setPauseOpen(true);
+      if (isGroup) void groupTracking.refresh();
       showToast("Trip paused. Location sharing stopped.");
     } catch (error) {
       const stale = apiConflict(error);
@@ -866,6 +932,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       applyItinerary(result.itinerary);
       setTracking(result.tracking);
       setPauseOpen(false);
+      if (isGroup) void groupTracking.refresh();
       showToast("Trip resumed. Live tracking is on.");
     } catch (error) {
       const stale = apiConflict(error);
@@ -901,6 +968,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       const skipped = (result.itinerary.items ?? []).filter((item) => item.status === "skipped").length;
       setFinished({ skipped });
       setSummaryDismissed(false);
+      if (isGroup) void groupTracking.refresh();
       showToast("Trip finished. Your route is saved.");
     } catch (error) {
       const stale = apiConflict(error);
@@ -1306,6 +1374,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         )
       : null;
 
+  const groupMembers = groupTracking.state?.members ?? [];
+  const groupSharingCount = groupMembers.filter((member) => member.sharing).length;
+  const meetPosition =
+    groupSharing && liveTracking.position
+      ? { lat: liveTracking.position.lat, lng: liveTracking.position.lng }
+      : null;
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="relative h-full w-full overflow-hidden bg-sand-100">
@@ -1334,6 +1409,8 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           traveledPath={isOngoing ? liveTracking.traveled : []}
           nextStopPoint={nextStopPoint}
           following={isOngoing && followMap}
+          partyMembers={groupSharing ? partyMembers : []}
+          meetup={groupTracking.state?.meetup ?? null}
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[880] flex items-start justify-between gap-2 p-3 sm:p-4">
@@ -1469,6 +1546,24 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             onExportError={setItemError}
             itemError={itemError}
             notice={notice}
+            party={
+              isGroup ? (
+                <GroupPartyPanel
+                  state={groupTracking.state}
+                  lifecycle={lifecycle}
+                  loading={groupTracking.loading}
+                  busy={groupTracking.busy}
+                  error={groupTracking.error}
+                  message={groupTracking.message}
+                  transport={groupTracking.transport}
+                  meetPosition={meetPosition}
+                  onToggleSharing={(enabled) => void groupTracking.toggleSharing(enabled)}
+                  onPinMeetup={handlePinMeetup}
+                  onFocusMember={focusMember}
+                  onFocusMeetup={focusMeetup}
+                />
+              ) : null
+            }
             collapsed={panelCollapsed}
             hidden={panelHidden}
             width={effectivePanelWidth}
@@ -1534,18 +1629,29 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           bottomOffset={isMobile ? bottomSheetHeight : 0}
           centerOffset={legendOffset}
           busy={lifecycleBusy}
-          message={liveTracking.message}
+          message={isGroup ? groupTracking.message : liveTracking.message}
           wakeLockNotice={liveTracking.wakeLockNotice}
           pendingCount={liveTracking.pendingCount}
           canFinish={tracking?.can_finish ?? itinerary.can_finish ?? false}
+          canManage={!isGroup || canEdit}
           following={followMap}
+          group={
+            isGroup
+              ? {
+                  sharing: groupTracking.sharing,
+                  sharingCount: groupSharingCount,
+                  memberCount: groupMembers.length,
+                  transport: groupTracking.transport,
+                }
+              : null
+          }
           onToggleFollow={() => setFollowMap((value) => !value)}
           onPause={() => void handlePauseTrip()}
           onResume={() => void handleResumeTrip()}
           onFinish={handleOpenFinish}
         />
 
-        {arrivalItem && lifecycle === "active" ? (
+        {arrivalItem && lifecycle === "active" && (!isGroup || canEdit) ? (
           <div
             className="pointer-events-none absolute left-1/2 z-[895] -translate-x-1/2"
             style={isMobile ? { bottom: bottomSheetHeight + 88 } : { top: 82 }}

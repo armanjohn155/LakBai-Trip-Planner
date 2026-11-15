@@ -4,10 +4,10 @@ import type { CSSProperties } from "react";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 
-import { createNumberedPin, createPinIcon, dayColor } from "@/components/features/map/map-pin";
+import { createMemberPin, createNumberedPin, createPinIcon, dayColor, meetupPin, memberColor } from "@/components/features/map/map-pin";
 import { formatMoney } from "@/lib/format";
 import { formatTimeRange } from "@/components/features/itinerary/itinerary-constants";
-import type { Destination, ItineraryItem } from "@/lib/types";
+import type { Destination, GroupTrackingMeetup, GroupTrackingMember, ItineraryItem } from "@/lib/types";
 
 const CEBU_CENTER: [number, number] = [10.2, 123.6];
 
@@ -56,6 +56,8 @@ interface TripMapCanvasProps {
   traveledPath?: LiveMapPoint[];
   nextStopPoint?: [number, number] | null;
   following?: boolean;
+  partyMembers?: GroupTrackingMember[];
+  meetup?: GroupTrackingMeetup | null;
 }
 
 function FitToStops({ points, insets, fitKey }: { points: [number, number][]; insets: MapInsets; fitKey?: string | number }) {
@@ -195,6 +197,8 @@ export function TripMapCanvas({
   traveledPath = [],
   nextStopPoint = null,
   following = false,
+  partyMembers = [],
+  meetup = null,
 }: TripMapCanvasProps) {
   const located = useMemo(() => items.filter((item) => item.latitude !== null && item.longitude !== null), [items]);
   const points = useMemo(
@@ -378,6 +382,48 @@ export function TripMapCanvas({
             </Marker>
           );
         })}
+
+        {partyMembers.map((member) =>
+          member.position ? (
+            <Marker
+              key={`party-${member.user_id}`}
+              position={[member.position.lat, member.position.lng]}
+              icon={createMemberPin({
+                name: member.name,
+                color: memberColor(member.user_id),
+                stale: member.online === false,
+              })}
+              zIndexOffset={1500}
+            >
+              <Popup closeButton={false} maxWidth={220} autoPan={false}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-lagoon-900">{member.name}</p>
+                  <p className="text-xs text-ink-600">
+                    {member.online ? "Sharing now" : "Signal is stale — they may have locked their phone"}
+                  </p>
+                  {member.arrived_stop ? (
+                    <p className="text-xs font-medium text-sea-600">At {member.arrived_stop.title}</p>
+                  ) : null}
+                </div>
+              </Popup>
+            </Marker>
+          ) : null,
+        )}
+
+        {meetup ? (
+          <Marker position={[meetup.lat, meetup.lng]} icon={meetupPin} zIndexOffset={1400}>
+            <Popup closeButton={false} maxWidth={220} autoPan={false}>
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-lagoon-900">
+                  {meetup.note?.trim() ? meetup.note : "Meet here"}
+                </p>
+                <p className="text-xs text-ink-600">
+                  Pinned by {meetup.created_by_name ?? "a traveller"}
+                </p>
+              </div>
+            </Popup>
+          </Marker>
+        ) : null}
 
         {livePoint ? (
           <Marker position={livePoint} icon={liveIcon} zIndexOffset={2000} interactive={false} />

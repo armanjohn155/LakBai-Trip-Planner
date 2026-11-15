@@ -89,6 +89,7 @@ interface TripPanelProps {
   onExportError: (message: string) => void;
   itemError: string | null;
   notice?: ReactNode;
+  party?: ReactNode;
   collapsed: boolean;
   hidden: boolean;
   width: number;
@@ -144,6 +145,7 @@ export function TripPanel({
   onExportError,
   itemError,
   notice,
+  party,
   collapsed,
   hidden,
   width,
@@ -516,6 +518,7 @@ export function TripPanel({
             </div>
 
             {notice ? <div className="px-3 pb-2">{notice}</div> : null}
+            {party ? <div className="px-3 pb-2">{party}</div> : null}
             {itemError ? (
               <p role="alert" className="mx-3 mb-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-inset ring-red-200">
                 {itemError}
