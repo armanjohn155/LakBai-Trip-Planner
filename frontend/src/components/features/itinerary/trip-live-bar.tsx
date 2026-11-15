@@ -22,6 +22,13 @@ interface TripLiveBarProps {
   canManage?: boolean;
   following?: boolean;
   group?: TripLiveBarGroup | null;
+  routeDistanceM?: number | null;
+  routeDurationS?: number | null;
+  routeApproximate?: boolean;
+  routeLoading?: boolean;
+  routeHint?: string | null;
+  routeRetry?: (() => void) | null;
+  locationStatus?: string | null;
   onToggleFollow?: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -60,6 +67,13 @@ export function TripLiveBar({
   canManage = true,
   following = false,
   group = null,
+  routeDistanceM = null,
+  routeDurationS = null,
+  routeApproximate = false,
+  routeLoading = false,
+  routeHint = null,
+  routeRetry = null,
+  locationStatus = null,
   onToggleFollow,
   onPause,
   onResume,
@@ -84,6 +98,12 @@ export function TripLiveBar({
   const nextStop = summary?.next_stop ?? null;
   const nextDistance = nextStop?.distance_m != null ? formatDistance(nextStop.distance_m) : null;
   const isPaused = lifecycle === "paused";
+  const routeLooksValid = routeDistanceM != null && routeDurationS != null
+    && Number.isFinite(routeDistanceM) && routeDistanceM >= 0 && routeDistanceM < 10_000_000
+    && Number.isFinite(routeDurationS) && routeDurationS >= 0 && routeDurationS < 14 * 24 * 3600;
+  const routeHours = routeLooksValid ? Math.floor((routeDurationS ?? 0) / 3600) : 0;
+  const routeMinutes = routeLooksValid ? Math.max(1, Math.round(((routeDurationS ?? 0) % 3600) / 60)) : 0;
+  const routeEta = routeHours > 0 ? `${routeHours} h ${routeMinutes} min` : `${routeMinutes} min`;
 
   const notice = message ?? wakeLockNotice ?? (pendingCount > 0 ? `${pendingCount} location updates queued` : null);
 
@@ -179,6 +199,18 @@ export function TripLiveBar({
           ) : (
             <span className="text-[11px] font-medium text-ink-500">No stops remaining</span>
           )}
+
+          {routeLooksValid ? (
+            <span className={cn("inline-flex items-center gap-1 rounded-full bg-surf-400/10 px-2 py-0.5 text-[10px] font-semibold text-sea-700", routeLoading && "animate-pulse")} aria-live="polite">
+              {routeApproximate ? "Approx. " : ""}{formatDistance(routeDistanceM)} · {routeEta}
+            </span>
+          ) : null}
+          {routeLoading && !routeLooksValid ? <span className="animate-pulse rounded-full bg-sand-100 px-2 py-0.5 text-[10px] font-medium text-ink-500">Finding road route…</span> : null}
+          {locationStatus ? <span className="rounded-full bg-sand-100 px-2 py-0.5 text-[10px] font-medium text-ink-600">{locationStatus}</span> : null}
+          {routeHint ? <span className="basis-full text-[10px] font-medium text-mango-800">{routeHint}</span> : null}
+          {routeRetry ? (
+            <button type="button" onClick={routeRetry} className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-sea-700 hover:bg-surf-400/10">Retry route</button>
+          ) : null}
 
           {onToggleFollow ? (
             <button

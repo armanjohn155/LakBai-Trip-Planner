@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Events\TripCompleted;
+use App\Events\TripDeleted;
+use App\Listeners\BuildTripRecap;
+use App\Listeners\CleanupTripPhotos;
 use App\Listeners\NotificationEventSubscriber;
 use App\Models\Review;
 use App\Observers\ReviewObserver;
@@ -29,5 +33,8 @@ class AppServiceProvider extends ServiceProvider
         Review::observe(ReviewObserver::class);
 
         Event::subscribe(NotificationEventSubscriber::class);
+
+        Event::listen(TripCompleted::class, BuildTripRecap::class);
+        Event::listen(TripDeleted::class, CleanupTripPhotos::class);
     }
 }

@@ -149,6 +149,10 @@ class ItineraryController extends Controller
     {
         $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'));
 
+        if ($itinerary->isReadOnly()) {
+            abort(409, 'A completed trip is read-only. Edit its recap instead.');
+        }
+
         $attributes = $request->safe()->only([
             'title',
             'description',
@@ -193,6 +197,18 @@ class ItineraryController extends Controller
             $copy->trip_type = Itinerary::TRIP_SOLO;
             $copy->version = 1;
             $copy->updated_by = $user->id;
+
+            // "Plan this again" must produce a fresh, planned trip rather than
+            // a second completed record with stale timers.
+            $copy->lifecycle_status = Itinerary::LIFECYCLE_PLANNED;
+            $copy->started_at = null;
+            $copy->paused_at = null;
+            $copy->completed_at = null;
+            $copy->total_paused_seconds = 0;
+            $copy->distance_m = 0;
+            $copy->moving_seconds = 0;
+            $copy->started_by = null;
+
             $copy->save();
 
             $itinerary->load(['items.destination' => fn ($query) => $query->withTrashed()]);

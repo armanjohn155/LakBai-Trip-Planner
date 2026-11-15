@@ -1,13 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 
 import L from "leaflet";
-import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 
-import { createMemberPin, createNumberedPin, createPinIcon, dayColor, meetupPin, memberColor } from "@/components/features/map/map-pin";
-import { formatMoney } from "@/lib/format";
+import { createMemberPin, createNumberedPin, createPinIcon, dayColor, meetupPin, memberColor, nextStopPin } from "@/components/features/map/map-pin";
+import { formatMoney, relativeTime } from "@/lib/format";
 import { formatTimeRange } from "@/components/features/itinerary/itinerary-constants";
-import type { Destination, GroupTrackingMeetup, GroupTrackingMember, ItineraryItem } from "@/lib/types";
+import type { Destination, GroupTrackingMeetup, GroupTrackingMember, ItineraryItem, RouteGeometryResponse } from "@/lib/types";
+import type { PlannedRoadRoute } from "@/hooks/use-route";
 
 const CEBU_CENTER: [number, number] = [10.2, 123.6];
 
@@ -15,6 +16,8 @@ export interface LiveMapPosition {
   lat: number;
   lng: number;
   accuracy: number | null;
+  heading?: number | null;
+  speed?: number | null;
 }
 
 export interface LiveMapPoint {
@@ -48,6 +51,7 @@ interface TripMapCanvasProps {
   onAddDestination?: (destination: Destination) => void;
   insets: MapInsets;
   fitKey?: string | number;
+  fitLiveKey?: number;
   bottomInset?: number;
   rightInset?: number;
   interactive?: boolean;
@@ -55,13 +59,17 @@ interface TripMapCanvasProps {
   livePosition?: LiveMapPosition | null;
   traveledPath?: LiveMapPoint[];
   nextStopPoint?: [number, number] | null;
+  liveRoute?: RouteGeometryResponse | null;
+  plannedRoutes?: PlannedRoadRoute[];
   following?: boolean;
+  onManualPan?: () => void;
   partyMembers?: GroupTrackingMember[];
   meetup?: GroupTrackingMeetup | null;
 }
 
-function FitToStops({ points, insets, fitKey }: { points: [number, number][]; insets: MapInsets; fitKey?: string | number }) {
+function FitToStops({ points, insets, fitKey, suppressFit, following, roadGeometryReady }: { points: [number, number][]; insets: MapInsets; fitKey?: string | number; suppressFit: boolean; following: boolean; roadGeometryReady: boolean }) {
   const map = useMap();
+  const firstRouteFit = useRef(false);
   const pointKey = points.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
 
   useEffect(() => {
@@ -69,6 +77,8 @@ function FitToStops({ points, insets, fitKey }: { points: [number, number][]; in
 
     const run = () => {
       if (cancelled) return;
+      if (suppressFit) return;
+      if (firstRouteFit.current && !following) return;
       map.invalidateSize();
       const paddingTopLeft: L.PointExpression = [insets.left, insets.top];
       const paddingBottomRight: L.PointExpression = [insets.right, insets.bottom];
@@ -91,6 +101,7 @@ function FitToStops({ points, insets, fitKey }: { points: [number, number][]; in
           maxZoom: 15,
           animate: false,
         });
+        if (roadGeometryReady) firstRouteFit.current = true;
         return;
       }
 
@@ -100,6 +111,7 @@ function FitToStops({ points, insets, fitKey }: { points: [number, number][]; in
         maxZoom: 15,
         animate: false,
       });
+      if (roadGeometryReady) firstRouteFit.current = true;
     };
 
     // Run once immediately after paint and again after the floating panel settles.
@@ -111,7 +123,7 @@ function FitToStops({ points, insets, fitKey }: { points: [number, number][]; in
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [pointKey, insets.left, insets.top, insets.right, insets.bottom, fitKey, map, points]);
+  }, [pointKey, insets.left, insets.top, insets.right, insets.bottom, fitKey, map, points, suppressFit, following, roadGeometryReady]);
 
   return null;
 }
@@ -159,14 +171,48 @@ function ClickToPick({ onPickPoint }: { onPickPoint: (lat: number, lng: number) 
   return null;
 }
 
-function FollowPosition({ point, following }: { point: [number, number] | null; following: boolean }) {
+function FollowPosition({ point, following, insets }: { point: [number, number] | null; following: boolean; insets: MapInsets }) {
   const map = useMap();
 
   useEffect(() => {
     if (!point || !following) return;
-    map.panTo(point, { animate: true, duration: 0.6 });
-  }, [point, following, map]);
+    const zoom = map.getZoom();
+    const projected = map.project(point, zoom).subtract(L.point((insets.left - insets.right) / 2, (insets.top - insets.bottom) / 2));
+    map.panTo(map.unproject(projected, zoom), { animate: true, duration: 0.6 });
+  }, [point, following, insets.bottom, insets.left, insets.right, insets.top, map]);
 
+  return null;
+}
+
+function FitToLiveBounds({ point, destination, route, following, insets, fitKey }: { point: [number, number] | null; destination: [number, number] | null; route: [number, number][]; following: boolean; insets: MapInsets; fitKey: number }) {
+  const map = useMap();
+  const firstFit = useRef(false);
+  const latest = useRef({ point, destination, route, insets, following });
+  useEffect(() => {
+    latest.current = { point, destination, route, insets, following };
+  }, [destination, insets, point, route, following]);
+  useEffect(() => {
+    const current = latest.current;
+    if (fitKey === 0 || current.point === null || current.route.length < 2) return;
+    if (firstFit.current && !current.following) return;
+    firstFit.current = true;
+    const bounds = L.latLngBounds(current.route);
+    map.fitBounds(bounds.pad(current.destination ? 0.15 : 0.08), {
+      paddingTopLeft: [current.insets.left, current.insets.top],
+      paddingBottomRight: [current.insets.right, current.insets.bottom],
+      maxZoom: 15,
+      animate: true,
+    });
+  }, [fitKey, map, route, following]);
+  return null;
+}
+
+function ManualPanListener({ onManualPan }: { onManualPan?: () => void }) {
+  useMapEvents({
+    dragstart(event) {
+      if ("originalEvent" in event) onManualPan?.();
+    },
+  });
   return null;
 }
 
@@ -189,6 +235,7 @@ export function TripMapCanvas({
   onAddDestination,
   insets,
   fitKey,
+  fitLiveKey = 0,
   bottomInset = 0,
   rightInset = 0,
   interactive = true,
@@ -196,7 +243,10 @@ export function TripMapCanvas({
   livePosition = null,
   traveledPath = [],
   nextStopPoint = null,
+  liveRoute = null,
+  plannedRoutes = [],
   following = false,
+  onManualPan,
   partyMembers = [],
   meetup = null,
 }: TripMapCanvasProps) {
@@ -205,6 +255,11 @@ export function TripMapCanvas({
     () => located.map((item) => [Number(item.latitude), Number(item.longitude)] as [number, number]),
     [located],
   );
+  const plannedGeometryPoints = useMemo(
+    () => plannedRoutes.flatMap((path) => path.coordinates),
+    [plannedRoutes],
+  );
+  const fitPoints = plannedGeometryPoints.length > 1 ? plannedGeometryPoints : points;
 
   const ordered = useMemo(
     () => [...items].sort((a, b) => a.day_number - b.day_number || a.order - b.order),
@@ -216,18 +271,6 @@ export function TripMapCanvas({
     return map;
   }, [ordered]);
 
-  const paths = useMemo(() => {
-    const days = [...new Set(located.map((item) => item.day_number))].sort((a, b) => a - b);
-    return days
-      .map((day) => ({
-        day,
-        points: located
-          .filter((item) => item.day_number === day)
-          .map((item) => [Number(item.latitude), Number(item.longitude)] as [number, number]),
-      }))
-      .filter((path) => path.points.length > 1);
-  }, [located]);
-
   const livePoint = useMemo<[number, number] | null>(
     () => (livePosition ? [livePosition.lat, livePosition.lng] : null),
     [livePosition],
@@ -236,15 +279,36 @@ export function TripMapCanvas({
     () => traveledPath.map((point) => [point.lat, point.lng] as [number, number]),
     [traveledPath],
   );
+  const liveRoutePositions = useMemo(() => {
+    const coordinates = liveRoute?.geometry.coordinates ?? [];
+    const points = coordinates.map(([lng, lat]) => [lat, lng] as [number, number]);
+    if (livePoint === null || points.length < 2) return points;
+    let closest = { distance: Number.POSITIVE_INFINITY, index: 0, point: points[0] };
+    const scale = Math.cos(livePoint[0] * Math.PI / 180) * 111_000;
+    const xy = (point: [number, number]) => [point[1] * scale, point[0] * 111_000] as const;
+    const user = xy(livePoint);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const a = xy(points[index]); const b = xy(points[index + 1]);
+      const dx = b[0] - a[0]; const dy = b[1] - a[1];
+      const length = dx * dx + dy * dy;
+      const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((user[0] - a[0]) * dx + (user[1] - a[1]) * dy) / length));
+      const projected: [number, number] = [points[index][0] + (points[index + 1][0] - points[index][0]) * t, points[index][1] + (points[index + 1][1] - points[index][1]) * t];
+      const distance = Math.hypot(user[0] - (a[0] + dx * t), user[1] - (a[1] + dy * t));
+      if (distance < closest.distance) closest = { distance, index, point: projected };
+    }
+    return [closest.point, ...points.slice(closest.index + 1)];
+  }, [liveRoute, livePoint]);
+  const heading = livePosition?.heading ?? null;
+  const speed = livePosition?.speed ?? null;
   const liveIcon = useMemo(
     () =>
       L.divIcon({
         className: "trip-live-marker",
-        html: '<span class="trip-live-marker__pulse"></span><span class="trip-live-marker__dot"></span>',
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
+        html: `<span class="trip-live-marker__pulse"></span>${speed != null && speed > 1 && heading != null ? `<span class="trip-live-marker__arrow" style="transform:rotate(${heading}deg)">↑</span>` : '<span class="trip-live-marker__dot"></span>'}`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
       }),
-    [],
+    [heading, speed],
   );
 
   const style = {
@@ -271,22 +335,22 @@ export function TripMapCanvas({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        <FitToStops points={points} insets={insets} fitKey={fitKey} />
+        <FitToStops points={fitPoints} insets={insets} fitKey={fitKey} suppressFit={livePoint !== null} following={following} roadGeometryReady={plannedGeometryPoints.length > 1} />
         <ResizeWatcher />
         <PanToFocus point={focusPoint} nonce={focusNonce} insets={insets} />
-        <FollowPosition point={livePoint} following={following} />
+        <FollowPosition point={livePoint} following={following} insets={insets} />
+        <FitToLiveBounds point={livePoint} destination={nextStopPoint} route={liveRoutePositions} following={following} insets={insets} fitKey={fitLiveKey} />
+        <ManualPanListener onManualPan={onManualPan} />
         {pickMode && onPickPoint ? <ClickToPick onPickPoint={onPickPoint} /> : null}
         <ZoomControl position="bottomright" />
 
-        {paths.map((path) => (
-          <Polyline
-            key={`day-${path.day}`}
-            positions={path.points}
-            pathOptions={{ color: dayColor(path.day), weight: 4, opacity: 0.8, dashArray: "7 9" }}
-          />
+        {plannedRoutes.map((path) => (
+          <Polyline key={`day-${path.day}`} positions={path.coordinates} pathOptions={{ color: dayColor(path.day), weight: 3, opacity: 0.72, ...(path.approximate ? { dashArray: "7 9" } : {}) }}>
+            {path.approximate ? <Tooltip sticky>Approx. (no road route)</Tooltip> : null}
+          </Polyline>
         ))}
 
-        {livePoint && livePosition?.accuracy != null && livePosition.accuracy > 0 ? (
+        {livePoint && livePosition?.accuracy != null && livePosition.accuracy > 0 && livePosition.accuracy <= 200 ? (
           <Circle
             center={livePoint}
             radius={Math.max(livePosition.accuracy, 5)}
@@ -304,12 +368,16 @@ export function TripMapCanvas({
           </>
         ) : null}
 
-        {livePoint && nextStopPoint ? (
-          <Polyline
-            positions={[livePoint, nextStopPoint]}
-            pathOptions={{ color: "#0f766e", weight: 3, opacity: 0.8, dashArray: "2 9" }}
-          />
+        {liveRoutePositions.length > 1 ? (
+          <>
+            {liveRoute?.approximate ? null : <Polyline positions={liveRoutePositions} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.95, lineCap: "round", lineJoin: "round" }} />}
+            <Polyline positions={liveRoutePositions} pathOptions={{ color: "#0284c7", weight: 6, opacity: 0.95, lineCap: "round", lineJoin: "round", ...(liveRoute?.approximate ? { dashArray: "8 8" } : {}) }}>
+              {liveRoute?.approximate ? <Tooltip sticky>Approx. (no road route)</Tooltip> : null}
+            </Polyline>
+          </>
         ) : null}
+
+        {livePoint && nextStopPoint ? <Marker position={nextStopPoint} icon={nextStopPin} zIndexOffset={1800} /> : null}
 
         {located.map((item) => {
           const label = sequence.get(item.id) ?? item.order;
@@ -391,6 +459,7 @@ export function TripMapCanvas({
               icon={createMemberPin({
                 name: member.name,
                 color: memberColor(member.user_id),
+                avatarUrl: member.avatar_url,
                 stale: member.online === false,
               })}
               zIndexOffset={1500}
@@ -399,10 +468,12 @@ export function TripMapCanvas({
                 <div className="space-y-0.5">
                   <p className="text-sm font-semibold text-lagoon-900">{member.name}</p>
                   <p className="text-xs text-ink-600">
-                    {member.online ? "Sharing now" : "Signal is stale — they may have locked their phone"}
+                    {member.online
+                      ? `Sharing now${member.last_seen_at ? ` · ${relativeTime(member.last_seen_at)}` : ""}`
+                      : `Last seen ${relativeTime(member.last_seen_at)} (stale)`}
                   </p>
                   {member.arrived_stop ? (
-                    <p className="text-xs font-medium text-sea-600">At {member.arrived_stop.title}</p>
+                    <p className="text-xs font-medium text-sea-600">✓ At {member.arrived_stop.title}</p>
                   ) : null}
                 </div>
               </Popup>
@@ -426,7 +497,9 @@ export function TripMapCanvas({
         ) : null}
 
         {livePoint ? (
-          <Marker position={livePoint} icon={liveIcon} zIndexOffset={2000} interactive={false} />
+          <Marker position={livePoint} icon={liveIcon} zIndexOffset={2000}>
+            <Tooltip direction="top" offset={[0, -12]}>You are here</Tooltip>
+          </Marker>
         ) : null}
 
         {pickedPoint ? (

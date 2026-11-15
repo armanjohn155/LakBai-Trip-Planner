@@ -18,7 +18,12 @@ class RouteEstimatorTest extends TestCase
     {
         Http::fake([
             'router.project-osrm.org/*' => Http::response([
-                'routes' => [['distance' => 4200.0, 'duration' => 600.0]],
+                'routes' => [[
+                    'distance' => 4200.0,
+                    'duration' => 600.0,
+                    'geometry' => ['type' => 'LineString', 'coordinates' => [[123.0, 10.0], [123.1, 10.1]]],
+                    'legs' => [['distance' => 4200.0, 'duration' => 600.0]],
+                ]],
             ]),
         ]);
 

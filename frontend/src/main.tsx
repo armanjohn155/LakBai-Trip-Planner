@@ -31,12 +31,15 @@ import FriendsPage from "@/pages/dashboard/user/friends";
 import DashboardHomePage from "@/pages/dashboard/user/home";
 import HistoryPage from "@/pages/dashboard/user/history";
 import ItineraryPage from "@/pages/dashboard/user/itinerary";
+import { TripPageErrorBoundary } from "@/components/features/itinerary/trip-page-error-boundary";
 import ProfilePage from "@/pages/dashboard/user/profile";
 import MyReviewsPage from "@/pages/dashboard/user/reviews";
 import NotificationsPage from "@/pages/app/notifications/index";
 import NotificationPreferencesPage from "@/pages/app/profile/settings/notifications";
 import TripsPage from "@/pages/dashboard/user/trips";
+import TripRecapPage from "@/pages/dashboard/user/trip-recap";
 import TripWizardPage from "@/pages/dashboard/user/trip-wizard";
+import SharedRecapPage from "@/pages/public/shared-recap";
 import AboutPage from "@/pages/guest/about";
 import ContactPage from "@/pages/guest/contact";
 import GuestLayout from "@/pages/guest/layout";
@@ -71,6 +74,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route path="invite/:token" element={<InviteAcceptPage />} />
+          <Route path="s/:token" element={<SharedRecapPage />} />
 
           {/* Declared before the /app layout so stale dashboard destination URLs
               never hit AppLayout's auth guard — guests land straight on the
@@ -91,7 +95,8 @@ createRoot(document.getElementById("root")!).render(
             <Route index element={<DashboardHomePage />} />
             <Route path="trips" element={<TripsPage />} />
             <Route path="trips/new" element={<TripWizardPage />} />
-            <Route path="trips/:id" element={<ItineraryPage />} />
+            <Route path="trips/:id/recap" element={<TripRecapPage />} />
+            <Route path="trips/:id" element={<TripPageErrorBoundary><ItineraryPage /></TripPageErrorBoundary>} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="friends" element={<FriendsPage />} />
             <Route path="history" element={<HistoryPage />} />

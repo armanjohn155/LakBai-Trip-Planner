@@ -13,6 +13,8 @@ export interface LivePosition {
   lat: number;
   lng: number;
   accuracy: number | null;
+  heading?: number | null;
+  speed?: number | null;
   recordedAt: string;
 }
 
@@ -97,10 +99,13 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
   const [wakeLockState, setWakeLockState] = useState<"inactive" | "active" | "unsupported" | "denied">("inactive");
   const [pendingCount, setPendingCount] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const watchIdRef = useRef<number | null>(null);
+  const positionRef = useRef<LivePosition | null>(null);
   const queueRef = useRef<QueuedPoint[]>([]);
   const lastFixAtRef = useRef(0);
+  const lastUiUpdateAtRef = useRef(0);
   const lastQueuedAtRef = useRef(0);
   const lastPolylineRef = useRef<{ lat: number; lng: number } | null>(null);
   const uploadTimerRef = useRef<number | null>(null);
@@ -210,7 +215,17 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
         .query({ name: "geolocation" as PermissionName })
         .then((status) => {
           setPermission(status.state);
-          status.onchange = () => setPermission(status.state);
+          status.onchange = () => {
+            setPermission(status.state);
+            if (status.state === "denied") {
+              setMessage("Location permission was denied. Enable it in your browser site settings, then retry.");
+              if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+              }
+              releaseWakeLock();
+            }
+          };
         })
         .catch(() => undefined);
     }
@@ -223,10 +238,23 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
           lat: fix.coords.latitude,
           lng: fix.coords.longitude,
           accuracy: Number.isFinite(fix.coords.accuracy) ? fix.coords.accuracy : null,
+          heading: Number.isFinite(fix.coords.heading) ? fix.coords.heading : null,
+          speed: Number.isFinite(fix.coords.speed) ? fix.coords.speed : null,
           recordedAt: recordedAt,
         };
 
-        setPosition(next);
+        const previous = positionRef.current;
+        if (previous && (next.accuracy ?? Infinity) > 100 && (previous.accuracy ?? Infinity) <= 100) return;
+        if (previous && haversineKm(previous.lat, previous.lng, next.lat, next.lng) * 1000 < MIN_FORMAT_DISTANCE_M) {
+          next.lat = previous.lat;
+          next.lng = previous.lng;
+        }
+
+        if (now - lastUiUpdateAtRef.current >= 2_000 || previous === null) {
+          lastUiUpdateAtRef.current = now;
+          positionRef.current = next;
+          setPosition(next);
+        }
         setWatching(true);
         setPermission("granted");
         setMessage(null);
@@ -255,6 +283,7 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
             lng: next.lng,
             accuracy: next.accuracy,
             speed: Number.isFinite(fix.coords.speed) ? fix.coords.speed : null,
+            heading: Number.isFinite(fix.coords.heading) ? fix.coords.heading : null,
             recorded_at: recordedAt,
           },
         ];
@@ -262,7 +291,14 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
       },
       (error) => {
         setWatching(false);
-        if (error.code === error.PERMISSION_DENIED) setPermission("denied");
+        if (error.code === error.PERMISSION_DENIED) {
+          setPermission("denied");
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+          }
+          releaseWakeLock();
+        }
         setMessage(geolocationMessage(error));
       },
       {
@@ -301,13 +337,14 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
     };
     // requestWakeLock/flush/persist are stable; itineraryId intentionally restarts the watch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, itineraryId, supported]);
+  }, [enabled, itineraryId, supported, retryCount]);
 
   // Clear local history when switching trips or leaving the planner.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTraveled([]);
     setPosition(null);
+    positionRef.current = null;
     lastPolylineRef.current = null;
     lastFixAtRef.current = 0;
     lastQueuedAtRef.current = 0;
@@ -316,6 +353,7 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
   const retryNow = useCallback(() => {
     void flush();
   }, [flush]);
+  const retryLocation = useCallback(() => setRetryCount((count) => count + 1), []);
 
   const wakeLockNotice =
     wakeLockState === "unsupported"
@@ -336,6 +374,7 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
     wakeLockState,
     wakeLockNotice,
     retryNow,
+    retryLocation,
     flush,
   };
 }

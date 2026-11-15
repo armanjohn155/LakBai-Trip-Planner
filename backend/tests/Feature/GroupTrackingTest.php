@@ -165,10 +165,15 @@ class GroupTrackingTest extends TestCase
 
         Event::fake([MemberLocationUpdated::class, MemberPresenceChanged::class]);
 
-        $this->postPoints($viewer, $trip, 10.0001, 123.0001, 8);
+        $this->postPoints($viewer, $trip, 10.0001, 123.0001, 8, 0, 180, 5.5);
         $this->postPoints($viewer, $trip, 10.0002, 123.0002, 8);
 
         Event::assertDispatchedTimes(MemberLocationUpdated::class, 1);
+        Event::assertDispatched(MemberLocationUpdated::class, function (MemberLocationUpdated $event) {
+            $payload = $event->broadcastWith();
+
+            return $payload['heading'] === 180 && abs($payload['speed'] - 5.5) < 0.1;
+        });
 
         Carbon::setTestNow(Carbon::now()->addSeconds(6));
 
@@ -202,6 +207,26 @@ class GroupTrackingTest extends TestCase
             ->count());
     }
 
+    public function test_viewers_own_roster_row_uses_the_session_position_when_cache_expires(): void
+    {
+        [, $viewer, $trip] = $this->activeGroupTrip(Itinerary::ROLE_VIEWER);
+
+        $this->share($viewer, $trip, true);
+        $this->postPoints($viewer, $trip, 10.0001, 123.0001, 8);
+        Cache::store()->forget("lakbai.tracking.group.{$trip->id}.position.{$viewer->id}");
+
+        $body = $this->actingAs($viewer)
+            ->getJson("/api/itineraries/{$trip->id}/tracking/group")
+            ->assertOk()
+            ->json('data');
+
+        $viewerRow = collect($body['members'])->firstWhere('user_id', $viewer->id);
+
+        $this->assertTrue($viewerRow['online']);
+        $this->assertEqualsWithDelta(10.0001, (float) $viewerRow['position']['lat'], 0.0000001);
+        $this->assertEquals($body['me']['position'], $viewerRow['position']);
+    }
+
     public function test_pausing_the_trip_stops_everyones_sharing_and_clears_cached_positions(): void
     {
         [$owner, $viewer, $trip] = $this->activeGroupTrip(Itinerary::ROLE_VIEWER);
@@ -225,6 +250,16 @@ class GroupTrackingTest extends TestCase
 
         Event::assertDispatched(MemberSharingChanged::class, fn (MemberSharingChanged $event) => $event->sharing === false
             && $event->reason === 'paused');
+
+        // The party list reports the whole group as paused, not just the actor.
+        $paused = $this->actingAs($owner)
+            ->getJson("/api/itineraries/{$trip->id}/tracking/group")
+            ->assertOk()
+            ->json('data');
+
+        foreach ($paused['members'] as $member) {
+            $this->assertSame(TrackingSession::STATUS_PAUSED, $member['session_status']);
+        }
 
         // Sharing cannot be re-enabled until the trip resumes.
         $this->actingAs($viewer)
@@ -272,6 +307,7 @@ class GroupTrackingTest extends TestCase
         foreach ($body['members'] as $member) {
             $this->assertFalse($member['sharing']);
             $this->assertNull($member['position']);
+            $this->assertSame(TrackingSession::STATUS_ENDED, $member['session_status']);
         }
 
         $this->actingAs($viewer)
@@ -342,6 +378,58 @@ class GroupTrackingTest extends TestCase
 
         Notification::assertSentTo($viewer, MemberArrivedNotification::class);
         Notification::assertNotSentTo($owner, MemberArrivedNotification::class);
+    }
+
+    public function test_complete_stop_also_broadcasts_member_arrived_if_not_already_arrived(): void
+    {
+        [$owner, $viewer, $trip] = $this->activeGroupTrip(Itinerary::ROLE_VIEWER);
+
+        $this->share($owner, $trip, true);
+        $this->share($viewer, $trip, true);
+
+        Event::fake([MemberArrived::class]);
+        Notification::fake();
+
+        $item = $trip->items()->firstOrFail();
+
+        $this->actingAs($owner)
+            ->postJson("/api/itineraries/{$trip->id}/stops/{$item->id}/complete", [
+                'latitude' => 10.0,
+                'longitude' => 123.0,
+                'accuracy' => 10,
+            ])
+            ->assertOk();
+
+        Event::assertDispatched(MemberArrived::class, fn (MemberArrived $event) => $event->member->is($owner)
+            && $event->itemId === $item->id);
+
+        Notification::assertSentTo($viewer, MemberArrivedNotification::class);
+        Notification::assertNotSentTo($owner, MemberArrivedNotification::class);
+    }
+
+    public function test_group_state_includes_distance_to_next_stop_and_session_status(): void
+    {
+        [$owner, $viewer, $trip] = $this->activeGroupTrip(Itinerary::ROLE_VIEWER);
+
+        $this->share($owner, $trip, true);
+        $this->share($viewer, $trip, true);
+
+        // Stop is at lat 10.0, lng 123.0. Post viewer at 10.01, 123.0 (~1112 m away).
+        $this->postPoints($viewer, $trip, 10.01, 123.0, 8);
+
+        $body = $this->actingAs($owner)
+            ->getJson("/api/itineraries/{$trip->id}/tracking/group")
+            ->assertOk()
+            ->json('data');
+
+        $viewerRow = collect($body['members'])->firstWhere('user_id', $viewer->id);
+
+        $this->assertNotNull($viewerRow);
+        $this->assertSame(TrackingSession::STATUS_ACTIVE, $viewerRow['session_status']);
+        $this->assertNotNull($viewerRow['distance_to_next_stop_m']);
+        $this->assertGreaterThan(1000, $viewerRow['distance_to_next_stop_m']);
+        $this->assertLessThan(1200, $viewerRow['distance_to_next_stop_m']);
+        $this->assertSame($trip->items()->firstOrFail()->id, $body['next_stop']['id']);
     }
 
     public function test_broadcast_payloads_never_contain_email_addresses(): void
@@ -474,6 +562,13 @@ class GroupTrackingTest extends TestCase
 
         $this->share($owner, $trip, true);
         $this->share($editor, $trip, true);
+        $this->share($viewer, $trip, true);
+
+        // Start the matrix with the accepted viewer opted out.
+        TrackingSession::query()
+            ->where('itinerary_id', $trip->id)
+            ->where('user_id', $viewer->id)
+            ->update(['shared_with_group' => false]);
 
         $this->enableRealBroadcasting();
 
@@ -483,6 +578,23 @@ class GroupTrackingTest extends TestCase
         // Accepted member who has not opted in yet.
         $this->assertChannelAuth($viewer, $trip, 403);
 
+        // An accepted viewer may subscribe once they opt in.
+        TrackingSession::query()
+            ->where('itinerary_id', $trip->id)
+            ->where('user_id', $viewer->id)
+            ->update(['shared_with_group' => true]);
+
+        $this->assertChannelAuth($viewer, $trip, 200);
+
+        // Opting out revokes the channel for that traveller only.
+        TrackingSession::query()
+            ->where('itinerary_id', $trip->id)
+            ->where('user_id', $owner->id)
+            ->update(['shared_with_group' => false]);
+
+        $this->assertChannelAuth($owner, $trip, 403);
+        $this->assertChannelAuth($editor, $trip, 200);
+
         // Pending invite and total outsider are indistinguishable from a
         // non-existent trip.
         $this->assertChannelAuth($pending, $trip, 404);
@@ -491,10 +603,16 @@ class GroupTrackingTest extends TestCase
         // An ended session revokes access even when the trip is still active.
         TrackingSession::query()
             ->where('itinerary_id', $trip->id)
-            ->where('user_id', $owner->id)
+            ->where('user_id', $editor->id)
             ->update(['status' => TrackingSession::STATUS_ENDED, 'ended_at' => Carbon::now()]);
 
-        $this->assertChannelAuth($owner, $trip, 403);
+        $this->assertChannelAuth($editor, $trip, 403);
+
+        // A paused (or completed) trip closes the channel even for a member
+        // who is still flagged as sharing.
+        $trip->forceFill(['lifecycle_status' => Itinerary::LIFECYCLE_PAUSED])->save();
+
+        $this->assertChannelAuth($viewer, $trip, 403);
     }
 
     /**
@@ -561,15 +679,27 @@ class GroupTrackingTest extends TestCase
         float $lng,
         int $accuracy,
         int $offsetSeconds = 0,
+        ?int $heading = null,
+        ?float $speed = null,
     ): void {
+        $point = [
+            'lat' => $lat,
+            'lng' => $lng,
+            'accuracy' => $accuracy,
+            'recorded_at' => Carbon::now()->addSeconds($offsetSeconds)->toIso8601String(),
+        ];
+
+        if ($heading !== null) {
+            $point['heading'] = $heading;
+        }
+
+        if ($speed !== null) {
+            $point['speed'] = $speed;
+        }
+
         $this->actingAs($user)
             ->postJson("/api/itineraries/{$trip->id}/tracking/points", [
-                'points' => [[
-                    'lat' => $lat,
-                    'lng' => $lng,
-                    'accuracy' => $accuracy,
-                    'recorded_at' => Carbon::now()->addSeconds($offsetSeconds)->toIso8601String(),
-                ]],
+                'points' => [$point],
             ])
             ->assertOk();
     }

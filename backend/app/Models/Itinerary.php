@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'user_id',
@@ -92,6 +93,15 @@ class Itinerary extends Model
             self::LIFECYCLE_ACTIVE,
             self::LIFECYCLE_PAUSED,
         ], true);
+    }
+
+    /**
+     * A completed trip is a record: the itinerary becomes read-only except
+     * for stop notes and recap photos. The recap itself stays editable.
+     */
+    public function isReadOnly(): bool
+    {
+        return ($this->lifecycle_status ?? self::LIFECYCLE_PLANNED) === self::LIFECYCLE_COMPLETED;
     }
 
     /**
@@ -188,6 +198,16 @@ class Itinerary extends Model
     public function trackingSessions(): HasMany
     {
         return $this->hasMany(TrackingSession::class);
+    }
+
+    public function recap(): HasOne
+    {
+        return $this->hasOne(TripRecap::class);
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(TripPhoto::class);
     }
 
     public function startedBy(): BelongsTo

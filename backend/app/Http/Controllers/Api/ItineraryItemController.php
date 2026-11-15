@@ -31,6 +31,7 @@ class ItineraryItemController extends Controller
     public function store(StoreItineraryItemRequest $request, Itinerary $itinerary): JsonResponse
     {
         Gate::authorize('update', $itinerary);
+        $this->assertEditable($itinerary);
         $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'));
 
         $dayNumber = $request->integer('day_number', 1);
@@ -85,6 +86,23 @@ class ItineraryItemController extends Controller
         Gate::authorize('update', $item);
         $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'), 'stop', $item->id);
 
+        if ($itinerary->isReadOnly()) {
+            // The only part of a finished trip that stays writable is the
+            // traveller's own note on each stop; photos live on the recap.
+            $extra = array_diff(array_keys($request->all()), ['notes', 'base_version']);
+
+            if ($extra !== []) {
+                abort(409, 'A completed trip is read-only. Stop notes can still be edited.');
+            }
+
+            $item->forceFill([
+                'notes' => $request->input('notes'),
+                'updated_by' => $request->user()->id,
+            ])->save();
+
+            return new ItineraryResource($itinerary->loadForDisplay($request->user()));
+        }
+
         $attributes = $request->safe()->only([
             'destination_id',
             'custom_title',
@@ -128,6 +146,7 @@ class ItineraryItemController extends Controller
     public function destroy(Itinerary $itinerary, ItineraryItem $item): Response
     {
         Gate::authorize('delete', $item);
+        $this->assertEditable($itinerary);
         $this->conflictGuard->assertFresh($itinerary, request()->input('base_version'), 'stop', $item->id);
 
         $itemId = $item->id;
@@ -148,6 +167,7 @@ class ItineraryItemController extends Controller
     public function reorder(Request $request, Itinerary $itinerary): ItineraryResource
     {
         Gate::authorize('update', $itinerary);
+        $this->assertEditable($itinerary);
         // A stale base_version for reorder returns 409 with the fresh order.
         $this->conflictGuard->assertFresh($itinerary, $request->input('base_version'));
 
@@ -198,12 +218,18 @@ class ItineraryItemController extends Controller
         return new ItineraryResource($itinerary->loadForDisplay($request->user()));
     }
 
+    private function assertEditable(Itinerary $itinerary): void
+    {
+        if ($itinerary->isReadOnly()) {
+            abort(409, 'A completed trip is read-only. Stop notes and recap photos are the exceptions.');
+        }
+    }
+
     /**
      * Budget defaults to the destination's estimated cost when omitted.
      */
     private function resolveBudget(StoreItineraryItemRequest $request, mixed $destinationId): mixed
-    {
-        if ($request->filled('estimated_budget')) {
+    {        if ($request->filled('estimated_budget')) {
             return $request->input('estimated_budget');
         }
 

@@ -25,6 +25,10 @@ use App\Http\Controllers\Api\NotificationPreferenceController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\ReviewReportController;
+use App\Http\Controllers\Api\RouteController;
+use App\Http\Controllers\Api\SharedRecapController;
+use App\Http\Controllers\Api\TripPhotoController;
+use App\Http\Controllers\Api\TripRecapController;
 use App\Http\Controllers\Api\TripStopController;
 use App\Http\Controllers\Api\TripTrackingController;
 use App\Http\Controllers\Api\VisitController;
@@ -40,6 +44,10 @@ Route::get('/destinations/{destination}', [DestinationController::class, 'show']
 // Public review listing; auth (when present) unlocks "can" flags and admin visibility.
 Route::get('/destinations/{destination}/reviews', [ReviewController::class, 'index']);
 
+// Public trip recap. Token-gated, rate-limited, and safe to open without auth.
+Route::get('/shared/recaps/{token}', [SharedRecapController::class, 'show'])
+    ->middleware('throttle:'.config('lakbai.recap.public_throttle', '30,1').',shared-recap');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user', [ProfileController::class, 'update']);
@@ -49,6 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/settings', [ProfileController::class, 'settings']);
     Route::put('/user/settings', [ProfileController::class, 'updateSettings']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/routes', [RouteController::class, 'store'])
+        ->middleware('throttle:30,1,trip-routes');
 
     // Friends
     Route::middleware('throttle:'.config('lakbai.friends.read_throttle', '60,1').',friend-read')->group(function () {
@@ -89,6 +99,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/itineraries/{itinerary}/route-estimates', [ItineraryRouteEstimateController::class, 'show']);
     Route::get('/itineraries/{itinerary}/export', [ItineraryExportController::class, 'export'])
         ->middleware('throttle:'.config('lakbai.export.throttle', '20,1').',itinerary-export');
+
+    // Completed-trip recap: memorable design, photos and a revocable public link.
+    Route::get('/itineraries/{itinerary}/recap', [TripRecapController::class, 'show']);
+    Route::put('/itineraries/{itinerary}/recap', [TripRecapController::class, 'update']);
+    Route::post('/itineraries/{itinerary}/recap/share-link', [TripRecapController::class, 'shareLink'])
+        ->middleware('throttle:'.config('lakbai.recap.share_throttle', '10,1').',recap-share');
+    Route::delete('/itineraries/{itinerary}/recap/share-link', [TripRecapController::class, 'revokeShareLink'])
+        ->middleware('throttle:'.config('lakbai.recap.share_throttle', '10,1').',recap-share');
+    Route::get('/itineraries/{itinerary}/recap/export', [TripRecapController::class, 'export'])
+        ->middleware('throttle:'.config('lakbai.export.throttle', '20,1').',itinerary-export');
+
+    Route::get('/itineraries/{itinerary}/photos', [TripPhotoController::class, 'index']);
+    Route::post('/itineraries/{itinerary}/photos', [TripPhotoController::class, 'store'])
+        ->middleware('throttle:'.config('lakbai.recap.upload_throttle', '30,1').',recap-photo-upload');
+    Route::put('/itineraries/{itinerary}/photos/reorder', [TripPhotoController::class, 'reorder']);
+    Route::match(['put', 'patch'], '/itineraries/{itinerary}/photos/{photo}', [TripPhotoController::class, 'update'])
+        ->scopeBindings();
+    Route::delete('/itineraries/{itinerary}/photos/{photo}', [TripPhotoController::class, 'destroy'])
+        ->scopeBindings();
 
     // Sharing
     Route::get('/itineraries/{itinerary}/members', [ItineraryMemberController::class, 'index']);

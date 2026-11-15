@@ -76,6 +76,8 @@ class TripTrackingService
         $lastLng = $session->last_lng !== null ? (float) $session->last_lng : null;
         $lastAt = $session->last_point_at;
         $lastAccuracy = $session->last_accuracy_m;
+        $lastHeading = null;
+        $lastSpeed = null;
 
         $accepted = 0;
         $rejected = 0;
@@ -150,6 +152,12 @@ class TripTrackingService
             $lastLng = $lng;
             $lastAt = $recordedAt;
             $lastAccuracy = (int) round($accuracy);
+            $lastHeading = isset($point['heading']) && is_numeric($point['heading'])
+                ? (int) round((float) $point['heading'])
+                : null;
+            $lastSpeed = isset($point['speed']) && is_numeric($point['speed'])
+                ? round((float) $point['speed'], 1)
+                : ($computedSpeed !== null ? round($computedSpeed / 3.6, 1) : null);
 
             $shouldStore = $lastStoredAt === null
                 || $recordedAt->getTimestamp() - Carbon::parse($lastStoredAt)->getTimestamp() >= $sampleSeconds;
@@ -189,6 +197,8 @@ class TripTrackingService
                     'lat' => $lastLat,
                     'lng' => $lastLng,
                     'accuracy_m' => $lastAccuracy,
+                    'heading' => $lastHeading,
+                    'speed' => $lastSpeed,
                     'recorded_at' => $lastAt->toIso8601String(),
                 ], $now);
             }

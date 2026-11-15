@@ -60,6 +60,15 @@ class ItineraryPolicy
     }
 
     /**
+     * Edit the recap design and share link. Owner only; members may still
+     * read the recap and upload their own photos.
+     */
+    public function manageRecap(User $user, Itinerary $itinerary): bool
+    {
+        return $itinerary->roleFor($user) === Itinerary::ROLE_OWNER;
+    }
+
+    /**
      * Any member (owner, editor, viewer) may export.
      */
     public function export(User $user, Itinerary $itinerary): bool

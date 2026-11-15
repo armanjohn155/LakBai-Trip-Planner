@@ -26,6 +26,8 @@ class MemberLocationUpdated implements ShouldBroadcastNow
         public float $lng,
         public ?int $accuracyM,
         public string $recordedAt,
+        public ?int $heading = null,
+        public ?float $speed = null,
     ) {}
 
     public function broadcastOn(): PrivateChannel
@@ -43,7 +45,7 @@ class MemberLocationUpdated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return [
+        $payload = [
             'itinerary_id' => (int) $this->itinerary->id,
             'user_id' => (int) $this->member->id,
             'name' => $this->member->name,
@@ -53,5 +55,15 @@ class MemberLocationUpdated implements ShouldBroadcastNow
             'accuracy_m' => $this->accuracyM,
             'recorded_at' => $this->recordedAt,
         ];
+
+        if ($this->heading !== null) {
+            $payload['heading'] = $this->heading;
+        }
+
+        if ($this->speed !== null) {
+            $payload['speed'] = $this->speed;
+        }
+
+        return $payload;
     }
 }

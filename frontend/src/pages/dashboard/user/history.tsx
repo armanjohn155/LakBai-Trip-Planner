@@ -119,6 +119,16 @@ export default function HistoryPage() {
         </Link>
       </div>
 
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+        <div>
+          <h2 className="font-semibold text-lagoon-900">Past trips</h2>
+          <p className="mt-1 text-sm text-ink-600">Revisit completed itineraries, routes and trip photos.</p>
+        </div>
+        <Link to="/app/trips?filter=completed">
+          <Button variant="secondary">View completed trips</Button>
+        </Link>
+      </Card>
+
       {error ? <InlineError message={error} /> : null}
 
       {stats ? (

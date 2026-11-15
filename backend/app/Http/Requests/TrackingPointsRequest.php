@@ -37,6 +37,7 @@ class TrackingPointsRequest extends FormRequest
             'points.*.lng' => ['required', 'numeric', 'between:-180,180'],
             'points.*.accuracy' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'points.*.speed' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'points.*.heading' => ['nullable', 'numeric', 'min:0', 'max:360'],
             'points.*.recorded_at' => ['required', 'date'],
         ];
     }

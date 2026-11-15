@@ -5,6 +5,8 @@ import { FriendsIcon, MapIcon, PinIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
+import { formatDistance } from "@/lib/geo";
+import { relativeTime } from "@/lib/format";
 import type {
   GroupTrackingMember,
   GroupTrackingState,
@@ -34,16 +36,6 @@ const ROLE_LABEL: Record<TripRole, string> = {
   editor: "Editor",
   viewer: "Viewer",
 };
-
-function relativeTime(iso: string | null): string {
-  if (iso === null) return "No ping yet";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms)) return "No ping yet";
-  if (ms < 15_000) return "just now";
-  if (ms < 60_000) return `${Math.max(1, Math.round(ms / 1_000))}s ago`;
-  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m ago`;
-  return `${Math.round(ms / 3_600_000)}h ago`;
-}
 
 function expiryLabel(iso: string | null): string {
   if (iso === null) return "";
@@ -140,8 +132,9 @@ export function GroupPartyPanel({
 
       <div className="mt-2 flex items-start justify-between gap-3 rounded-xl bg-sand-50 p-2.5">
         <p className="text-[11px] leading-snug text-ink-700">
-          <span className="font-semibold text-ink-900">You choose.</span> The trip owner cannot turn this
-          on for you. While it is on, accepted members see your latest location, not your history.
+          <span className="font-semibold text-ink-900">Share my live location with this group.</span>{" "}
+          You choose — the trip owner cannot turn this on for you. While it is on, accepted members
+          see your latest location, not your history.
         </p>
         <button
           type="button"
@@ -215,11 +208,21 @@ export function GroupPartyPanel({
                       {ROLE_LABEL[member.role]}
                     </span>
                   ) : null}
+                  {member.session_status === "paused" ? (
+                    <span className="rounded-full bg-mango-100 px-1.5 text-[9px] font-semibold text-mango-700">
+                      Paused
+                    </span>
+                  ) : null}
                 </p>
-                <p className="truncate text-[10px] text-ink-600">{memberStatus(member, sharing)}</p>
+                <p className="truncate text-[10px] text-ink-600">
+                  {memberStatus(member, sharing)}
+                  {sharing && member.distance_to_next_stop_m != null ? (
+                    <span> · {formatDistance(member.distance_to_next_stop_m)} to next stop</span>
+                  ) : null}
+                </p>
                 {member.arrived_stop ? (
-                  <p className="truncate text-[10px] font-medium text-sea-600">
-                    At {member.arrived_stop.title}
+                  <p className="flex items-center gap-1 truncate text-[10px] font-medium text-sea-600">
+                    <span aria-hidden="true" className="font-bold text-emerald-600">✓</span> Arrived at {member.arrived_stop.title}
                   </p>
                 ) : null}
               </div>

@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from "react-router";
 
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { TripCard, tripStatus } from "@/components/features/itinerary/trip-card";
-import { CheckIcon, ChevronIcon, FriendsIcon, PinIcon, UserIcon, XIcon } from "@/components/icons";
+import { RecapTripCard } from "@/components/features/recap/recap-trip-card";
+import { CheckIcon, ChevronIcon, FriendsIcon, PinIcon, RouteIcon, UserIcon, XIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/feedback";
@@ -15,6 +16,7 @@ import {
   createItinerary,
   declinePendingInvitation,
   deleteItinerary,
+  duplicateItinerary,
   getAllItineraries,
   getDestinations,
   getPendingInvitations,
@@ -23,7 +25,10 @@ import { cn } from "@/lib/cn";
 import type { Destination, Itinerary, PendingInvite } from "@/lib/types";
 
 type TripSort = "upcoming" | "recent" | "soonest" | "latest";
-type TripFilter = "all" | "owned" | "shared" | "invited";
+type TripFilter = "all" | "owned" | "shared" | "completed" | "invited";
+
+const isCompletedTrip = (trip: Itinerary): boolean =>
+  trip.lifecycle_status === "completed" || (trip.lifecycle_status === undefined && tripStatus(trip) === "past");
 
 const TRIP_SORT_OPTIONS: { value: TripSort; label: string }[] = [
   { value: "upcoming", label: "Upcoming first" },
@@ -34,7 +39,8 @@ const TRIP_SORT_OPTIONS: { value: TripSort; label: string }[] = [
 
 export default function TripsPage() {
   const navigate = useNavigate();
-  const routeState = (useLocation().state as { addDestinationId?: number } | null) ?? {};
+  const location = useLocation();
+  const routeState = (location.state as { addDestinationId?: number } | null) ?? {};
   const addDestinationId = routeState.addDestinationId;
 
   const [trips, setTrips] = useState<Itinerary[]>([]);
@@ -43,8 +49,11 @@ export default function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<TripSort>("upcoming");
-  const [filter, setFilter] = useState<TripFilter>("all");
+  const [filter, setFilter] = useState<TripFilter>(() =>
+    new URLSearchParams(location.search).get("filter") === "completed" ? "completed" : "all",
+  );
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [planAgainId, setPlanAgainId] = useState<number | null>(null);
   const [busyInviteId, setBusyInviteId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
@@ -143,6 +152,19 @@ export default function TripsPage() {
     }
   };
 
+  const planAgain = async (itinerary: Itinerary) => {
+    setPlanAgainId(itinerary.id);
+    setError(null);
+    try {
+      const copy = await duplicateItinerary(itinerary.id);
+      navigate(`/app/trips/${copy.id}`);
+    } catch (err) {
+      setError(apiError(err));
+    } finally {
+      setPlanAgainId(null);
+    }
+  };
+
   const sortedTrips = useMemo(() => {
     const list = [...trips];
     switch (sortBy) {
@@ -173,8 +195,11 @@ export default function TripsPage() {
   const visibleTrips = useMemo(() => {
     if (filter === "owned") return sortedTrips.filter((trip) => (trip.my_role ?? "owner") === "owner");
     if (filter === "shared") return sortedTrips.filter((trip) => trip.is_shared);
+    if (filter === "completed") return sortedTrips.filter(isCompletedTrip);
     return sortedTrips;
   }, [filter, sortedTrips]);
+
+  const completedTrips = useMemo(() => trips.filter(isCompletedTrip), [trips]);
 
   const showInvites = filter === "all" || filter === "invited";
   const showTrips = filter !== "invited";
@@ -210,6 +235,7 @@ export default function TripsPage() {
           { id: "all", label: "All trips", count: trips.length + inviteCount },
           { id: "owned", label: "Mine", count: trips.filter((trip) => (trip.my_role ?? "owner") === "owner").length },
           { id: "shared", label: "Shared with me", count: trips.filter((trip) => trip.is_shared).length },
+          { id: "completed", label: "Completed", count: completedTrips.length },
           { id: "invited", label: "Invitations", count: inviteCount },
         ] as const).map((item) => (
           <button
@@ -322,7 +348,34 @@ export default function TripsPage() {
       ) : null}
 
       {showTrips ? (
-        visibleTrips.length === 0 ? (
+        filter === "completed" ? (
+          completedTrips.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sand-100 text-sea-600">
+                <RouteIcon className="h-6 w-6" />
+              </span>
+              <h3 className="mt-1 font-display text-2xl font-medium text-lagoon-900">No finished trips yet</h3>
+              <p className="max-w-md text-sm text-ink-600">
+                Finish a trip from its tracking view and it will become a recap you can design and share here.
+              </p>
+              <Button size="lg" className="mt-3" onClick={() => navigate("/app/trips/new")}>
+                Plan a new trip
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleTrips.map((trip) => (
+                <RecapTripCard
+                  key={trip.id}
+                  itinerary={trip}
+                  onOpen={() => navigate(`/app/trips/${trip.id}/recap`)}
+                  onPlanAgain={() => void planAgain(trip)}
+                  planAgainBusy={planAgainId === trip.id}
+                />
+              ))}
+            </div>
+          )
+        ) : visibleTrips.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sand-100 text-sea-600">
               {filter === "shared" ? <UserIcon className="h-6 w-6" /> : <PinIcon className="h-6 w-6" />}
@@ -360,8 +413,7 @@ export default function TripsPage() {
   );
 }
 
-interface SortDropdownProps {
-  className?: string;
+interface SortDropdownProps {  className?: string;
   ariaLabel: string;
   value: TripSort;
   onChange: (value: TripSort) => void;

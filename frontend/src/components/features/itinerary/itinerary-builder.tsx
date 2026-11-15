@@ -38,18 +38,21 @@ import {
   ArrowLeftIcon,
   ChevronIcon,
   ClockIcon,
+  CrosshairIcon,
   LayersIcon,
   PlusIcon,
   RouteIcon,
 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import { InlineError } from "@/components/ui/feedback";
+import { InlineError, Spinner } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/hooks/use-auth";
 import { useGroupTracking } from "@/hooks/use-group-tracking";
+import { useCurrentLocation } from "@/hooks/use-current-location";
 import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
 import { useTripTracking, type LivePosition } from "@/hooks/use-trip-tracking";
+import { useLiveRoute, usePlannedRoutes } from "@/hooks/use-route";
 import { haversineMeters } from "@/lib/geo";
 import {
   addItineraryItem,
@@ -421,6 +424,44 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       setTracking((current) => (current === null ? current : { ...current, distance_m: result.distance_m }));
     },
   });
+  const currentLocation = useCurrentLocation();
+  const stopCurrentLocation = currentLocation.stop;
+
+  useEffect(() => {
+    if (lifecycle !== "planned") stopCurrentLocation();
+  }, [lifecycle, stopCurrentLocation]);
+
+  const positionForMap = lifecycle === "planned"
+    ? currentLocation.position
+    : isOngoing
+      ? liveTracking.position ?? currentLocation.position
+      : null;
+  const livePosition = positionForMap
+    ? {
+        lat: positionForMap.lat,
+        lng: positionForMap.lng,
+        accuracy: positionForMap.accuracy,
+        heading: positionForMap.heading,
+        speed: positionForMap.speed,
+      }
+    : null;
+  const nextStopItem = useMemo(() => {
+    const backendNextId = tracking?.next_stop?.id;
+    const backendNext = backendNextId == null ? null : items.find((item) => item.id === backendNextId);
+    if (backendNext && backendNext.status !== "done" && backendNext.status !== "skipped") return backendNext;
+    return [...items]
+      .filter((item) => item.status === "planned" || item.status === "arrived")
+      .sort((a, b) => a.day_number - b.day_number || a.order - b.order)[0] ?? null;
+  }, [items, tracking]);
+
+  const roadRoutes = usePlannedRoutes(items, true);
+  const liveRoute = useLiveRoute(
+    livePosition ? { lat: livePosition.lat, lng: livePosition.lng } : null,
+    nextStopItem?.latitude != null && nextStopItem.longitude != null
+      ? { lat: Number(nextStopItem.latitude), lng: Number(nextStopItem.longitude) }
+      : null,
+    lifecycle === "active" && livePosition !== null && nextStopItem !== null,
+  );
 
   useEffect(() => {
     itemsRef.current = items;
@@ -881,6 +922,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     setLifecycleBusy(true);
     setLifecycleError(null);
     try {
+      const ageMs = currentLocation.position ? Date.now() - Date.parse(currentLocation.position.recordedAt) : Infinity;
+      const fix = ageMs <= 30_000 ? currentLocation.position : await currentLocation.requestOnce();
+      if (!fix) {
+        setLifecycleBusy(false);
+        return;
+      }
+      setFollowMap(true);
       const result = await startTrip(itineraryId, itinerary.version);
       applyItinerary(result.itinerary);
       setTracking(result.tracking);
@@ -899,6 +947,47 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     } finally {
       setLifecycleBusy(false);
     }
+  };
+
+  const handleStartWithoutLocation = async () => {
+    if (!itinerary || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      const result = await startTrip(itineraryId, itinerary.version);
+      applyItinerary(result.itinerary);
+      setTracking(result.tracking);
+      setStartOpen(false);
+      if (addOpen) handleCloseAdd();
+      if (isGroup) void groupTracking.refresh();
+      showToast("Trip started without location. You can try My location any time.");
+    } catch (error) {
+      const stale = apiConflict(error);
+      if (stale) {
+        setStartOpen(false);
+        setConflict(stale);
+      } else {
+        setLifecycleError(apiError(error));
+      }
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleMyLocation = () => {
+    if (lifecycle === "active" && trackingEnabled && liveTracking.permission === "denied") {
+      liveTracking.retryLocation();
+      showToast("Retrying location access. Check this site's browser permission if it stays off.");
+      return;
+    }
+    if (!livePosition) {
+      if (lifecycle === "planned") currentLocation.start();
+      else showToast("Waiting for the trip GPS fix. Check location permissions and retry.");
+      return;
+    }
+    setFollowMap((following) => !following);
+    focusNonceRef.current += 1;
+    setFocus({ point: [livePosition.lat, livePosition.lng], nonce: focusNonceRef.current });
   };
 
   const handlePauseTrip = async () => {
@@ -969,7 +1058,8 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       setFinished({ skipped });
       setSummaryDismissed(false);
       if (isGroup) void groupTracking.refresh();
-      showToast("Trip finished. Your route is saved.");
+      showToast("Trip finished. Opening your recap...");
+      navigate(`/app/trips/${itineraryId}/recap`);
     } catch (error) {
       const stale = apiConflict(error);
       if (stale) {
@@ -1348,20 +1438,43 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       </div>
     </div>
   ) : null;
+  const plannedIslandFallback = roadRoutes.routes.some((route) => {
+    if (route.reason !== "no_road_route") return false;
+    const dayItems = groups.find((group) => group.day === route.day)?.items ?? [];
+    return dayItems.some((item, index) => index > 0 && (haversineMeters(dayItems[index - 1], item) ?? 0) >= 30_000);
+  });
+  const panelNotice = notice || plannedIslandFallback ? (
+    <div className="space-y-2">
+      {notice}
+      {plannedIslandFallback ? (
+        <p role="status" className="rounded-xl bg-mango-400/15 px-3 py-2 text-xs text-ink-800">
+          This stop needs a ferry or boat. Showing a straight line.
+        </p>
+      ) : null}
+    </div>
+  ) : null;
 
-  const livePosition = isOngoing && liveTracking.position
-    ? {
-        lat: liveTracking.position.lat,
-        lng: liveTracking.position.lng,
-        accuracy: liveTracking.position.accuracy,
-      }
+  const nextStopPoint: [number, number] | null = nextStopItem?.latitude != null && nextStopItem.longitude != null
+    ? [Number(nextStopItem.latitude), Number(nextStopItem.longitude)]
     : null;
-  const nextStopPoint: [number, number] | null =
-    lifecycle === "active" &&
-    tracking?.next_stop?.latitude != null &&
-    tracking.next_stop.longitude != null
-      ? [Number(tracking.next_stop.latitude), Number(tracking.next_stop.longitude)]
-      : null;
+  const liveDistance = livePosition && nextStopItem
+    ? haversineMeters(
+        { latitude: livePosition.lat, longitude: livePosition.lng },
+        { latitude: nextStopItem.latitude, longitude: nextStopItem.longitude },
+      )
+    : null;
+  const routeNeedsRetry = liveRoute.error !== null || liveRoute.route?.reason === "provider_unavailable" || liveRoute.route?.reason === "rate_limited";
+  const islandRouteHint = liveRoute.route?.reason === "no_road_route" && liveDistance !== null && liveDistance >= 30_000
+    ? "This stop needs a ferry or boat. Showing a straight line."
+    : null;
+  const locationStatus = livePosition === null
+    ? null
+    : livePosition.accuracy == null
+      ? "GPS: unavailable"
+      : livePosition.accuracy > 200
+        ? "Weak GPS signal"
+        : `GPS: ${livePosition.accuracy <= 30 ? "good" : "fair"}`;
+
   const remainingStops = items.filter((item) => item.status === "planned" || item.status === "arrived");
   const visitedCount = items.filter((item) => item.status === "done").length;
   const skippedCount = items.filter((item) => item.status === "skipped").length;
@@ -1403,15 +1516,75 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           onAddDestination={addDestinationStop}
           insets={mapInsets}
           fitKey={`${itinerary.version ?? 0}-${items.length}`}
+          fitLiveKey={livePosition ? itineraryId : 0}
           bottomInset={isMobile ? bottomSheetHeight : 0}
           rightInset={zoomRightInset}
           livePosition={livePosition}
           traveledPath={isOngoing ? liveTracking.traveled : []}
           nextStopPoint={nextStopPoint}
-          following={isOngoing && followMap}
+          liveRoute={liveRoute.route}
+          plannedRoutes={roadRoutes.routes}
+          following={Boolean(livePosition) && followMap}
+          onManualPan={() => setFollowMap(false)}
           partyMembers={groupSharing ? partyMembers : []}
           meetup={groupTracking.state?.meetup ?? null}
         />
+
+        {livePosition && lifecycle !== "active" && lifecycle !== "paused" ? (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-[920] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl bg-white/95 px-4 py-2.5 text-xs text-lagoon-900 shadow-lg ring-1 ring-line/70 backdrop-blur" style={{ marginLeft: isMobile ? 0 : legendOffset }}>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+              <span className="font-semibold">Your current location</span>
+              <span>{nextStopItem ? `Next: ${nextStopItem.title}` : "No stops remaining"}</span>
+              {locationStatus ? <span className="text-ink-600">{locationStatus}</span> : null}
+              {lifecycle === "planned" && currentLocation.error !== null ? (
+                <span className="text-ink-600">Last updated {new Date(positionForMap?.recordedAt ?? "").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+              ) : null}
+            </div>
+          </div>
+        ) : !livePosition && lifecycle !== "active" && currentLocation.status === "locating" ? (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-[920] flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-medium text-lagoon-900 shadow-lg ring-1 ring-line/70">
+            <Spinner className="h-4 w-4" /> Finding your location...
+          </div>
+        ) : null}
+
+        {currentLocation.error && lifecycle === "planned" ? (
+          <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-[920] w-[min(92vw,420px)] -translate-x-1/2 rounded-xl bg-white/95 px-3 py-2 text-center text-xs text-amber-800 shadow ring-1 ring-amber-200">
+            {currentLocation.error}
+          </div>
+        ) : null}
+
+        {lifecycle === "active" && liveTracking.permission === "denied" ? (
+          <div className="absolute left-1/2 top-[4.25rem] z-[930] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs text-amber-900 shadow ring-1 ring-amber-200">
+            <span>Location permission is off. Enable it in site settings.</span>
+            <button type="button" onClick={liveTracking.retryLocation} className="font-bold text-sea-700 underline">Retry</button>
+          </div>
+        ) : null}
+
+        {livePosition && !followMap ? (
+          <button
+            type="button"
+            onClick={() => {
+              focusNonceRef.current += 1;
+              setFocus({ point: [livePosition.lat, livePosition.lng], nonce: focusNonceRef.current });
+              setFollowMap(true);
+            }}
+            className="absolute left-1/2 top-[4.25rem] z-[930] -translate-x-1/2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-sea-700 shadow ring-1 ring-line/70"
+          >
+            Recenter
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={handleMyLocation}
+          aria-label={followMap && livePosition ? "Stop following your location" : "Show my location"}
+          title={followMap && livePosition ? "Following your location" : "My location"}
+          className="absolute z-[930] flex h-12 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-sea-700 shadow-xl ring-1 ring-line/70 transition hover:bg-sand-50"
+          style={isMobile ? { right: 16, bottom: bottomSheetHeight + 18 } : { right: Math.max(16, rightMapInset + 10), bottom: 20 }}
+        >
+          <CrosshairIcon className="h-5 w-5" />
+          {followMap && livePosition ? "Following" : "My location"}
+        </button>
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[880] flex items-start justify-between gap-2 p-3 sm:p-4">
           <div className="pointer-events-auto flex flex-col items-start gap-2">
@@ -1527,7 +1700,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             flashItemId={flashItemId}
             scrollRequest={scrollRequest}
             lifecycle={lifecycle}
-            nextStopId={tracking?.next_stop?.id ?? null}
+            nextStopId={nextStopItem?.id ?? null}
             livePosition={livePosition}
             markingItemId={markingItemId}
             startBusy={lifecycleBusy}
@@ -1545,7 +1718,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             onOpenShare={() => setShareOpen(true)}
             onExportError={setItemError}
             itemError={itemError}
-            notice={notice}
+            notice={panelNotice}
             party={
               isGroup ? (
                 <GroupPartyPanel
@@ -1645,6 +1818,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                 }
               : null
           }
+          routeDistanceM={liveRoute.route?.distance_m ?? null}
+          routeDurationS={liveRoute.route?.duration_s ?? null}
+          routeApproximate={liveRoute.route?.approximate ?? false}
+          routeLoading={liveRoute.loading}
+          routeHint={islandRouteHint}
+          routeRetry={routeNeedsRetry ? liveRoute.retry : null}
+          locationStatus={locationStatus}
           onToggleFollow={() => setFollowMap((value) => !value)}
           onPause={() => void handlePauseTrip()}
           onResume={() => void handleResumeTrip()}
@@ -1738,9 +1918,12 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         itinerary={itinerary}
         stopCount={items.length}
         busy={lifecycleBusy}
+        locating={currentLocation.status === "locating"}
+        locationError={currentLocation.error}
         error={lifecycleError}
         onClose={() => setStartOpen(false)}
         onConfirm={() => void handleStartTrip()}
+        onStartWithoutLocation={() => void handleStartWithoutLocation()}
       />
 
       <TripPauseSheet

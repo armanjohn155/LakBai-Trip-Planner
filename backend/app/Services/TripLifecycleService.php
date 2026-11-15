@@ -126,9 +126,13 @@ class TripLifecycleService
         $now = Carbon::now();
 
         DB::transaction(function () use ($itinerary, $actor, $now) {
+            /*
+             * A paused trip pauses every traveller's session, not just the one
+             * who pressed the button, so the party list reports "paused" for
+             * the whole group instead of showing stale "active" rows.
+             */
             TrackingSession::query()
                 ->whereBelongsTo($itinerary)
-                ->whereBelongsTo($actor)
                 ->where('status', TrackingSession::STATUS_ACTIVE)
                 ->update(['status' => TrackingSession::STATUS_PAUSED]);
 
@@ -169,7 +173,6 @@ class TripLifecycleService
         DB::transaction(function () use ($itinerary, $actor, $pausedFor) {
             TrackingSession::query()
                 ->whereBelongsTo($itinerary)
-                ->whereBelongsTo($actor)
                 ->where('status', TrackingSession::STATUS_PAUSED)
                 ->update(['status' => TrackingSession::STATUS_ACTIVE]);
 
@@ -520,6 +523,10 @@ class TripLifecycleService
             'item_id' => $item->id,
             'visit_id' => $visit?->id,
         ]);
+
+        if ($this->group->isGroup($itinerary)) {
+            $this->group->memberArrived($itinerary, $item, $actor, $now);
+        }
 
         return [
             'ok' => true,

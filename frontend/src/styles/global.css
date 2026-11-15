@@ -303,6 +303,54 @@
 }
 
 /* Keep Leaflet's bottom controls clear of the floating trip sheet. */
+.trip-live-marker {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.trip-live-marker__pulse,
+.trip-live-marker__dot {
+  position: absolute;
+  inset: 5px;
+  border-radius: 9999px;
+}
+
+.trip-live-marker__pulse {
+  background: rgb(14 165 233 / 0.25);
+  box-shadow: 0 0 0 5px rgb(14 165 233 / 0.13), 0 0 20px 8px rgb(14 165 233 / 0.55);
+  animation: trip-location-pulse 1.8s ease-out infinite;
+}
+
+.trip-live-marker__dot {
+  inset: 10px;
+  border: 3px solid white;
+  background: #0284c7;
+  box-shadow: 0 2px 8px rgb(3 105 161 / 0.55);
+}
+
+.trip-live-marker__arrow {
+  position: absolute;
+  inset: 1px;
+  display: grid;
+  place-items: center;
+  color: #0369a1;
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 3px white, 0 0 5px white;
+  transform-origin: center;
+}
+
+@keyframes trip-location-pulse {
+  0% { transform: scale(0.78); opacity: 0.85; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-live-marker__pulse { animation: none; opacity: 0.45; }
+}
+
 .trip-map-canvas .leaflet-bottom {
   bottom: var(--trip-map-bottom, 0px);
 }
@@ -488,12 +536,14 @@
 }
 
 .trip-member-marker__dot {
+  position: relative;
   display: flex;
   height: 32px;
   width: 32px;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
+  overflow: hidden;
   background: var(--member-color, #0284c7);
   border: 2px solid #ffffff;
   box-shadow: 0 4px 12px rgb(7 31 37 / 0.35);
@@ -504,6 +554,15 @@
   transition:
     opacity 160ms ease,
     filter 160ms ease;
+}
+
+.trip-member-marker__avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 9999px;
 }
 
 .trip-member-marker__label,

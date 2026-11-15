@@ -62,7 +62,7 @@ class GroupTrackingService
      * Store the latest position, broadcast it at most once per interval and
      * flip presence to online on the first fresh ping.
      *
-     * @param  array{lat: float, lng: float, accuracy_m?: int|null, recorded_at: string}  $position
+     * @param  array{lat: float, lng: float, accuracy_m?: int|null, heading?: int|null, speed?: float|null, recorded_at: string}  $position
      */
     public function recordMemberPosition(
         Itinerary $itinerary,
@@ -86,6 +86,12 @@ class GroupTrackingService
             'lat' => (float) $position['lat'],
             'lng' => (float) $position['lng'],
             'accuracy_m' => isset($position['accuracy_m']) ? (int) $position['accuracy_m'] : null,
+            'heading' => isset($position['heading']) && is_numeric($position['heading'])
+                ? (int) round((float) $position['heading'])
+                : null,
+            'speed' => isset($position['speed']) && is_numeric($position['speed'])
+                ? round((float) $position['speed'], 1)
+                : null,
             'recorded_at' => $position['recorded_at'],
         ];
 
@@ -98,15 +104,17 @@ class GroupTrackingService
 
         $broadcastKey = $this->broadcastKey($itinerary->id, $member->id);
 
-        if ($this->cache()->has($broadcastKey)) {
-            return;
-        }
-
-        $this->cache()->put(
+        /*
+         * `add()` is atomic on every cache store, unlike has()+put(), so two
+         * concurrent pings from the same traveller cannot both broadcast.
+         */
+        if (! $this->cache()->add(
             $broadcastKey,
             true,
             max(1, (int) config('lakbai.tracking.group_broadcast_seconds', 5)),
-        );
+        )) {
+            return;
+        }
 
         MemberLocationUpdated::dispatch(
             $itinerary,
@@ -115,6 +123,8 @@ class GroupTrackingService
             $payload['lng'],
             $payload['accuracy_m'],
             $payload['recorded_at'],
+            $payload['heading'],
+            $payload['speed'],
         );
     }
 
@@ -126,7 +136,7 @@ class GroupTrackingService
     public function state(Itinerary $itinerary, User $viewer, ?Carbon $now = null): array
     {
         $now ??= Carbon::now();
-        $itinerary->loadMissing(['user', 'members']);
+        $itinerary->loadMissing(['user', 'members', 'items.destination']);
 
         $owner = $itinerary->user;
         $accepted = $itinerary->members
@@ -145,22 +155,63 @@ class GroupTrackingService
             ->get()
             ->keyBy('user_id');
 
+        $allSessions = TrackingSession::query()
+            ->whereBelongsTo($itinerary)
+            ->latest('started_at')
+            ->get()
+            ->groupBy('user_id');
+
         $viewerSharing = ($itinerary->lifecycle_status ?? null) === Itinerary::LIFECYCLE_ACTIVE
             && $sessions->has($viewer->id);
 
         $onlineSeconds = max(1, (int) config('lakbai.tracking.group_online_seconds', 60));
 
-        $members = $people->map(function (User $person) use ($itinerary, $sessions, $viewer, $viewerSharing, $now, $onlineSeconds) {
+        $nextStop = $itinerary->items
+            ->whereIn('status', ['planned', 'arrived'])
+            ->sortBy([['day_number', 'asc'], ['order', 'asc']])
+            ->first();
+        $nextCoords = $nextStop?->resolvedCoordinates();
+
+        $members = $people->map(function (User $person) use ($itinerary, $sessions, $allSessions, $viewer, $viewerSharing, $now, $onlineSeconds, $nextCoords) {
             $session = $sessions->get($person->id);
+            $userSession = $allSessions->get($person->id)?->first();
             $sharing = $session instanceof TrackingSession;
             $position = $sharing ? $this->cache()->get($this->positionKey($itinerary->id, $person->id)) : null;
             $position = is_array($position) ? $position : null;
+
+            // The viewer already receives this same latest point in `me` as a
+            // session fallback. Keep the roster row consistent if the short
+            // lived position cache has expired while the active session remains.
+            if ($position === null
+                && $person->id === $viewer->id
+                && $viewerSharing
+                && $session instanceof TrackingSession
+                && $session->last_lat !== null
+                && $session->last_lng !== null
+                && $session->last_point_at !== null) {
+                $position = [
+                    'lat' => (float) $session->last_lat,
+                    'lng' => (float) $session->last_lng,
+                    'accuracy_m' => $session->last_accuracy_m,
+                    'recorded_at' => $session->last_point_at->toIso8601String(),
+                ];
+            }
 
             $online = $position !== null
                 && $this->ageSeconds($position['recorded_at'] ?? null, $now) <= $onlineSeconds;
 
             $arrival = $this->cache()->get($this->arrivalKey($itinerary->id, $person->id));
             $arrival = is_array($arrival) ? $arrival : null;
+
+            $distanceToNext = null;
+            if ($viewerSharing && $position !== null && $nextCoords !== null) {
+                $distanceToNext = (int) round($this->haversineMeters(
+                    (float) $position['lat'],
+                    (float) $position['lng'],
+                    (float) $nextCoords[0],
+                    (float) $nextCoords[1],
+                ));
+            }
 
             return [
                 'user_id' => (int) $person->id,
@@ -169,8 +220,10 @@ class GroupTrackingService
                 'role' => $itinerary->roleFor($person),
                 'is_me' => (int) $person->id === (int) $viewer->id,
                 'sharing' => $sharing,
+                'session_status' => $userSession?->status,
                 'online' => $viewerSharing ? $online : null,
                 'last_seen_at' => $viewerSharing && $position !== null ? $position['recorded_at'] : null,
+                'distance_to_next_stop_m' => $distanceToNext,
                 'position' => $viewerSharing ? $position : null,
                 'arrived_stop' => $viewerSharing && $arrival !== null ? [
                     'id' => (int) ($arrival['item_id'] ?? 0),
@@ -200,6 +253,10 @@ class GroupTrackingService
             'lifecycle_status' => $itinerary->lifecycle_status ?? Itinerary::LIFECYCLE_PLANNED,
             'group' => true,
             'poll_seconds' => max(1, (int) config('lakbai.tracking.group_poll_seconds', 10)),
+            'next_stop' => $nextStop !== null ? [
+                'id' => (int) $nextStop->id,
+                'title' => $nextStop->resolvedTitle(),
+            ] : null,
             'me' => [
                 'user_id' => (int) $viewer->id,
                 'role' => $itinerary->roleFor($viewer),
@@ -248,6 +305,7 @@ class GroupTrackingService
                     'user_id' => $actor->id,
                     'status' => TrackingSession::STATUS_ACTIVE,
                     'shared_with_group' => true,
+                    'ever_shared_with_group' => true,
                     'started_at' => $now,
                     'distance_m' => 0,
                 ]);
@@ -255,6 +313,7 @@ class GroupTrackingService
                 $session->forceFill([
                     'status' => TrackingSession::STATUS_ACTIVE,
                     'shared_with_group' => true,
+                    'ever_shared_with_group' => true,
                     'ended_at' => null,
                 ])->save();
             }
@@ -593,6 +652,26 @@ class GroupTrackingService
     private function arrivalNotifyKey(int $itineraryId): string
     {
         return "lakbai.tracking.group.{$itineraryId}.arrival.notify";
+    }
+
+    public function haversineMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadiusM = 6_371_000.0;
+
+        $latFrom = deg2rad($lat1);
+        $lngFrom = deg2rad($lng1);
+        $latTo = deg2rad($lat2);
+        $lngTo = deg2rad($lng2);
+
+        $latDelta = $latTo - $latFrom;
+        $lngDelta = $lngTo - $lngFrom;
+
+        $angle = 2 * asin(sqrt(
+            sin($latDelta / 2) ** 2 +
+            cos($latFrom) * cos($latTo) * (sin($lngDelta / 2) ** 2)
+        ));
+
+        return $angle * $earthRadiusM;
     }
 
     private function cache(): CacheRepository

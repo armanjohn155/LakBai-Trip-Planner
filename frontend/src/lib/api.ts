@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, GroupTrackingMeetup, GroupTrackingState, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, Review, ReviewReportReason, TrackingBatchResult, TrackingPointPayload, TripTrackingSummary, TripTransitionResult, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
+import type { AuthPayload, Destination, ExportFormat, FriendCode, Friendship, FriendUser, GroupTrackingMeetup, GroupTrackingState, InvitePreview, Itinerary, ItineraryActivity, ItineraryChanges, ItineraryInvite, ItineraryItem, ItineraryItemStatus, ItineraryMember, ItineraryRouteEstimate, ItineraryTemplate, Paginated, PendingInvite, PublicTripRecap, RecapShareLink, Review, ReviewReportReason, RouteGeometryResponse, RouteProfile, TrackingBatchResult, TrackingPointPayload, TripPhoto, TripPhotoPayload, TripRecap, TripRecapPayload, TripTrackingSummary, TripTransitionResult, User, UserSettings, Visit, VisitStats, VisitedMapPlace } from "@/lib/types";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
@@ -280,6 +280,19 @@ export const getItinerarySummary = async (id: number) => {
 
 export const getItineraryRouteEstimates = async (id: number) => {
   const { data } = await api.get<{ data: ItineraryRouteEstimate }>(`/itineraries/${id}/route-estimates`);
+  return data.data;
+};
+
+export const getRoadRoute = async (
+  waypoints: { lat: number; lng: number }[],
+  profile: RouteProfile = "driving",
+  signal?: AbortSignal,
+) => {
+  const { data } = await api.post<{ data: RouteGeometryResponse }>(
+    "/routes",
+    { waypoints, profile },
+    { signal },
+  );
   return data.data;
 };
 
@@ -758,4 +771,94 @@ export const getInvitePreview = async (token: string) => {
 export const acceptInvite = async (token: string) => {
   const { data } = await api.post<{ data: { itinerary_id: number }; message: string }>(`/invites/${token}/accept`);
   return data;
+};
+
+/* ── Completed-trip recaps ─────────────────────────────────────────────── */
+
+export const getTripRecap = async (itineraryId: number) => {
+  const { data } = await api.get<{ data: TripRecap }>(`/itineraries/${itineraryId}/recap`);
+  return data.data;
+};
+
+export const updateTripRecap = async (itineraryId: number, payload: TripRecapPayload) => {
+  const { data } = await api.put<{ data: TripRecap }>(`/itineraries/${itineraryId}/recap`, payload);
+  return data.data;
+};
+
+export const getTripPhotos = async (itineraryId: number) => {
+  const { data } = await api.get<{ data: TripPhoto[] }>(`/itineraries/${itineraryId}/photos`);
+  return data.data;
+};
+
+export const uploadTripPhoto = async (
+  itineraryId: number,
+  file: File,
+  extra: { caption?: string | null; itinerary_item_id?: number | null; taken_at?: string | null } = {},
+  onProgress?: (percent: number) => void,
+) => {
+  const form = new FormData();
+  form.append("photo", file);
+  if (extra.caption) form.append("caption", extra.caption);
+  if (extra.itinerary_item_id !== undefined && extra.itinerary_item_id !== null) {
+    form.append("itinerary_item_id", String(extra.itinerary_item_id));
+  }
+  if (extra.taken_at) form.append("taken_at", extra.taken_at);
+
+  const { data } = await api.post<{ data: TripPhoto }>(`/itineraries/${itineraryId}/photos`, form, {
+    onUploadProgress: (event) => {
+      if (!onProgress) return;
+      const total = event.total ?? event.bytes ?? 0;
+      if (total > 0) onProgress(Math.round((event.loaded / total) * 100));
+    },
+  });
+
+  return data.data;
+};
+
+export const updateTripPhoto = async (itineraryId: number, photoId: number, payload: TripPhotoPayload) => {
+  const { data } = await api.put<{ data: TripPhoto }>(`/itineraries/${itineraryId}/photos/${photoId}`, payload);
+  return data.data;
+};
+
+export const reorderTripPhotos = async (itineraryId: number, photos: number[]) => {
+  const { data } = await api.put<{ data: TripPhoto[] }>(`/itineraries/${itineraryId}/photos/reorder`, { photos });
+  return data.data;
+};
+
+export const deleteTripPhoto = async (itineraryId: number, photoId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/photos/${photoId}`);
+};
+
+export const createRecapShareLink = async (itineraryId: number, expiresInDays?: number | null) => {
+  const { data } = await api.post<{ data: RecapShareLink }>(`/itineraries/${itineraryId}/recap/share-link`, {
+    expires_in_days: expiresInDays ?? null,
+  });
+  return data.data;
+};
+
+export const revokeRecapShareLink = async (itineraryId: number) => {
+  await api.delete(`/itineraries/${itineraryId}/recap/share-link`);
+};
+
+export const getSharedRecap = async (token: string) => {
+  const { data } = await api.get<{ data: PublicTripRecap }>(`/shared/recaps/${encodeURIComponent(token)}`);
+  return data.data;
+};
+
+/** Download the server-rendered recap PDF using the existing Dompdf exporter. */
+export const downloadRecapExport = async (itineraryId: number, fallbackName: string) => {
+  const response = await api.get(`/itineraries/${itineraryId}/recap/export`, { responseType: "blob" });
+
+  const disposition = (response.headers["content-disposition"] as string | undefined) ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  const filename = match ? decodeURIComponent(match[1]) : `${fallbackName}-recap.pdf`;
+
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };

@@ -82,7 +82,7 @@ export function StopRow({
   const image = item.destination?.image_url ?? null;
   const radiusM = item.destination?.radius_m ?? 150;
   const distanceM =
-    ongoing && livePosition
+    livePosition
       ? haversineMeters(
           { latitude: livePosition.lat, longitude: livePosition.lng },
           { latitude: item.latitude, longitude: item.longitude },
@@ -188,7 +188,7 @@ export function StopRow({
                   <Badge tone="neutral">Skipped</Badge>
                 ) : isArrived ? (
                   <Badge tone="surf">Arrived</Badge>
-                ) : isNext && ongoing ? (
+                ) : isNext && (ongoing || livePosition !== null) ? (
                   <Badge tone="sea">Up next</Badge>
                 ) : null}
               </span>

@@ -18,6 +18,8 @@ interface MemberLocationPayload {
   lat: number;
   lng: number;
   accuracy_m: number | null;
+  heading?: number | null;
+  speed?: number | null;
   recorded_at: string;
 }
 
@@ -71,6 +73,8 @@ function positionFromEvent(event: MemberLocationPayload): TrackingPosition {
     lat: event.lat,
     lng: event.lng,
     accuracy_m: event.accuracy_m,
+    heading: event.heading,
+    speed: event.speed,
     recorded_at: event.recorded_at,
   };
 }
@@ -82,6 +86,7 @@ function clearMemberVisibility(member: GroupTrackingMember): GroupTrackingMember
     position: null,
     online: null,
     last_seen_at: null,
+    distance_to_next_stop_m: null,
     arrived_stop: null,
   };
 }

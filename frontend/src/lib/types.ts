@@ -195,10 +195,24 @@ export interface ItineraryRouteEstimate {
   days: Array<{ day_number: number; legs: ItineraryRouteLeg[] }>;
 }
 
+export type RouteProfile = "driving" | "motorcycle" | "walking" | "cycling";
+
+export interface RouteGeometryResponse {
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+  distance_m: number;
+  duration_s: number;
+  legs: { distance_m: number; duration_s: number }[];
+  provider: string;
+  approximate: boolean;
+  reason?: "no_road_route" | "provider_unavailable" | "rate_limited";
+}
+
 export interface TrackingPosition {
   lat: number;
   lng: number;
   accuracy_m?: number | null;
+  heading?: number | null;
+  speed?: number | null;
   recorded_at?: string | null;
 }
 
@@ -235,8 +249,10 @@ export interface GroupTrackingMember {
   role: TripRole | null;
   is_me: boolean;
   sharing: boolean;
+  session_status?: "active" | "paused" | "ended" | null;
   online: boolean | null;
   last_seen_at: string | null;
+  distance_to_next_stop_m?: number | null;
   position: TrackingPosition | null;
   arrived_stop: { id: number; title: string; at: string | null } | null;
 }
@@ -256,6 +272,7 @@ export interface GroupTrackingState {
   lifecycle_status: TripLifecycleStatus;
   group: true;
   poll_seconds: number;
+  next_stop?: { id: number; title: string } | null;
   me: {
     user_id: number;
     role: TripRole | null;
@@ -272,6 +289,7 @@ export interface TrackingPointPayload {
   lng: number;
   accuracy: number | null;
   speed?: number | null;
+  heading?: number | null;
   recorded_at: string;
 }
 
@@ -502,4 +520,163 @@ export interface Paginated<T> {
     per_page: number;
     total: number;
   };
+}
+
+/* ── Completed-trip recaps ─────────────────────────────────────────────── */
+
+export type RecapVisibility = "private" | "members" | "link" | "public";
+export type RecapAccent = "surf" | "mango" | "magenta" | "sea" | "royal";
+
+/** A photo as returned by the recap and photo endpoints. */
+export interface TripPhoto {
+  id: number;
+  url: string;
+  thumbnail_url: string;
+  caption: string | null;
+  taken_at: string | null;
+  itinerary_item_id: number | null;
+  position: number;
+  is_hidden: boolean;
+  /** Only present on member payloads. */
+  user?: { id: number; name: string | null };
+  itinerary_id?: number;
+  user_id?: number;
+}
+
+export interface RecapStats {
+  distance_m: number | null;
+  moving_seconds: number | null;
+  elapsed_seconds: number | null;
+  days: number | null;
+  stops_total: number | null;
+  stops_visited: number | null;
+  stops_skipped: number | null;
+  verified_visits: number | null;
+  average_speed_kmh: number | null;
+  travellers?: number | null;
+  /** Owner/editor only; null for viewers without budget sharing. */
+  spend_planned?: number | null;
+  spend_estimated?: number | null;
+}
+
+export interface RecapRouteFeature {
+  type: "Feature";
+  properties: { day: number; sequence: number; point_count: number };
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+}
+
+export interface RecapRoute {
+  type: "FeatureCollection";
+  features: RecapRouteFeature[];
+}
+
+/**
+ * Stops share one shape. Member payloads add private fields (notes,
+ * destination id, verification) while the public payload simply omits them.
+ */
+export interface RecapStop {
+  id: number;
+  day_number: number;
+  order: number;
+  title: string;
+  category: string | null;
+  municipality: string | null;
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: ItineraryItemStatus;
+  photo_ids: number[];
+  destination_id?: number | null;
+  start_time?: string | null;
+  arrived_at?: string | null;
+  completed_at?: string | null;
+  verified?: boolean;
+  notes?: string | null;
+}
+
+export interface RecapMember {
+  id: number;
+  name: string;
+  username: string | null;
+  avatar_url: string | null;
+  role: TripRole;
+}
+
+export interface RecapShareState {
+  active: boolean;
+  has_link: boolean;
+  expires_at: string | null;
+  /** Raw links are never stored, so this is always null on reads. */
+  url: string | null;
+}
+
+export interface TripRecap {
+  id: number;
+  itinerary_id: number;
+  title: string;
+  summary: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  day_count: number;
+  lifecycle_status: TripLifecycleStatus;
+  completed_at: string | null;
+  cover_photo_id: number | null;
+  cover_photo: TripPhoto | null;
+  visibility: RecapVisibility;
+  hide_endpoints: boolean;
+  show_stats: boolean;
+  show_photos: boolean;
+  theme_accent: RecapAccent;
+  stats: RecapStats | null;
+  route: RecapRoute;
+  stops: RecapStop[];
+  photos: TripPhoto[];
+  members: RecapMember[];
+  member_count: number;
+  share: RecapShareState;
+  permissions: {
+    can_edit: boolean;
+    can_upload_photos: boolean;
+  };
+}
+
+/** Strict whitelist returned by `/api/shared/recaps/{token}`. */
+export interface PublicTripRecap {
+  title: string;
+  summary: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  day_count: number;
+  theme_accent: RecapAccent;
+  hide_endpoints: boolean;
+  cover_photo: TripPhoto | null;
+  stats: RecapStats | null;
+  route: RecapRoute;
+  stops: RecapStop[];
+  photos: TripPhoto[];
+}
+
+export interface TripRecapPayload {
+  title?: string;
+  summary?: string | null;
+  visibility?: RecapVisibility;
+  hide_endpoints?: boolean;
+  show_stats?: boolean;
+  show_photos?: boolean;
+  theme_accent?: RecapAccent;
+  cover_photo_id?: number | null;
+}
+
+export interface TripPhotoPayload {
+  caption?: string | null;
+  taken_at?: string | null;
+  itinerary_item_id?: number | null;
+  is_hidden?: boolean;
+}
+
+export interface RecapShareLink {
+  token: string;
+  url: string;
+  expires_at: string | null;
+  visibility: RecapVisibility;
 }

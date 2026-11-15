@@ -25,6 +25,13 @@ export const createPinIcon = (active = false): L.DivIcon =>
 export const defaultPin = createPinIcon(false);
 export const activePin = createPinIcon(true);
 
+export const nextStopPin = L.divIcon({
+  className: "trip-next-stop-pin",
+  html: '<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M15 1C7.8 1 2 6.9 2 14.7 2 25.4 15 37 15 37s13-11.6 13-22.3C28 6.9 22.2 1 15 1z" fill="#0284c7" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/><circle cx="15" cy="14" r="2" fill="#0369a1"/></svg>',
+  iconSize: [30, 38],
+  iconAnchor: [15, 36],
+});
+
 const dayColors = ["#2fb8a6", "#f6b01e", "#6d5efc", "#ef5da8", "#3f8efc", "#22c55e", "#f97316", "#14b8a6"];
 
 /** A fixed colour per day number so day polylines and markers match. */
@@ -75,17 +82,24 @@ const initials = (name: string): string => {
 interface MemberPinOptions {
   name: string;
   color: string;
+  avatarUrl?: string | null;
   stale?: boolean;
 }
 
-/** Initials bubble for a sharing traveller; fades when their ping is stale. */
-export const createMemberPin = ({ name, color, stale = false }: MemberPinOptions): L.DivIcon =>
-  L.divIcon({
+/** Initials bubble or avatar for a sharing traveller; fades when their ping is stale. */
+export const createMemberPin = ({ name, color, avatarUrl, stale = false }: MemberPinOptions): L.DivIcon => {
+  const memberInitials = escapeHtml(initials(name));
+  const inner = avatarUrl
+    ? `<span aria-hidden="true">${memberInitials}</span><img src="${escapeHtml(avatarUrl)}" alt="" class="trip-member-marker__avatar" />`
+    : memberInitials;
+
+  return L.divIcon({
     className: `trip-member-marker${stale ? " is-stale" : ""}`,
-    html: `<span class="trip-member-marker__dot" style="--member-color:${color}">${escapeHtml(initials(name))}</span><span class="trip-member-marker__label">${escapeHtml(name)}</span>`,
+    html: `<span class="trip-member-marker__dot" style="--member-color:${color}">${inner}</span><span class="trip-member-marker__label">${escapeHtml(name)}</span>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
+};
 
 /** Temporary "meet here" pin. */
 export const meetupPin = L.divIcon({

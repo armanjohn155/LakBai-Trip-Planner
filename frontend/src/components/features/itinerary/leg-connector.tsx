@@ -25,6 +25,7 @@ export function LegConnector({ from, to, leg, estimatesEnabled, loading = false 
   const hasEstimate = estimatesEnabled && leg?.duration_s != null;
   const distance = hasEstimate ? leg.distance_m : straightLine;
   const minutes = hasEstimate ? Math.max(1, Math.round((leg.duration_s ?? 0) / 60)) : approximateDriveMinutes(straightLine);
+  const approximate = !hasEstimate || leg?.source === "haversine";
 
   if (distance === null && minutes === null) return null;
 
@@ -39,7 +40,7 @@ export function LegConnector({ from, to, leg, estimatesEnabled, loading = false 
         {distanceLabel ? <span className="font-semibold text-ink-600">{distanceLabel}</span> : null}
         {distanceLabel && minutes !== null ? " · " : null}
         {minutes !== null ? `~${minutes} min drive` : null}
-        {!hasEstimate ? <span className="ml-1 text-ink-500">approx.</span> : null}
+        {approximate ? <span className="ml-1 text-ink-500">approx.</span> : null}
       </span>
     </div>
   );

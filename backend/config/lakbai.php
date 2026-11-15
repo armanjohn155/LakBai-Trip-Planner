@@ -53,10 +53,14 @@ return [
     |
     */
     'routing' => [
-        'enabled' => env('LAKBAI_ROUTE_ESTIMATES', false),
+        'enabled' => env('LAKBAI_ROUTE_ESTIMATES', true),
+        'provider' => env('ROUTING_PROVIDER', 'osrm'),
         'osrm_url' => env('LAKBAI_OSRM_URL', 'https://router.project-osrm.org'),
         'timeout' => env('LAKBAI_OSRM_TIMEOUT', 4),
         'cache_ttl' => env('LAKBAI_ROUTE_CACHE_TTL', 86400),
+        'ors_api_key' => env('ORS_API_KEY'),
+        'circuit_breaker_seconds' => (int) env('LAKBAI_ROUTE_BREAKER_SECONDS', 60),
+        'simplify_tolerance_m' => (float) env('LAKBAI_ROUTE_SIMPLIFY_TOLERANCE_M', 5),
         // Assumed average driving speed used for Haversine fallbacks (km/h).
         'fallback_speed_kmh' => env('LAKBAI_ROUTE_FALLBACK_SPEED_KMH', 30),
     ],
@@ -196,5 +200,41 @@ return [
         // Cache store for group positions. Null uses the app default (database),
         // set to "redis" when a Redis cache is available.
         'group_cache_store' => env('LAKBAI_TRACKING_GROUP_CACHE_STORE'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trip Recaps
+    |--------------------------------------------------------------------------
+    |
+    | A completed trip gets a shareable recap. Raw tracking points are
+    | simplified before they are stored, and public links never expose the
+    | exact first/last metres of a route unless the owner turns that off.
+    |
+    */
+    'recap' => [
+        // Photos are capped per traveller per trip.
+        'max_photos_per_user' => (int) env('LAKBAI_RECAP_MAX_PHOTOS_PER_USER', 20),
+        'max_photo_kb' => (int) env('LAKBAI_RECAP_MAX_PHOTO_KB', 5120),
+        // Longest edge of the generated thumbnail, in pixels.
+        'thumbnail_max_px' => (int) env('LAKBAI_RECAP_THUMBNAIL_MAX_PX', 480),
+        // Longest edge kept for the full-size re-encoded photo.
+        'max_image_px' => (int) env('LAKBAI_RECAP_MAX_IMAGE_PX', 2400),
+        // Route simplification tolerance (Ramer-Douglas-Peucker, metres).
+        'simplify_tolerance_m' => (float) env('LAKBAI_RECAP_SIMPLIFY_TOLERANCE_M', 15),
+        // How much of each route end a public link trims when endpoints are hidden.
+        'privacy_radius_m' => (float) env('LAKBAI_RECAP_PRIVACY_RADIUS_M', 300),
+        // Default and maximum share-link lifetimes in days.
+        'share_days' => (int) env('LAKBAI_RECAP_SHARE_DAYS', 30),
+        'max_share_days' => (int) env('LAKBAI_RECAP_MAX_SHARE_DAYS', 365),
+        // API throttles (attempts, minutes).
+        'share_throttle' => env('LAKBAI_RECAP_SHARE_THROTTLE', '10,1'),
+        'upload_throttle' => env('LAKBAI_RECAP_UPLOAD_THROTTLE', '30,1'),
+        'public_throttle' => env('LAKBAI_RECAP_PUBLIC_THROTTLE', '30,1'),
+        'meta_throttle' => env('LAKBAI_RECAP_META_THROTTLE', '60,1'),
+        // Base URL for the server-rendered Open Graph page and share links.
+        'public_base_url' => rtrim(env('LAKBAI_PUBLIC_BASE_URL', env('APP_URL', 'http://localhost')), '/'),
+        // Where the Open Graph page sends real browsers (the SPA route /s/{token}).
+        'app_url' => rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/'),
     ],
 ];

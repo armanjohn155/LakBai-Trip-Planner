@@ -10,11 +10,14 @@ interface TripStartDialogProps {
   stopCount: number;
   busy?: boolean;
   error?: string | null;
+  locating?: boolean;
+  locationError?: string | null;
+  onStartWithoutLocation?: () => void;
   onClose: () => void;
   onConfirm: () => void;
 }
 
-export function TripStartDialog({ open, itinerary, stopCount, busy = false, error, onClose, onConfirm }: TripStartDialogProps) {
+export function TripStartDialog({ open, itinerary, stopCount, busy = false, error, locating = false, locationError, onStartWithoutLocation, onClose, onConfirm }: TripStartDialogProps) {
   const dateRange = formatTripDateRange(itinerary.start_date, itinerary.end_date);
 
   return (
@@ -31,7 +34,7 @@ export function TripStartDialog({ open, itinerary, stopCount, busy = false, erro
             Not yet
           </Button>
           <Button onClick={onConfirm} disabled={busy || stopCount === 0}>
-            {busy ? "Starting..." : "Start trip"}
+            {locating ? "Finding your location..." : busy ? "Starting..." : locationError ? "Try location again" : "Start trip"}
           </Button>
         </>
       }
@@ -57,10 +60,22 @@ export function TripStartDialog({ open, itinerary, stopCount, busy = false, erro
         <div className="flex gap-2 rounded-xl bg-sea-500/5 px-3 py-2.5 text-xs text-ink-700 ring-1 ring-inset ring-sea-500/15">
           <ShieldIcon className="mt-0.5 h-4 w-4 shrink-0 text-sea-600" />
           <p>
-            Your device shares precise location only while this trip is active. The track is private to you and
-            stops uploading as soon as you pause or finish. Keep this tab open for reliable GPS updates.
+            Your location is used on this screen while the trip is active. Active trip points are saved to your private trip record
+            and stop uploading when you pause or finish. Keep this screen on; browsers may pause location when the screen locks.
           </p>
         </div>
+
+        {locationError ? (
+          <div className="space-y-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-900 ring-1 ring-inset ring-amber-200">
+            <p>{locationError}</p>
+            <p>If permission was denied, allow location for this site in your browser settings. You can still start without it.</p>
+            {onStartWithoutLocation ? (
+              <Button size="sm" variant="secondary" onClick={onStartWithoutLocation} disabled={busy}>
+                Start without location
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {stopCount === 0 ? (
           <p className="rounded-xl bg-mango-400/15 px-3 py-2 text-xs text-ink-800">
