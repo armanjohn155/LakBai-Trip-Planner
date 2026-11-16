@@ -82,25 +82,31 @@ export function DestinationShowcase() {
   const [bantayan, moalboal, kawasan, sirao, magellans, temple, osmena] = SHOWCASE_DESTINATIONS;
 
   return (
-    <section aria-labelledby="destination-showcase-heading" className="py-14 sm:py-20">
+    <section aria-labelledby="destination-showcase-heading" className="py-9 sm:py-20">
       <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
-        <header className="mx-auto mb-8 max-w-2xl text-center sm:mb-10">
+        <header className="mb-6 max-w-2xl sm:mx-auto sm:mb-10 sm:text-center">
           <h2
             id="destination-showcase-heading"
             className="font-display text-2xl font-bold tracking-tight text-lagoon-900 sm:text-3xl lg:text-4xl"
           >
             Explore places to visit around Cebu
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-ink-600 sm:text-base">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-600 sm:mx-auto sm:mt-3 sm:text-base">
             From island shores and waterfalls to city landmarks and mountain views, find a stop for your next trip.
           </p>
         </header>
 
         <div className="space-y-4 lg:space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-            <DestinationCard destination={bantayan} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
-            <DestinationCard destination={moalboal} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
-            <DestinationCard destination={kawasan} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 lg:gap-5">
+            <div className="w-[78vw] max-w-[22rem] shrink-0 snap-start sm:w-auto sm:max-w-none">
+              <DestinationCard destination={bantayan} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
+            </div>
+            <div className="w-[78vw] max-w-[22rem] shrink-0 snap-start sm:w-auto sm:max-w-none">
+              <DestinationCard destination={moalboal} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
+            </div>
+            <div className="w-[78vw] max-w-[22rem] shrink-0 snap-start sm:w-auto sm:max-w-none">
+              <DestinationCard destination={kawasan} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />
+            </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_2fr] lg:gap-5">
             <DestinationCard destination={sirao} heightClass="h-[220px] sm:h-[280px] lg:h-[360px] xl:h-[420px]" />

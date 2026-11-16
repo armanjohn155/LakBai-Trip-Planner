@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router";
 
 import { Footer } from "@/components/common/footer";
 import { Header } from "@/components/common/header";
+import { MobileBottomNav } from "@/components/features/home/mobile-bottom-nav";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function AppLayout() {
@@ -30,6 +31,8 @@ export default function AppLayout() {
         <Outlet />
       </main>
       {isPlanner ? null : <Footer />}
+      {/* Bottom navigation: all logged-in pages except landing page (/app routes are never landing) */}
+      <MobileBottomNav />
     </div>
   );
 }

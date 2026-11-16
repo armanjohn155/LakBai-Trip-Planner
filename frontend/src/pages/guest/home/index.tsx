@@ -7,13 +7,17 @@ import { DestinationsMapPanel } from "@/components/features/home/destinations-ma
 import { DestinationShowcase } from "@/components/features/home/destination-showcase";
 import { FeatureSection } from "@/components/features/home/feature-section";
 import { FeatureHighlights } from "@/components/features/home/feature-highlights";
-import { LakbaiFeatures } from "@/components/features/home/lakbai-features";
+import { ForYouRecommendations } from "@/components/features/home/for-you-recommendations";
 import { HomepageBannerSection } from "@/components/features/home/homepage-banner-section";
+import { LakbaiFeatures } from "@/components/features/home/lakbai-features";
+import { MobileHomeTopSection } from "@/components/features/home/mobile-home-top-section";
+import { NearByYou } from "@/components/features/home/near-by-you";
 import { ProfileSection } from "@/components/features/home/profile-section";
+import { TrendingDestinations } from "@/components/features/home/trending-destinations";
 import { InlineError } from "@/components/ui/feedback";
 import { Section } from "@/components/common/section";
 import { getDestinations, getItineraries, apiError } from "@/lib/api";
-import type { Destination, DestinationFilters, Itinerary } from "@/lib/types";
+import type { Destination, DestinationFilters } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 
 const EMPTY_FILTERS: DestinationFilters = { category: "", region: "", search: "", min_price: "", max_price: "" };
@@ -29,7 +33,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tripCount, setTripCount] = useState(0);
-  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +43,6 @@ export default function HomePage() {
       .then(([page, trips]) => {
         if (cancelled) return;
         setDestinations(page.data);
-        setItineraries(trips);
         setTripCount(trips.length);
       })
       .catch((err) => {
@@ -74,11 +76,6 @@ export default function HomePage() {
     [destinations],
   );
 
-  const recentItineraries = useMemo(
-    () => [...itineraries].sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? ""))),
-    [itineraries],
-  );
-
   const scrollToMap = useCallback(() => {
     document.getElementById("destinations-map")?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -108,48 +105,91 @@ export default function HomePage() {
   }
 
   return (
-    <>
-      <HomepageBannerSection
-        destinations={destinations}
-        loggedIn={Boolean(user)}
-        itineraries={recentItineraries}
-        onBrowse={scrollToDestination}
-        onBuildTrip={buildTrip}
-      />
+    <div className="flex flex-col pb-[calc(90px+env(safe-area-inset-bottom))] md:pb-0">
+      {/* Hero banner: visible for both logged-in and logged-out users */}
+      <div className="order-1">
+        <HomepageBannerSection
+          destinations={destinations}
+          loggedIn={Boolean(user)}
+          itineraries={[]}
+          onBrowse={scrollToDestination}
+          onBuildTrip={buildTrip}
+        />
+      </div>
 
       {error ? (
-        <Section>
-          <InlineError message={error} />
-        </Section>
+        <div className="order-2">
+          <Section>
+            <InlineError message={error} />
+          </Section>
+        </div>
       ) : null}
 
-      <DestinationsMapPanel
-        destinations={destinations}
-        selected={selected}
-        onSelect={setSelected}
-        loggedIn={Boolean(user)}
-        onAddToTrip={(destination) => navigate("/app/trips", { state: { addDestinationId: destination.id } })}
-        onSignUp={() => navigate("/register")}
-      />
+      {/* Mobile-only top section + personalized sections: logged-in only */}
+      {user ? (
+        <>
+          <div className="md:hidden">
+            <MobileHomeTopSection
+              user={user}
+              onProfilePress={() => navigate("/app/profile")}
+              onNotificationsPress={() => navigate("/app/notifications")}
+            />
+          </div>
 
-      <FeatureSection />
+          <div className="order-3 md:hidden">
+            <TrendingDestinations
+              destinations={destinations}
+              onSelect={handleSelect}
+              sectionTitle="Trending destinations"
+            />
+          </div>
 
-      <LakbaiFeatures />
+          <div className="order-4 md:hidden">
+            <ForYouRecommendations
+              destinations={destinations}
+              onSelect={handleSelect}
+              sectionTitle="For you"
+            />
+          </div>
 
-      <FeatureHighlights />
+          <div className="order-5 md:hidden">
+            <NearByYou
+              destinations={destinations}
+              onSelect={handleSelect}
+              sectionTitle="Near by you"
+            />
+          </div>
+        </>
+      ) : null}
 
-      <DestinationShowcase />
+      <div className="order-6 md:order-8">
+        <CardDataSection
+          destinations={visible}
+          total={destinations.length}
+          categories={categories}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onSelect={handleSelect}
+        />
+      </div>
 
-      <CardDataSection
-        destinations={visible}
-        total={destinations.length}
-        categories={categories}
-        filters={filters}
-        onFiltersChange={setFilters}
-        onSelect={handleSelect}
-      />
+      <div className="order-7 md:order-7"><DestinationShowcase /></div>
 
-      <ProfileSection loggedIn={Boolean(user)} tripCount={tripCount} onAction={buildTrip} />
-    </>
+      <div className="order-8 md:order-3">
+        <DestinationsMapPanel
+          destinations={destinations}
+          selected={selected}
+          onSelect={setSelected}
+          loggedIn={Boolean(user)}
+          onAddToTrip={(destination) => navigate("/app/trips", { state: { addDestinationId: destination.id } })}
+          onSignUp={() => navigate("/register")}
+        />
+      </div>
+
+      <div className="order-9 md:order-6"><FeatureHighlights /></div>
+      <div className="order-10 md:order-4"><FeatureSection /></div>
+      <div className="order-11 md:order-5"><LakbaiFeatures /></div>
+      <div className="order-12"><ProfileSection loggedIn={Boolean(user)} tripCount={tripCount} onAction={buildTrip} /></div>
+    </div>
   );
 }

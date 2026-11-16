@@ -44,6 +44,10 @@ Route::get('/destinations/{destination}', [DestinationController::class, 'show']
 // Public review listing; auth (when present) unlocks "can" flags and admin visibility.
 Route::get('/destinations/{destination}/reviews', [ReviewController::class, 'index']);
 
+// Road geometry contains no user-specific data and is used by the public map.
+Route::post('/routes', [RouteController::class, 'store'])
+    ->middleware('throttle:30,1,trip-routes');
+
 // Public trip recap. Token-gated, rate-limited, and safe to open without auth.
 Route::get('/shared/recaps/{token}', [SharedRecapController::class, 'show'])
     ->middleware('throttle:'.config('lakbai.recap.public_throttle', '30,1').',shared-recap');
@@ -57,9 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/settings', [ProfileController::class, 'settings']);
     Route::put('/user/settings', [ProfileController::class, 'updateSettings']);
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::post('/routes', [RouteController::class, 'store'])
-        ->middleware('throttle:30,1,trip-routes');
-
     // Friends
     Route::middleware('throttle:'.config('lakbai.friends.read_throttle', '60,1').',friend-read')->group(function () {
         Route::get('/friends', [FriendController::class, 'index']);

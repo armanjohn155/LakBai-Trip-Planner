@@ -67,12 +67,12 @@ class RouteApiTest extends TestCase
             ->assertJsonPath('data.reason', 'provider_unavailable');
     }
 
-    public function test_route_endpoint_requires_auth_and_validates_waypoints(): void
+    public function test_route_endpoint_is_public_and_validates_waypoints(): void
     {
+        Http::fake(['router.project-osrm.org/*' => Http::response(['code' => 'NoRoute'])]);
         $payload = ['waypoints' => [['lat' => 10, 'lng' => 123], ['lat' => 11, 'lng' => 124]]];
-        $this->postJson('/api/routes', $payload)->assertUnauthorized();
+        $this->postJson('/api/routes', $payload)->assertOk();
 
-        Sanctum::actingAs(User::factory()->create());
         $this->postJson('/api/routes', ['waypoints' => [
             ['lat' => 91, 'lng' => 123], ['lat' => 10, 'lng' => 124],
         ]])->assertUnprocessable();

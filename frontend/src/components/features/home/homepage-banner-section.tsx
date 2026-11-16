@@ -61,7 +61,7 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
 
   return (
     <>
-    <section className="relative overflow-hidden  text-sand-50">
+    <section className="relative min-h-[calc(100svh-3.5rem)] overflow-hidden text-sand-50 sm:min-h-0">
       <video
         className="absolute inset-0 h-full w-full object-cover"
         autoPlay={!prefersReducedMotion}
@@ -76,27 +76,28 @@ export function HomepageBannerSection({ destinations, loggedIn, itineraries, onB
       </video>
       <div className="absolute inset-0 bg-gradient-to-tr from-royal-950 via-royal-950/20 to-royal-700/20" aria-hidden="true" />
 
-      <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
-        <p className="text-surf-300">LAKBAI — Cebu on one map</p>
-        <h1 className="mt-3 max-w-3xl font-brand text-4xl leading-[1.05] sm:text-6xl">
+      <div className="relative mx-auto flex min-h-[calc(100svh-3.5rem)] max-w-6xl flex-col items-center px-5 pb-6 pt-12 text-center sm:block sm:min-h-0 sm:px-6 sm:py-28 sm:text-left">
+        <p className="text-sm font-semibold tracking-wide text-surf-300 sm:text-base">LAKBAI — Cebu on one map</p>
+        <h1 className="mt-4 max-w-[12ch] font-brand text-[2.1rem] font-semibold leading-[1.05] sm:mt-3 sm:max-w-3xl sm:text-6xl">
           MANGLAKAW TA BAI!
         </h1>
-        <p className="mt-5 max-w-xl text-base leading-relaxed text-sand-50/75 sm:text-lg">
+        <p className="mt-4 max-w-sm text-sm leading-relaxed text-sand-50/85 sm:mt-5 sm:max-w-xl sm:text-lg">
           Curated spots across Metro Cebu, North, and South — pinned with the estimated cost, so your trip plans itself
           around a budget you can see.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Button variant="primary" size="lg" onClick={onBuildTrip}>
-            Build a trip
+        <div className="mt-auto flex w-full flex-col gap-3 pt-10 sm:mt-8 sm:w-auto sm:flex-row sm:flex-wrap sm:pt-0">
+          <Button variant="primary" size="lg" className="min-h-14 w-full text-base sm:min-h-0 sm:w-auto" onClick={onBuildTrip}>
+            <span className="sm:hidden">Get started</span>
+            <span className="hidden sm:inline">Build a trip</span>
           </Button>
-          <Button variant="ghost" size="lg" className="ring-1 ring-inset ring-white/40 hover:bg-white/15" onClick={onBrowse}>
+          <Button variant="ghost" size="lg" className="w-full ring-1 ring-inset ring-white/40 hover:bg-white/15 sm:w-auto" onClick={onBrowse}>
             Browse destinations
           </Button>
         </div>
 
         {!loggedIn ? (
-          <dl className="mt-12 flex gap-8 border-t border-white/20 pt-6 sm:mt-16">
+          <dl className="mt-12 hidden gap-8 border-t border-white/20 pt-6 sm:mt-16 sm:flex">
             <Stat value={stats.spots} label={stats.spots === 1 ? "curated spot" : "curated spots"} />
             <Stat value={stats.categories} label={stats.categories === 1 ? "category" : "categories"} />
             <Stat value={stats.regions} label={stats.regions === 1 ? "region" : "regions"} />

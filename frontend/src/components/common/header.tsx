@@ -66,8 +66,8 @@ export function Header() {
       isActive ? "text-lagoon-900" : "text-ink-700",
     );
 
-  const renderCenterLink = (link: CenterLink, onNavigate?: () => void) => (
-    <NavLink key={link.label} to={link.to} end={link.exact} onClick={onNavigate} className={navItemClass}>
+  const renderCenterLink = (link: CenterLink, onNavigate?: () => void, mobileClassName = "") => (
+    <NavLink key={link.label} to={link.to} end={link.exact} onClick={onNavigate} className={(state) => cn(navItemClass(state), mobileClassName)}>
       {({ isActive }) => (
         <>
           {link.label}
@@ -84,17 +84,18 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2" onClick={closeMenu}>
-
-          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-20 w-35" />
-           
-
+      <div className="mx-auto grid h-14 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-0 px-3 sm:flex sm:h-16 sm:gap-3 sm:px-6">
+        <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2" onClick={closeMenu}>
+          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-8 w-auto max-w-[5rem] object-contain sm:h-12 sm:max-w-none md:h-20 md:w-35" />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">{centerLinks.map((link) => renderCenterLink(link))}</nav>
+        <nav className="flex justify-center md:hidden" aria-label="Current page">
+          {renderCenterLink(centerLinks[0], undefined, "px-2")}
+        </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Main navigation">{centerLinks.map((link) => renderCenterLink(link))}</nav>
+
+        <div className="flex items-center justify-end gap-0 sm:ml-auto sm:gap-2 md:ml-0">
           {user ? (
             <div className="flex items-center gap-1">
               <NotificationBell />
@@ -102,7 +103,7 @@ export function Header() {
             </div>
           ) : (
             <>
-              <Link to="/login" className="rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink-900">
+              <Link to="/login" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink-900 sm:inline-flex">
                 Sign in
               </Link>
               <Link to="/register" className="hidden rounded-full bg-sand-100 px-4 py-2 text-sm font-semibold text-lagoon-900 transition-colors hover:bg-sand-200 sm:inline">
@@ -114,11 +115,11 @@ export function Header() {
           <button
             type="button"
             onClick={planTrip}
-            className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300 sm:px-4"
+            aria-label="Plan trip"
+            className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-2.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300 sm:px-4"
           >
             <PinIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Plan Trip</span>
-            <span className="sm:hidden">Plan</span>
           </button>
 
           <button
@@ -138,9 +139,10 @@ export function Header() {
           <nav className="flex flex-col gap-1">
             {centerLinks.map((link) => renderCenterLink(link, closeMenu))}
             {!user ? (
-              <Link to="/register" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">
-                Create account
-              </Link>
+              <>
+                <Link to="/login" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">Sign in</Link>
+                <Link to="/register" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">Create account</Link>
+              </>
             ) : null}
           </nav>
         </div>

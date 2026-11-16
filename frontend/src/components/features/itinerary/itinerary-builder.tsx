@@ -448,9 +448,11 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const nextStopItem = useMemo(() => {
     const backendNextId = tracking?.next_stop?.id;
     const backendNext = backendNextId == null ? null : items.find((item) => item.id === backendNextId);
-    if (backendNext && backendNext.status !== "done" && backendNext.status !== "skipped") return backendNext;
+    // Navigation advances as soon as GPS records arrival; visit completion
+    // remains a separate confirmation in the arrival prompt.
+    if (backendNext?.status === "planned") return backendNext;
     return [...items]
-      .filter((item) => item.status === "planned" || item.status === "arrived")
+      .filter((item) => item.status === "planned")
       .sort((a, b) => a.day_number - b.day_number || a.order - b.order)[0] ?? null;
   }, [items, tracking]);
 

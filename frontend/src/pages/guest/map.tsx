@@ -12,22 +12,168 @@ import { TransportList } from "@/components/features/destination-detail/transpor
 import { TipsList } from "@/components/features/destination-detail/tips-list";
 import { categoryTone, destinationLocation, RatingLine } from "@/components/features/destinations/destination-explorer-card";
 import { TripChooser } from "@/components/features/destinations/trip-chooser";
-import { CheckIcon, HeartIcon, PinIcon, PlusIcon, ShareIcon, XIcon } from "@/components/icons";
+import { CheckIcon, CrosshairIcon, HeartIcon, PinIcon, PlusIcon, ShareIcon, XIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InlineError, Spinner } from "@/components/ui/feedback";
 import { useAddToTrip } from "@/hooks/use-add-to-trip";
 import { useAuth } from "@/hooks/use-auth";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useCurrentLocation } from "@/hooks/use-current-location";
+import { requestRoute, useLiveRoute, type RouteWaypoint } from "@/hooks/use-route";
 import { apiError, getDestinations } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import type { Destination, Itinerary } from "@/lib/types";
+import type { Destination, Itinerary, RouteGeometryResponse } from "@/lib/types";
+
+const SOUTH_CEBU_STOPS = [
+  { name: "Cebu City", lat: 10.3157, lng: 123.8854 },
+  { name: "Moalboal", lat: 9.95, lng: 123.3833 },
+  { name: "Kawasan Falls, Badian", lat: 9.8019444, lng: 123.3738889 },
+] satisfies { name: string; lat: number; lng: number }[];
+
+function formatRouteDistance(meters: number): string {
+  return `${(meters / 1000).toFixed(meters >= 100_000 ? 0 : 1)} km`;
+}
+
+function formatRouteDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return hours > 0 ? `${hours} hr${hours === 1 ? "" : "s"}${remainingMinutes ? ` ${remainingMinutes} min` : ""}` : `${minutes} min`;
+}
+
+function RouteMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-sky-50 px-2.5 py-2 text-center ring-1 ring-inset ring-sky-100">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{label}</p>
+      <p className="mt-0.5 text-xs font-bold text-sky-950">{value}</p>
+    </div>
+  );
+}
+
+function SouthCebuRouteCard({
+  route,
+  routeLoading,
+  routeError,
+  liveRoute,
+  liveRouteLoading,
+  liveRouteError,
+  livePosition,
+  gpsStatus,
+  gpsError,
+  onStartGps,
+  onStopGps,
+  targetIndex,
+  onTargetChange,
+  onRetryRoute,
+}: {
+  route: RouteGeometryResponse | null;
+  routeLoading: boolean;
+  routeError: string | null;
+  liveRoute: RouteGeometryResponse | null;
+  liveRouteLoading: boolean;
+  liveRouteError: string | null;
+  livePosition: { lat: number; lng: number; accuracy: number | null } | null;
+  gpsStatus: string;
+  gpsError: string | null;
+  onStartGps: () => void;
+  onStopGps: () => void;
+  targetIndex: number;
+  onTargetChange: (value: string) => void;
+  onRetryRoute: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute left-3 top-[4.25rem] z-[1000] max-h-[calc(100%-5rem)] w-[min(92%,20rem)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md sm:left-4 sm:top-[4.5rem] sm:w-80">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">South Cebu road trip</p>
+          <h2 className="mt-0.5 text-sm font-bold text-lagoon-950">Cebu City → Kawasan Falls</h2>
+        </div>
+        <span className="rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold text-ink-600">Road route</span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {SOUTH_CEBU_STOPS.slice(0, -1).map((stop, index) => {
+          const leg = route?.legs[index];
+          return (
+            <div key={stop.name} className="rounded-xl border border-line/80 bg-white px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 truncate text-[11px] font-semibold text-ink-900">
+                  {stop.name} <span className="font-normal text-ink-500">to {SOUTH_CEBU_STOPS[index + 1].name.split(",")[0]}</span>
+                </p>
+                {leg ? <span className="shrink-0 text-[10px] text-ink-500">Leg {index + 1}</span> : null}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <RouteMetric label="Distance" value={leg ? formatRouteDistance(leg.distance_m) : routeLoading ? "Routing…" : "—"} />
+                <RouteMetric label="Est. time" value={leg ? formatRouteDuration(leg.duration_s) : routeLoading ? "Routing…" : "—"} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {route?.approximate ? (
+        <p className="mt-2 text-[10px] leading-relaxed text-amber-800">Approximate fallback estimate; road routing is unavailable right now.</p>
+      ) : null}
+      {routeError ? <p className="mt-2 text-xs text-rose-700">Could not load the road route: {routeError}</p> : null}
+
+      <div className="pointer-events-auto mt-3 border-t border-line pt-3">
+        <label htmlFor="live-route-target" className="block text-[11px] font-semibold text-ink-700">Navigate to</label>
+        <div className="mt-1.5 flex gap-2">
+          <select
+            id="live-route-target"
+            value={targetIndex}
+            onChange={(event) => onTargetChange(event.target.value)}
+            className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 text-xs font-medium text-ink-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
+          >
+            <option value={1}>Moalboal</option>
+            <option value={2}>Kawasan Falls, Badian</option>
+          </select>
+          <button
+            type="button"
+            onClick={gpsStatus === "active" ? onStopGps : onStartGps}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 text-xs font-semibold text-white transition-colors hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2"
+          >
+            <GpsIcon />
+            {gpsStatus === "active" ? "Stop GPS" : gpsStatus === "locating" ? "Locating…" : "Start GPS"}
+          </button>
+        </div>
+        {gpsError ? <p className="mt-1.5 text-[11px] leading-relaxed text-rose-700">{gpsError}</p> : null}
+        {gpsStatus === "active" && livePosition ? (
+          <div className="mt-2 rounded-xl bg-sky-50 px-3 py-2 ring-1 ring-inset ring-sky-100">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">Remaining to {SOUTH_CEBU_STOPS[targetIndex].name.split(",")[0]}</p>
+            <p className="mt-0.5 text-xs font-bold text-sky-950">
+              {liveRouteLoading ? "Updating route…" : liveRoute ? `${formatRouteDistance(liveRoute.distance_m)} · ${formatRouteDuration(liveRoute.duration_s)}` : "Finding road route…"}
+            </p>
+            {liveRouteError ? (
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-[10px] text-rose-700">Could not update route.</p>
+                <button type="button" onClick={onRetryRoute} className="text-[10px] font-semibold text-sky-800 underline">Retry</button>
+              </div>
+            ) : null}
+            {liveRoute?.approximate ? <p className="mt-1 text-[10px] text-amber-800">Approximate route estimate.</p> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function GpsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+    </svg>
+  );
+}
 
 export default function MapPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { isFavorited, toggle: toggleFavorite } = useFavorites();
+  const currentLocation = useCurrentLocation();
   const { trips, tripsLoading, busyTripId, creating, error: chooserError, toast, addToTrip, createAndAdd, resetError } = useAddToTrip();
 
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -38,6 +184,10 @@ export default function MapPage() {
   const [query, setQuery] = useState("");
   const [showChooser, setShowChooser] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [southRoute, setSouthRoute] = useState<RouteGeometryResponse | null>(null);
+  const [southRouteLoading, setSouthRouteLoading] = useState(true);
+  const [southRouteError, setSouthRouteError] = useState<string | null>(null);
+  const [routeTargetIndex, setRouteTargetIndex] = useState(2);
 
   const panelScrollRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +229,28 @@ export default function MapPage() {
   }, [destinations, paramId]);
 
   const loggedIn = Boolean(user);
+  const routeTarget: RouteWaypoint = SOUTH_CEBU_STOPS[routeTargetIndex];
+  const liveRoute = useLiveRoute(
+    currentLocation.position ? { lat: currentLocation.position.lat, lng: currentLocation.position.lng } : null,
+    routeTarget,
+    currentLocation.status === "active",
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    requestRoute(SOUTH_CEBU_STOPS.map(({ lat, lng }) => ({ lat, lng })), "driving", controller.signal)
+      .then((route) => {
+        setSouthRoute(route);
+        setSouthRouteError(null);
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === "AbortError")) setSouthRouteError(apiError(err));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSouthRouteLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   const handleSelect = (destination: Destination) => {
     setSelected(destination);
@@ -254,14 +426,35 @@ export default function MapPage() {
                 </div>
               ) : (
                 <>
-                  <div className="h-[45dvh] overflow-hidden md:h-full">
+                  <div className="h-[45dvh] overflow-hidden md:h-full relative">
                     <CebuMap
                       destinations={destinations}
                       activeId={selected?.id ?? null}
                       focusId={focusId}
                       onSelect={handleSelect}
+                      route={southRoute}
+                      liveRoute={liveRoute.route}
+                      routeStops={SOUTH_CEBU_STOPS}
+                      livePosition={currentLocation.status === "active" ? currentLocation.position : null}
                       className="h-full w-full"
                     />
+                    <button
+                      type="button"
+                      onClick={() => currentLocation.start()}
+                      aria-label={currentLocation.status === "active" ? "Stop location tracking" : "Use my current location"}
+                      className={`absolute left-3 top-3 z-[600] flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-sand-50 ${currentLocation.status === "active" ? "text-lagoon-900 bg-lagoon-100" : "text-ink-600"}`}
+                    >
+                      {currentLocation.status === "active" ? (
+                        <PinIcon className="h-5 w-5" />
+                      ) : (
+                        <CrosshairIcon className="h-5 w-5" />
+                      )}
+                    </button>
+                    {currentLocation.error ? (
+                      <div className="absolute right-3 top-3 z-[600] rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 shadow-md ring-1 ring-inset ring-rose-100">
+                        {currentLocation.error}
+                      </div>
+                    ) : null}
                   </div>
                   <MapSearchOverlay
                     query={query}
@@ -269,6 +462,22 @@ export default function MapPage() {
                     matches={matches}
                     onSelect={handleSearchSelect}
                     total={destinations.length}
+                  />
+                  <SouthCebuRouteCard
+                    route={southRoute}
+                    routeLoading={southRouteLoading}
+                    routeError={southRouteError}
+                    liveRoute={liveRoute.route}
+                    liveRouteLoading={liveRoute.loading}
+                    liveRouteError={liveRoute.error}
+                    livePosition={currentLocation.position}
+                    gpsStatus={currentLocation.status}
+                    gpsError={currentLocation.error}
+                    onStartGps={currentLocation.start}
+                    onStopGps={currentLocation.stop}
+                    targetIndex={routeTargetIndex}
+                    onTargetChange={(value) => setRouteTargetIndex(Number(value))}
+                    onRetryRoute={liveRoute.retry}
                   />
                 </>
               )}
