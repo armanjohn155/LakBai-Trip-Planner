@@ -34,6 +34,11 @@ services:
     build:
       context: ./backend
     image: suroy/backend
+    # Read Google OAuth / frontend settings from the compose file's .env,
+    # so the values no longer depend on which folder you run compose from.
+    env_file:
+      - path: ./.env
+        required: false
     environment: *backend-environment
     ports:
       - "8000:8080"

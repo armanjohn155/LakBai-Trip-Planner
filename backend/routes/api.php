@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DestinationController;
 use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\FriendController;
+use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\GroupTrackingController;
 use App\Http\Controllers\Api\InviteLinkController;
 use App\Http\Controllers\Api\ItineraryActivityController;
@@ -37,6 +38,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Google OAuth 2.0
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 
 Route::get('/destinations', [DestinationController::class, 'index']);
 Route::get('/destinations/{destination}', [DestinationController::class, 'show']);

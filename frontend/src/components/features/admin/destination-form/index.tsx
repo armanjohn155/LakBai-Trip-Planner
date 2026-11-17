@@ -195,7 +195,7 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
             <div><h2 className="text-lg font-semibold text-lagoon-900">Quick info</h2><p className="text-sm text-ink-600">Entrance fee, duration, hours, cost</p></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input label="Entrance fee text" value={v.entrance_fee_text} onChange={(e) => setF("entrance_fee_text", e.target.value)} placeholder="₱2,500 (guided tour)" className="h-12" />
-              <Input label="Estimated cost (₱)" type="number" min={0} step="0.01" value={v.estimated_cost} onChange={(e) => setF("estimated_cost", e.target.value)} error={errs.estimated_cost} placeholder="500" className="h-12" />
+              <Input label="Estimated cost (₱)" type="text" value={v.estimated_cost} onChange={(e) => setF("estimated_cost", e.target.value)} error={errs.estimated_cost} placeholder="e.g., ₱500 or free" className="h-12" />
               <Input label="Visit duration" value={v.visit_duration} onChange={(e) => setF("visit_duration", e.target.value)} placeholder="4-6 hours" className="h-12" />
               <Input label="Best time to visit" value={v.best_time_to_visit} onChange={(e) => setF("best_time_to_visit", e.target.value)} error={errs.best_time_to_visit} placeholder="Early morning, dry season" className="h-12" />
               <OpeningHoursInput value={v.opening_hours} onChange={(next) => setF("opening_hours", next)} error={errs.opening_hours} />

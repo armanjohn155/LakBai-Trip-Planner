@@ -60,6 +60,7 @@ class Destination extends Model
         'Diving & Water Activities',
         'Nature & Eco-Tourism',
         'Islands',
+        'Cave',
     ];
 
     public const MUNICIPALITIES = [
@@ -96,7 +97,7 @@ class Destination extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'radius_m' => 'integer',
-            'estimated_cost' => 'decimal:2',
+            'estimated_cost' => 'string',
             'rating' => 'decimal:1',
             'review_count' => 'integer',
             'base_rating' => 'decimal:1',

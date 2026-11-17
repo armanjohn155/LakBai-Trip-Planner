@@ -18,6 +18,7 @@ import { FavoritesProvider } from "@/hooks/use-favorites";
 import InviteAcceptPage from "@/pages/invite/accept";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
+import GoogleCallbackPage from "@/pages/auth/google-callback";
 import AdminDestinationEditPage from "@/pages/dashboard/admin/destination-edit";
 import AdminDestinationNewPage from "@/pages/dashboard/admin/destination-new";
 import AdminDestinationsPage from "@/pages/dashboard/admin/destinations";
@@ -73,6 +74,7 @@ createRoot(document.getElementById("root")!).render(
 
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="auth/google/callback" element={<GoogleCallbackPage />} />
           <Route path="invite/:token" element={<InviteAcceptPage />} />
           <Route path="s/:token" element={<SharedRecapPage />} />
 

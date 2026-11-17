@@ -40,7 +40,7 @@ class UpdateDestinationRequest extends FormRequest
             'latitude' => ['sometimes', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'numeric', 'between:-180,180'],
             'radius_m' => ['sometimes', 'nullable', 'integer', 'between:30,2000'],
-            'estimated_cost' => ['sometimes', 'numeric', 'min:0'],
+            'estimated_cost' => ['sometimes', 'nullable', 'string', 'max:255'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'image_url' => ['sometimes', 'nullable', 'string', 'max:500'],
             'best_time_to_visit' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -81,6 +81,19 @@ class UpdateDestinationRequest extends FormRequest
         }
         if (! empty($sanitized)) {
             $this->merge($sanitized);
+        }
+
+        // The admin form posts array fields (highlights, how_to_get_there,
+        // travel_tips) as JSON strings via FormData. Decode them back to
+        // PHP arrays so the `array` validation rule passes.
+        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips'];
+        foreach ($arrayFields as $field) {
+            if ($this->has($field) && is_string($this->input($field))) {
+                $decoded = json_decode($this->input($field), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $this->merge([$field => $decoded]);
+                }
+            }
         }
     }
 }

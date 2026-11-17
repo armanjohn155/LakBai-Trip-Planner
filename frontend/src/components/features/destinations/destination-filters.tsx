@@ -33,6 +33,7 @@ const CATEGORIES = [
   "Diving & Water Activities",
   "Nature & Eco-Tourism",
   "Islands",
+  "Cave",
 ];
 
 const PRICE_TIERS: { value: PriceTier; label: string }[] = [

@@ -10,6 +10,7 @@ export const DESTINATION_CATEGORIES = [
   "Diving & Water Activities",
   "Nature & Eco-Tourism",
   "Islands",
+  "Cave",
 ];
 
 export const DESTINATION_REGIONS: Region[] = [

@@ -32,7 +32,7 @@ class StoreDestinationRequest extends FormRequest
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'radius_m' => ['nullable', 'integer', 'between:30,2000'],
-            'estimated_cost' => ['required', 'numeric', 'min:0'],
+            'estimated_cost' => ['required', 'string', 'max:255'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'image_url' => ['nullable', 'string', 'max:500'],
             'best_time_to_visit' => ['nullable', 'string', 'max:255'],
@@ -74,6 +74,19 @@ class StoreDestinationRequest extends FormRequest
         }
         if (! empty($sanitized)) {
             $this->merge($sanitized);
+        }
+
+        // The admin form posts array fields (highlights, how_to_get_there,
+        // travel_tips) as JSON strings via FormData. Decode them back to
+        // PHP arrays so the `array` validation rule passes.
+        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips'];
+        foreach ($arrayFields as $field) {
+            if ($this->has($field) && is_string($this->input($field))) {
+                $decoded = json_decode($this->input($field), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $this->merge([$field => $decoded]);
+                }
+            }
         }
     }
 }

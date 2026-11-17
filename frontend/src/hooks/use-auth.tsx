@@ -12,6 +12,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
   register: (name: string, email: string, password: string) => Promise<User>;
+  loginWithToken: (store: { user: User; token: string }) => void;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -63,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const loginWithToken = useCallback(
+    (store: { user: User; token: string }) => {
+      persist(store);
+    },
+    [persist],
+  );
+
   const register = useCallback(
     async (name: string, email: string, password: string) => {
       const payload = await apiRegister({ name, email, password, password_confirmation: password });
@@ -87,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(current);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, register, loginWithToken, logout, updateUser }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
