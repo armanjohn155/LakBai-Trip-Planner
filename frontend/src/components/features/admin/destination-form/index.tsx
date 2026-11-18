@@ -4,15 +4,17 @@ import { CoordinatePicker } from "@/components/features/admin/coordinate-picker"
 import { DestinationFormPreview } from "@/components/features/admin/destination-form-preview";
 import { GalleryUploader, type GalleryItem } from "@/components/features/admin/destination-form/GalleryUploader";
 import { OpeningHoursInput } from "@/components/features/admin/destination-form/OpeningHoursInput";
+import { OptionCombobox } from "@/components/features/admin/destination-form/OptionCombobox";
 import { RepeatableList } from "@/components/features/admin/destination-form/RepeatableList";
 import { TagInput } from "@/components/features/admin/destination-form/TagInput";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineError, Spinner } from "@/components/ui/feedback";
-import { FieldHint, Input, Select } from "@/components/ui/input";
+import { FieldHint, Input } from "@/components/ui/input";
 import { apiError, apiFieldErrors, createAdminDestination, updateAdminDestination } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { CEBU_BOUNDS, DESTINATION_CATEGORIES, DESTINATION_REGIONS, MUNICIPALITY_SUGGESTIONS } from "@/lib/destination-constants";
+import { CEBU_BOUNDS, MUNICIPALITY_SUGGESTIONS } from "@/lib/destination-constants";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { Destination } from "@/lib/types";
 
 interface V {
@@ -78,9 +80,49 @@ const from = (d?: Destination): V =>
 const ta =
   "min-h-28 w-full rounded-xl bg-white/70 px-4 py-3 text-base text-ink-900 ring-1 ring-inset ring-line placeholder:text-ink-600/50 focus:outline-none focus:ring-2 focus:ring-surf-400 backdrop-blur-sm";
 
+/**
+ * Error roots that already render their own inline message. Laravel reports
+ * nested fields as `images.0` or `how_to_get_there.1.route`, so anything whose
+ * root is not in this list has to be surfaced in the form-level summary or it
+ * would fail silently.
+ */
+const INLINE_ERROR_ROOTS = new Set([
+  "name",
+  "description",
+  "category",
+  "region",
+  "municipality",
+  "latitude",
+  "longitude",
+  "estimated_cost",
+  "best_time_to_visit",
+  "tips",
+  "opening_hours",
+  "highlights",
+  "how_to_get_there",
+  "travel_tips",
+  "images",
+  "gallery",
+]);
+
+/** First message for a field, including nested keys such as `images.0`. */
+const errorFor = (errors: Record<string, string>, root: string): string | undefined =>
+  errors[root] ?? Object.entries(errors).find(([key]) => key.startsWith(`${root}.`))?.[1];
+
+const summarizeUnmappedErrors = (errors: Record<string, string>): string | null => {
+  const messages = Object.entries(errors)
+    .filter(([key]) => !INLINE_ERROR_ROOTS.has(key.split(".")[0]))
+    .map(([, message]) => message);
+
+  if (messages.length === 0) return null;
+
+  return `Could not save: ${Array.from(new Set(messages)).join(" ")}`;
+};
+
 export function DestinationForm({ destination }: { destination?: Destination }) {
   const nav = useNavigate();
   const edit = Boolean(destination);
+  const { options } = useDestinationOptions();
   const [v, setV] = useState<V>(() => from(destination));
   const [items, setItems] = useState<GalleryItem[]>(() => {
     if (destination?.gallery && destination.gallery.length > 0) {
@@ -144,7 +186,14 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
     } catch (err) {
       const fe = apiFieldErrors(err);
       setErrs(fe);
-      if (Object.keys(fe).length === 0) setFerr(apiError(err));
+
+      if (Object.keys(fe).length === 0) {
+        setFerr(apiError(err));
+      } else {
+        // Every validation message must be visible: inline where a field owns
+        // it, otherwise in the form-level banner.
+        setFerr(summarizeUnmappedErrors(fe));
+      }
     } finally {
       setSaving(false);
     }
@@ -168,8 +217,28 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
               <p className="text-sm text-ink-600">Core details shown at the top</p>
             </div>
             <Input label="Name" name="name" value={v.name} onChange={(e) => setF("name", e.target.value)} error={errs.name} placeholder="Kawasan Falls" className="h-12" required />
-            <Select label="Category" name="category" value={v.category} onChange={(e) => setF("category", e.target.value)} error={errs.category} emptyLabel="Choose a category" options={DESTINATION_CATEGORIES.map((c) => ({ value: c, label: c }))} className="h-12" required />
-            <Select label="Region" name="region" value={v.region} onChange={(e) => setF("region", e.target.value)} error={errs.region} emptyLabel="Choose a region" options={DESTINATION_REGIONS.map((r) => ({ value: r, label: r }))} className="h-12" required />
+            <OptionCombobox
+              label="Category"
+              name="category"
+              kind="categories"
+              value={v.category}
+              onChange={(value) => setF("category", value)}
+              options={options?.categories ?? []}
+              placeholder="Choose a category"
+              error={errs.category}
+              required
+            />
+            <OptionCombobox
+              label="Region"
+              name="region"
+              kind="regions"
+              value={v.region}
+              onChange={(value) => setF("region", value)}
+              options={options?.regions ?? []}
+              placeholder="Choose a region"
+              error={errs.region}
+              required
+            />
             <div className="space-y-1.5">
               <Input label="Municipality" name="municipality" value={v.municipality} onChange={(e) => setF("municipality", e.target.value)} error={errs.municipality} placeholder="Badian" list="ms" className="h-12" />
               <datalist id="ms">{MUNICIPALITY_SUGGESTIONS.map((m) => (<option key={m} value={m} />))}</datalist>
@@ -178,7 +247,7 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
 
           <Card className="space-y-4 p-5 sm:p-6">
             <div><h2 className="text-lg font-semibold text-lagoon-900">Highlights</h2><p className="text-sm text-ink-600">Tag chips shown on the detail page</p></div>
-            <TagInput value={v.highlights} onChange={(tags) => setF("highlights", tags)} placeholder="Type and press Enter (e.g., Canyoneering)" max={12} maxLength={40} error={errs.highlights} />
+            <TagInput value={v.highlights} onChange={(tags) => setF("highlights", tags)} placeholder="Type and press Enter (e.g., Canyoneering)" max={12} maxLength={40} error={errorFor(errs, "highlights")} />
           </Card>
 
           <Card className="space-y-4 p-5 sm:p-6 md:col-span-2">
@@ -189,13 +258,27 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
             </div>
           </Card>
 
-          <Card className="space-y-4 p-5 sm:p-6 md:col-span-2"><GalleryUploader items={items} onChange={setItems} error={errs.images || errs.gallery} /></Card>
+          <Card className="space-y-4 p-5 sm:p-6 md:col-span-2"><GalleryUploader items={items} onChange={setItems} error={errorFor(errs, "images") ?? errorFor(errs, "gallery")} /></Card>
 
           <Card className="space-y-4 p-5 sm:p-6 md:col-span-2">
             <div><h2 className="text-lg font-semibold text-lagoon-900">Quick info</h2><p className="text-sm text-ink-600">Entrance fee, duration, hours, cost</p></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input label="Entrance fee text" value={v.entrance_fee_text} onChange={(e) => setF("entrance_fee_text", e.target.value)} placeholder="₱2,500 (guided tour)" className="h-12" />
-              <Input label="Estimated cost (₱)" type="text" value={v.estimated_cost} onChange={(e) => setF("estimated_cost", e.target.value)} error={errs.estimated_cost} placeholder="e.g., ₱500 or free" className="h-12" />
+              <div>
+                <Input
+                  label="Estimated cost (₱)"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={v.estimated_cost}
+                  onChange={(e) => setF("estimated_cost", e.target.value)}
+                  error={errs.estimated_cost}
+                  placeholder="e.g., 500"
+                  className="h-12"
+                />
+                <FieldHint>A number only. Put ranges like 300-850 in "Entrance fee text".</FieldHint>
+              </div>
               <Input label="Visit duration" value={v.visit_duration} onChange={(e) => setF("visit_duration", e.target.value)} placeholder="4-6 hours" className="h-12" />
               <Input label="Best time to visit" value={v.best_time_to_visit} onChange={(e) => setF("best_time_to_visit", e.target.value)} error={errs.best_time_to_visit} placeholder="Early morning, dry season" className="h-12" />
               <OpeningHoursInput value={v.opening_hours} onChange={(next) => setF("opening_hours", next)} error={errs.opening_hours} />
@@ -205,12 +288,12 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
 
           <Card className="space-y-4 p-5 sm:p-6 md:col-span-2">
             <div><h2 className="text-lg font-semibold text-lagoon-900">How to get there</h2><p className="text-sm text-ink-600">Transport options shown on the page</p></div>
-            <RepeatableList type="transport" transportValue={v.how_to_get_there} onTransportChange={(rows) => setF("how_to_get_there", rows)} error={errs.how_to_get_there} />
+            <RepeatableList type="transport" transportValue={v.how_to_get_there} onTransportChange={(rows) => setF("how_to_get_there", rows)} error={errorFor(errs, "how_to_get_there")} />
           </Card>
 
           <Card className="space-y-4 p-5 sm:p-6 md:col-span-2">
             <div><h2 className="text-lg font-semibold text-lagoon-900">Travel tips</h2><p className="text-sm text-ink-600">Numbered tips on the detail page</p></div>
-            <RepeatableList type="tips" tipsValue={v.travel_tips} onTipsChange={(tips) => setF("travel_tips", tips)} error={errs.travel_tips} />
+            <RepeatableList type="tips" tipsValue={v.travel_tips} onTipsChange={(tips) => setF("travel_tips", tips)} error={errorFor(errs, "travel_tips")} />
             <div className="space-y-1.5">
               <label className="block text-sm font-semibold text-ink-900">Legacy tips (kept for compatibility)</label>
               <textarea className={ta} value={v.tips} onChange={(e) => setF("tips", e.target.value)} placeholder="Bring a dry bag, cash for entrance fees…" />

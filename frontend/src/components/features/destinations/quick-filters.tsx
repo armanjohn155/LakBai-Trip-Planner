@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
-import { DESTINATION_REGIONS } from "@/lib/destination-constants";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { DestinationFilters, Region } from "@/lib/types";
 
 interface QuickFiltersProps {
@@ -10,7 +10,11 @@ interface QuickFiltersProps {
 }
 
 export function QuickFilters({ filters, categories, onChange }: QuickFiltersProps) {
+  const { options } = useDestinationOptions();
   const update = (patch: Partial<DestinationFilters>) => onChange({ ...filters, ...patch });
+
+  const categoryNames = options?.categories.length ? options.categories.map((category) => category.name) : categories;
+  const regionNames = options?.regions.map((region) => region.name) ?? [];
 
   const clear = () => onChange({ category: "", region: "", search: "", min_price: "", max_price: "" });
 
@@ -29,9 +33,18 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
 
       <div className="-mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:hidden" role="group" aria-label="Filter by category">
         <CategoryChip active={!filters.category} label="All" onClick={() => update({ category: "" })} />
-        {categories.map((category) => (
-          <CategoryChip key={category} active={filters.category === category} label={category} onClick={() => update({ category })} />
-        ))}
+        {categoryNames.map((category) => {
+          const option = options?.categories.find((entry) => entry.name === category);
+          return (
+            <CategoryChip
+              key={category}
+              active={filters.category === category}
+              label={category}
+              color={option?.color ?? undefined}
+              onClick={() => update({ category })}
+            />
+          );
+        })}
       </div>
 
       <div className="hidden sm:block">
@@ -41,7 +54,7 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
           emptyLabel="Any region"
           value={filters.region ?? ""}
           onChange={(event) => update({ region: event.target.value as Region | "" })}
-          options={DESTINATION_REGIONS.map((region) => ({ value: region, label: region }))}
+          options={regionNames.map((region) => ({ value: region, label: region }))}
         />
       </div>
       <div className="hidden sm:block">
@@ -51,7 +64,7 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
           emptyLabel="Any category"
           value={filters.category ?? ""}
           onChange={(event) => update({ category: event.target.value })}
-          options={categories.map((category) => ({ value: category, label: category }))}
+          options={categoryNames.map((category) => ({ value: category, label: category }))}
         />
       </div>
       <div className="hidden items-end gap-2 sm:flex">
@@ -88,7 +101,7 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
             emptyLabel="Any region"
             value={filters.region ?? ""}
             onChange={(event) => update({ region: event.target.value as Region | "" })}
-            options={DESTINATION_REGIONS.map((region) => ({ value: region, label: region }))}
+            options={regionNames.map((region) => ({ value: region, label: region }))}
           />
           <Input
             name="mobile-min-price"
@@ -115,14 +128,15 @@ export function QuickFilters({ filters, categories, onChange }: QuickFiltersProp
   );
 }
 
-function CategoryChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function CategoryChip({ active, label, color, onClick }: { active: boolean; label: string; color?: string; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`snap-start whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-colors ${active ? "bg-surf-400 text-white" : "bg-white text-ink-800 ring-1 ring-inset ring-line hover:bg-sand-50"}`}
+      className={`snap-start inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-colors ${active ? "bg-surf-400 text-white" : "bg-white text-ink-800 ring-1 ring-inset ring-line hover:bg-sand-50"}`}
     >
+      {color ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: active ? "#ffffff" : color }} aria-hidden="true" /> : null}
       {label}
     </button>
   );

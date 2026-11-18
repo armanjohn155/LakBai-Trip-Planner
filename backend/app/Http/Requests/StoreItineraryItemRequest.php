@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Destination;
 use App\Models\Itinerary;
 use App\Models\ItineraryItem;
+use App\Services\DestinationOptionService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -60,6 +60,9 @@ class StoreItineraryItemRequest extends FormRequest
      */
     private function allowedCategories(): array
     {
-        return array_merge(Destination::CATEGORIES, ItineraryItem::CUSTOM_CATEGORIES);
+        return array_merge(
+            app(DestinationOptionService::class)->activeNames(DestinationOptionService::CATEGORY),
+            ItineraryItem::CUSTOM_CATEGORIES,
+        );
     }
 }

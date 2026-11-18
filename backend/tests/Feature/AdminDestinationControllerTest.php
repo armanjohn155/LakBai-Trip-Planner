@@ -167,20 +167,22 @@ class AdminDestinationControllerTest extends TestCase
     {
         $destination = Destination::factory()->create(['name' => 'Kawasan Falls', 'municipality' => 'Badian']);
 
-        $this->actingAs($this->admin())
+        $response = $this->actingAs($this->admin())
             ->putJson("/api/admin/destinations/{$destination->id}", [
                 'name' => 'Kawasan Falls',
                 'estimated_cost' => 750,
                 'tips' => 'Go early to avoid crowds.',
             ])
             ->assertOk()
-            ->assertJsonPath('data.estimated_cost', '750.00')
             ->assertJsonPath('data.tips', 'Go early to avoid crowds.');
 
-        $this->assertDatabaseHas('destinations', [
-            'id' => $destination->id,
-            'estimated_cost' => 750,
-        ]);
+        $this->assertEqualsWithDelta(750.0, (float) $response->json('data.estimated_cost'), 0.001);
+
+        $this->assertEqualsWithDelta(
+            750.0,
+            (float) Destination::findOrFail($destination->id)->estimated_cost,
+            0.001
+        );
     }
 
     public function test_admin_cannot_update_a_destination_to_a_duplicate_name(): void
@@ -453,5 +455,124 @@ class AdminDestinationControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.items.0.destination.name', $destination->name)
             ->assertJsonPath('data.items.0.destination.deleted_at', fn ($value) => $value !== null);
+    }
+
+    public function test_destination_saves_with_every_form_field(): void
+    {
+        $admin = $this->admin();
+
+        $response = $this->actingAs($admin)
+            ->postJson('/api/admin/destinations', $this->validPayload([
+                'name' => 'Bojo River',
+                'category' => 'Nature & Eco-Tourism',
+                'radius_m' => 300,
+                'best_time_to_visit' => 'December-May / High',
+                'tips' => 'Follow your local guide.',
+                'highlights' => ['Mangrove cruise', 'Birdwatching'],
+                'entrance_fee_text' => '300-850',
+                'visit_duration' => '2-3 hours',
+                'opening_hours' => '8:00 AM - 5:00 PM',
+                'how_to_get_there' => [
+                    ['mode' => 'Bus', 'route' => 'Cebu South Bus Terminal', 'duration' => '2-3 hours', 'price_text' => '80-150'],
+                ],
+                'travel_tips' => ['Avoid throwing garbage into the river.'],
+                'gallery' => ['/storage/destinations/bojo-river.jpg'],
+                'image_url' => '/storage/destinations/bojo-river.jpg',
+                // System-managed fields must be ignored, never persisted.
+                'rating' => 5,
+                'review_count' => 999,
+                'source' => 'seeded',
+                'created_by' => 999,
+            ]))
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Bojo River')
+            ->assertJsonPath('data.category', 'Nature & Eco-Tourism')
+            ->assertJsonPath('data.rating', '0.0')
+            ->assertJsonPath('data.review_count', 0);
+
+        $destination = Destination::findOrFail($response->json('data.id'));
+
+        $this->assertSame('admin', $destination->source);
+        $this->assertSame($admin->id, $destination->created_by);
+        $this->assertSame(300, $destination->radius_m);
+        $this->assertSame('December-May / High', $destination->best_time_to_visit);
+        $this->assertSame(['Mangrove cruise', 'Birdwatching'], $destination->highlights);
+        $this->assertSame('300-850', $destination->entrance_fee_text);
+        $this->assertSame('2-3 hours', $destination->visit_duration);
+        $this->assertSame('8:00 AM - 5:00 PM', $destination->opening_hours);
+        $this->assertSame('Cebu South Bus Terminal', $destination->how_to_get_there[0]['route']);
+        $this->assertSame('Avoid throwing garbage into the river.', $destination->travel_tips[0]);
+        $this->assertSame(['/storage/destinations/bojo-river.jpg'], $destination->gallery);
+    }
+
+    public function test_unknown_category_returns_a_422_instead_of_a_server_error(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/admin/destinations', $this->validPayload(['category' => 'Volcano']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category');
+    }
+
+    public function test_all_form_fields_with_unknown_category_returns_422_not_500(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->postJson('/api/admin/destinations', $this->validPayload([
+                'name' => 'Bojo River',
+                'category' => 'Not A Real Category',
+                'region' => 'South Cebu: Southwest and Highlands',
+                'radius_m' => 300,
+                'best_time_to_visit' => 'December-May / High',
+                'tips' => 'Follow your local guide.',
+                'highlights' => ['Mangrove cruise', 'Birdwatching'],
+                'entrance_fee_text' => '300-850',
+                'visit_duration' => '2-3 hours',
+                'opening_hours' => '8:00 AM - 5:00 PM',
+                'how_to_get_there' => [
+                    ['mode' => 'Bus', 'route' => 'Cebu South Bus Terminal', 'duration' => '2-3 hours', 'price_text' => '80-150'],
+                ],
+                'travel_tips' => ['Avoid throwing garbage into the river.'],
+                'gallery' => ['/storage/destinations/bojo-river.jpg'],
+                'image_url' => '/storage/destinations/bojo-river.jpg',
+                'rating' => 5,
+                'review_count' => 999,
+                'source' => 'seeded',
+                'created_by' => 999,
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category');
+
+        $this->assertDatabaseMissing('destinations', ['name' => 'Bojo River']);
+    }
+
+    public function test_a_range_estimated_cost_returns_a_422_instead_of_a_server_error(): void
+    {
+        $this->actingAs($this->admin())
+            ->postJson('/api/admin/destinations', $this->validPayload(['estimated_cost' => '300-850']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'estimated_cost' => 'Estimated cost must be a single number, e.g. 500 or 500.00. Put ranges like "300-850" in the entrance fee field.',
+            ]);
+    }
+
+    public function test_estimated_cost_accepts_currency_formatting(): void
+    {
+        $response = $this->actingAs($this->admin())
+            ->postJson('/api/admin/destinations', $this->validPayload(['estimated_cost' => '₱1,200.50']))
+            ->assertCreated();
+
+        $destination = Destination::findOrFail($response->json('data.id'));
+        $this->assertEqualsWithDelta(1200.50, (float) $destination->estimated_cost, 0.001);
+    }
+
+    public function test_updating_a_destination_rejects_a_range_estimated_cost(): void
+    {
+        $destination = Destination::factory()->create(['name' => 'Bojo River']);
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/admin/destinations/{$destination->id}", ['estimated_cost' => '300-850'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('estimated_cost');
     }
 }

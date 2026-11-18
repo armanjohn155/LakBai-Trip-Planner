@@ -88,6 +88,7 @@ export function RepeatableList({
               value={tip}
               onChange={(e) => updateTip(index, e.target.value)}
               placeholder="Enter a travel tip"
+              maxLength={500}
               className="h-12"
             />
             <div className="mt-1 flex items-center gap-1">
@@ -123,9 +124,9 @@ export function RepeatableList({
             options={TRANSPORT_MODES.map((m) => ({ value: m, label: m }))}
             className="h-12"
           />
-          <Input value={row.route || ""} onChange={(e) => updateTransport(index, "route", e.target.value)} placeholder="Route / origin" className="h-12" />
-          <Input value={row.duration || ""} onChange={(e) => updateTransport(index, "duration", e.target.value)} placeholder="Duration" className="h-12" />
-          <Input value={row.price_text || ""} onChange={(e) => updateTransport(index, "price_text", e.target.value)} placeholder="Price" className="h-12" />
+          <Input value={row.route || ""} onChange={(e) => updateTransport(index, "route", e.target.value)} placeholder="Route / origin" maxLength={255} className="h-12" />
+          <Input value={row.duration || ""} onChange={(e) => updateTransport(index, "duration", e.target.value)} placeholder="Duration" maxLength={255} className="h-12" />
+          <Input value={row.price_text || ""} onChange={(e) => updateTransport(index, "price_text", e.target.value)} placeholder="Price" maxLength={255} className="h-12" />
           <button type="button" onClick={() => removeTransport(index)} className="mt-1 rounded-full p-1.5 text-red-600 hover:bg-red-50">
             <XIcon className="h-4 w-4" />
           </button>

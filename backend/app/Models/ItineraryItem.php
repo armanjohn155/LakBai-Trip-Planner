@@ -41,7 +41,8 @@ class ItineraryItem extends Model
     public const STATUSES = ['planned', 'arrived', 'done', 'skipped'];
 
     /**
-     * Custom (destination-less) categories, in addition to Destination::CATEGORIES.
+     * Custom (destination-less) categories, in addition to the admin-managed
+     * destination categories.
      */
     public const CUSTOM_CATEGORIES = ['Transport', 'Accommodation', 'Meal', 'Other'];
 

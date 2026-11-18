@@ -21,6 +21,7 @@ import RegisterPage from "@/pages/auth/register";
 import GoogleCallbackPage from "@/pages/auth/google-callback";
 import AdminDestinationEditPage from "@/pages/dashboard/admin/destination-edit";
 import AdminDestinationNewPage from "@/pages/dashboard/admin/destination-new";
+import AdminDestinationOptionsPage from "@/pages/dashboard/admin/destination-options";
 import AdminDestinationsPage from "@/pages/dashboard/admin/destinations";
 import AdminLayout from "@/pages/dashboard/admin/layout";
 import AdminReviewsPage from "@/pages/dashboard/admin/reviews";
@@ -90,6 +91,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="destinations" element={<AdminDestinationsPage />} />
             <Route path="destinations/new" element={<AdminDestinationNewPage />} />
             <Route path="destinations/:id/edit" element={<AdminDestinationEditPage />} />
+            <Route path="destination-options" element={<AdminDestinationOptionsPage />} />
             <Route path="reviews" element={<AdminReviewsPage />} />
           </Route>
 

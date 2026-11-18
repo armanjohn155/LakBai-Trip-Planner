@@ -2,7 +2,8 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\Destination;
+use App\Rules\ActiveDestinationOption;
+use App\Services\DestinationOptionService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,6 +26,8 @@ class UpdateDestinationRequest extends FormRequest
     {
         $destination = $this->route('destination');
         $destinationId = is_object($destination) ? $destination->id : $destination;
+        $currentCategory = is_object($destination) ? $destination->category : null;
+        $currentRegion = is_object($destination) ? $destination->region : null;
 
         return [
             'name' => [
@@ -34,13 +37,13 @@ class UpdateDestinationRequest extends FormRequest
                 Rule::unique('destinations', 'name')->ignore($destinationId),
             ],
             'description' => ['sometimes', 'string'],
-            'category' => ['sometimes', 'string', Rule::in(Destination::CATEGORIES)],
-            'region' => ['sometimes', 'string', Rule::in(Destination::REGIONS)],
+            'category' => ['sometimes', 'string', new ActiveDestinationOption(DestinationOptionService::CATEGORY, $currentCategory)],
+            'region' => ['sometimes', 'string', new ActiveDestinationOption(DestinationOptionService::REGION, $currentRegion)],
             'municipality' => ['sometimes', 'string', 'max:255'],
             'latitude' => ['sometimes', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'numeric', 'between:-180,180'],
             'radius_m' => ['sometimes', 'nullable', 'integer', 'between:30,2000'],
-            'estimated_cost' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'estimated_cost' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'image_url' => ['sometimes', 'nullable', 'string', 'max:500'],
             'best_time_to_visit' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -68,10 +71,54 @@ class UpdateDestinationRequest extends FormRequest
     }
 
     /**
+     * Friendlier messages for the nested array rules admins actually hit.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'images.*.max' => 'Each photo must be 2 MB or smaller.',
+            'images.*.mimes' => 'Photos must be JPG, PNG, or WebP files.',
+            'images.*.uploaded' => 'One of the photos could not be uploaded. Check that it is 2 MB or smaller.',
+            'images.*.file' => 'One of the photos could not be uploaded. Check that it is 2 MB or smaller.',
+            'gallery.*.max' => 'Each gallery image URL must be 500 characters or fewer.',
+            'highlights.*.max' => 'Each highlight must be 40 characters or fewer.',
+            'how_to_get_there.*.route.max' => 'Each transport route must be 255 characters or fewer.',
+            'travel_tips.*.max' => 'Each travel tip must be 500 characters or fewer.',
+            'estimated_cost.numeric' => 'Estimated cost must be a single number, e.g. 500 or 500.00. Put ranges like "300-850" in the entrance fee field.',
+            'estimated_cost.max' => 'Estimated cost is too large.',
+        ];
+    }
+
+    /**
      * Prepare the data for validation.
      */
     protected function prepareForValidation(): void
     {
+        // destinations.estimated_cost is a decimal column, so accept the ways
+        // people actually type money ("₱500", "PHP 1,200", "500.00") instead
+        // of letting PostgreSQL reject the value with a 500.
+        $this->normalizeEstimatedCost();
+
+        // Canonicalize the option-backed fields so the stored value always
+        // matches the category/region table casing.
+        $options = app(DestinationOptionService::class);
+        $optionFields = [];
+
+        foreach ([DestinationOptionService::CATEGORY, DestinationOptionService::REGION] as $field) {
+            if (! is_string($this->input($field))) {
+                continue;
+            }
+
+            $name = $options->normalizeName($this->input($field));
+            $optionFields[$field] = $options->canonicalName($field, $name) ?? $name;
+        }
+
+        if (! empty($optionFields)) {
+            $this->merge($optionFields);
+        }
+
         $textFields = ['name', 'description', 'municipality', 'best_time_to_visit', 'tips', 'entrance_fee_text', 'visit_duration', 'opening_hours'];
         $sanitized = [];
         foreach ($textFields as $field) {
@@ -94,6 +141,25 @@ class UpdateDestinationRequest extends FormRequest
                     $this->merge([$field => $decoded]);
                 }
             }
+        }
+    }
+
+    /**
+     * Strip currency symbols and thousands separators from the cost so the
+     * `numeric` rule decides what is valid, not the database driver.
+     */
+    private function normalizeEstimatedCost(): void
+    {
+        $value = $this->input('estimated_cost');
+
+        if (! is_string($value)) {
+            return;
+        }
+
+        $cleaned = str_replace(['₱', 'PHP', 'Php', 'php', ',', ' '], '', trim($value));
+
+        if ($cleaned !== '' && $cleaned !== $value) {
+            $this->merge(['estimated_cost' => $cleaned]);
         }
     }
 }

@@ -1,11 +1,5 @@
-export type Region =
-  | "North Cebu Islands"
-  | "South Cebu: Southwest and Highlands"
-  | "Cebu City and Metro Cebu"
-  | "West Cebu"
-  | "North Cebu Mainland"
-  | "South Cebu: Southeast and Southern Trip"
-  | "Camotes and Cross Region Trip";
+// Region names are admin-managed; keep the alias for existing imports.
+export type Region = string;
 
 export interface Destination {
   id: number;

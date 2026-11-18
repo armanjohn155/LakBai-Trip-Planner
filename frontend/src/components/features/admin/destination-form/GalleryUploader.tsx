@@ -19,20 +19,39 @@ interface GalleryUploaderProps {
 
 export function GalleryUploader({ items, onChange, max = 8, error }: GalleryUploaderProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
     const newItems: GalleryItem[] = [];
+    let skippedType = 0;
+    let skippedSize = 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) continue;
-      if (file.size > 2 * 1024 * 1024) continue;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        skippedType += 1;
+        continue;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        skippedSize += 1;
+        continue;
+      }
       newItems.push({
         id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
         file,
         preview: URL.createObjectURL(file),
       });
     }
+
+    if (skippedType > 0 || skippedSize > 0) {
+      const reasons: string[] = [];
+      if (skippedSize > 0) reasons.push(`${skippedSize} over 2 MB`);
+      if (skippedType > 0) reasons.push(`${skippedType} not JPG/PNG/WebP`);
+      setNotice(`Skipped ${reasons.join(" and ")}. Nothing else was changed.`);
+    } else {
+      setNotice(null);
+    }
+
     const merged = [...items, ...newItems].slice(0, max);
     onChange(merged);
   };
@@ -71,7 +90,11 @@ export function GalleryUploader({ items, onChange, max = 8, error }: GalleryUplo
             multiple
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
-            onChange={(e) => addFiles(e.target.files)}
+            onChange={(e) => {
+              addFiles(e.target.files);
+              // Allow picking the same file again after a rejection.
+              e.target.value = "";
+            }}
           />
           <span className="inline-flex items-center rounded-full bg-sand-100 px-3 py-1.5 text-xs font-semibold text-lagoon-900 ring-1 ring-inset ring-line hover:bg-sand-50">
             Add photos
@@ -125,6 +148,11 @@ export function GalleryUploader({ items, onChange, max = 8, error }: GalleryUplo
           No photos yet
         </div>
       )}
+      {notice ? (
+        <p role="status" className="text-sm text-lagoon-900">
+          {notice}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );

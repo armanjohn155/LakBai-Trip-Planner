@@ -1,5 +1,9 @@
 import type { Region } from "@/lib/types";
 
+/**
+ * Fallback lists used only before `GET /api/destination-options` resolves.
+ * Categories and regions are admin-managed in the database at runtime.
+ */
 export const DESTINATION_CATEGORIES = [
   "Beach",
   "Waterfall",

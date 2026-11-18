@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { ItineraryMap } from "@/components/features/itinerary/itinerary-map";
 import { Button } from "@/components/ui/button";
 import { InlineError } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { STOP_CATEGORIES, STOP_STATUS_LABEL, STOP_STATUSES } from "@/components/features/itinerary/itinerary-constants";
+import { STOP_CATEGORIES, STOP_STATUS_LABEL, STOP_STATUSES, CUSTOM_STOP_CATEGORIES } from "@/components/features/itinerary/itinerary-constants";
 import { apiConflict, apiError, deleteItineraryItem, updateItineraryItem } from "@/lib/api";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { Destination, Itinerary, ItineraryItem } from "@/lib/types";
 
 interface StopEditorProps {
@@ -71,6 +72,7 @@ function initialState(item: ItineraryItem | null, destinations: Destination[]): 
 }
 
 export function StopEditor({ open, itinerary, item, destinations, onClose, onSaved, onConflict }: StopEditorProps) {
+  const { options } = useDestinationOptions();
   const [form, setForm] = useState<FormState>(() => initialState(item, destinations));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -82,6 +84,12 @@ export function StopEditor({ open, itinerary, item, destinations, onClose, onSav
     setForm(initialState(item, destinations));
     setError(null);
   }, [item, destinations]);
+
+  const stopCategoryOptions = useMemo(() => {
+    const names = options?.categories.length ? options.categories.map((category) => category.name) : STOP_CATEGORIES;
+
+    return Array.from(new Set([...names, ...CUSTOM_STOP_CATEGORIES, form.category].filter(Boolean)));
+  }, [form.category, options]);
 
   if (!item) return null;
 
@@ -213,7 +221,7 @@ export function StopEditor({ open, itinerary, item, destinations, onClose, onSav
             emptyLabel="Use default"
             value={form.category}
             onChange={(event) => update({ category: event.target.value })}
-            options={STOP_CATEGORIES.map((category) => ({ value: category, label: category }))}
+            options={stopCategoryOptions.map((category) => ({ value: category, label: category }))}
           />
         </div>
 

@@ -63,68 +63,75 @@ class DestinationController extends Controller
      */
     public function store(StoreDestinationRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
 
-        // Never accept source/created_by from request input
-        unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
+            // Never accept source/created_by from request input
+            unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
 
-        // Handle multiple images
-        $gallery = [];
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                if (! is_array($file) && $file) {
-                    $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? 'destination');
+            // Handle multiple images
+            $gallery = [];
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $file) {
+                    if (! is_array($file) && $file) {
+                        $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? 'destination');
+                    }
                 }
             }
-        }
-        unset($data['images'], $data['cover_index']);
+            unset($data['images'], $data['cover_index']);
 
-        // Handle single image (backward compatible)
-        if ($request->hasFile('image')) {
-            $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? 'destination');
-            $data['image_url'] = $imageUrl;
-            if (empty($gallery)) {
-                $gallery[] = $imageUrl;
+            // Handle single image (backward compatible)
+            if ($request->hasFile('image')) {
+                $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? 'destination');
+                $data['image_url'] = $imageUrl;
+                if (empty($gallery)) {
+                    $gallery[] = $imageUrl;
+                }
             }
-        }
-        unset($data['image']);
+            unset($data['image']);
 
-        // Normalize arrays if they come as JSON strings (FormData)
-        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
-        foreach ($arrayFields as $field) {
-            if (array_key_exists($field, $data) && is_string($data[$field])) {
-                $decoded = json_decode($data[$field], true);
-                $data[$field] = is_array($decoded) ? $decoded : null;
+            // Normalize arrays if they come as JSON strings (FormData)
+            $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
+            foreach ($arrayFields as $field) {
+                if (array_key_exists($field, $data) && is_string($data[$field])) {
+                    $decoded = json_decode($data[$field], true);
+                    $data[$field] = is_array($decoded) ? $decoded : null;
+                }
             }
-        }
 
-        if (! empty($gallery)) {
-            // Ensure gallery has entries
-            if (empty($data['gallery']) || ! is_array($data['gallery'])) {
-                $data['gallery'] = $gallery;
-            } else {
-                // Merge? Prefer uploaded gallery if present
-                $data['gallery'] = array_values($data['gallery']);
+            if (! empty($gallery)) {
+                // Ensure gallery has entries
+                if (empty($data['gallery']) || ! is_array($data['gallery'])) {
+                    $data['gallery'] = $gallery;
+                } else {
+                    $data['gallery'] = array_values($data['gallery']);
+                }
+                if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
+                    $data['image_url'] = $data['gallery'][0];
+                }
             }
-            if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
-                $data['image_url'] = $data['gallery'][0];
-            }
+
+            $destination = DB::transaction(function () use ($request, $data) {
+                $destination = new Destination($data);
+                $destination->source = 'admin';
+                $destination->created_by = $request->user()?->id;
+                $destination->save();
+
+                return $destination->fresh();
+            });
+
+            $this->clearDestinationCaches();
+
+            return (new DestinationResource($destination))
+                ->response()
+                ->setStatusCode(201);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Failed to create destination.',
+            ], 500);
         }
-
-        $destination = DB::transaction(function () use ($request, $data) {
-            $destination = new Destination($data);
-            $destination->source = 'admin';
-            $destination->created_by = $request->user()?->id;
-            $destination->save();
-
-            return $destination->fresh();
-        });
-
-        $this->clearDestinationCaches();
-
-        return (new DestinationResource($destination))
-            ->response()
-            ->setStatusCode(201);
     }
 
     /**
@@ -138,68 +145,74 @@ class DestinationController extends Controller
     /**
      * Update the specified destination.
      */
-    public function update(UpdateDestinationRequest $request, Destination $destination): DestinationResource
+    public function update(UpdateDestinationRequest $request, Destination $destination): DestinationResource|JsonResponse
     {
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
 
-        // Never accept source/created_by/rating/review_count from request input
-        unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
+            // Never accept source/created_by/rating/review_count from request input
+            unset($data['source'], $data['created_by'], $data['rating'], $data['review_count']);
 
-        $gallery = [];
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                if (! is_array($file) && $file) {
-                    $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? $destination->name);
+            $gallery = [];
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $file) {
+                    if (! is_array($file) && $file) {
+                        $gallery[] = $this->storeUploadedImage($file, $data['name'] ?? $destination->name);
+                    }
                 }
             }
-        }
-        unset($data['images'], $data['cover_index']);
+            unset($data['images'], $data['cover_index']);
 
-        if ($request->hasFile('image')) {
-            $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? $destination->name);
-            $data['image_url'] = $imageUrl;
-            if (empty($gallery)) {
-                $gallery[] = $imageUrl;
+            if ($request->hasFile('image')) {
+                $imageUrl = $this->storeUploadedImage($request->file('image'), $data['name'] ?? $destination->name);
+                $data['image_url'] = $imageUrl;
+                if (empty($gallery)) {
+                    $gallery[] = $imageUrl;
+                }
+                $this->removeUploadedImage($destination->image_url);
             }
-            $this->removeUploadedImage($destination->image_url);
-        }
-        unset($data['image']);
+            unset($data['image']);
 
-        // Normalize arrays if they come as JSON strings
-        $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
-        foreach ($arrayFields as $field) {
-            if (array_key_exists($field, $data) && is_string($data[$field])) {
-                $decoded = json_decode($data[$field], true);
-                $data[$field] = is_array($decoded) ? $decoded : null;
-            }
-        }
-
-        if (! empty($gallery)) {
-            if (empty($data['gallery']) || ! is_array($data['gallery'])) {
-                $data['gallery'] = $gallery;
-            } else {
-                // Append new uploads? Or replace? We'll append uploaded files
-                $data['gallery'] = array_values(array_merge($data['gallery'], $gallery));
-                // Limit to 8
-                if (count($data['gallery']) > 8) {
-                    $data['gallery'] = array_slice($data['gallery'], 0, 8);
+            // Normalize arrays if they come as JSON strings
+            $arrayFields = ['highlights', 'how_to_get_there', 'travel_tips', 'gallery'];
+            foreach ($arrayFields as $field) {
+                if (array_key_exists($field, $data) && is_string($data[$field])) {
+                    $decoded = json_decode($data[$field], true);
+                    $data[$field] = is_array($decoded) ? $decoded : null;
                 }
             }
-            if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
-                $data['image_url'] = $data['gallery'][0];
+
+            if (! empty($gallery)) {
+                if (empty($data['gallery']) || ! is_array($data['gallery'])) {
+                    $data['gallery'] = $gallery;
+                } else {
+                    $data['gallery'] = array_values(array_merge($data['gallery'], $gallery));
+                    if (count($data['gallery']) > 8) {
+                        $data['gallery'] = array_slice($data['gallery'], 0, 8);
+                    }
+                }
+                if (empty($data['image_url']) && ! empty($data['gallery'][0])) {
+                    $data['image_url'] = $data['gallery'][0];
+                }
             }
+
+            $destination = DB::transaction(function () use ($data, $destination) {
+                $destination->fill($data);
+                $destination->save();
+
+                return $destination->fresh();
+            });
+
+            $this->clearDestinationCaches();
+
+            return new DestinationResource($destination);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Failed to update destination.',
+            ], 500);
         }
-
-        $destination = DB::transaction(function () use ($data, $destination) {
-            $destination->fill($data);
-            $destination->save();
-
-            return $destination->fresh();
-        });
-
-        $this->clearDestinationCaches();
-
-        return new DestinationResource($destination);
     }
 
     /**

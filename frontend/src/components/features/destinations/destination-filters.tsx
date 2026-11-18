@@ -3,8 +3,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ChevronIcon, SlidersIcon } from "@/components/icons";
+import { OptionIcon } from "@/components/features/destinations/option-icon";
 import { Select } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { Destination, ExplorerFilters, PriceTier, SortBy } from "@/lib/types";
 
 export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -22,19 +24,6 @@ export const EMPTY_EXPLORER_FILTERS: ExplorerFilters = {
   minRating: 0,
   sortBy: "popular",
 };
-
-const CATEGORIES = [
-  "Beach",
-  "Waterfall",
-  "Mountains & Hiking",
-  "Historical & Cultural",
-  "Religious Sites",
-  "Food & Restaurants",
-  "Diving & Water Activities",
-  "Nature & Eco-Tourism",
-  "Islands",
-  "Cave",
-];
 
 const PRICE_TIERS: { value: PriceTier; label: string }[] = [
   { value: "", label: "Any price" },
@@ -58,6 +47,7 @@ interface DestinationFiltersProps {
 }
 
 export function DestinationFilters({ filters, allDestinations, onFiltersChange }: DestinationFiltersProps) {
+  const { options } = useDestinationOptions();
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const destination of allDestinations) {
@@ -65,6 +55,13 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
     }
     return counts;
   }, [allDestinations]);
+
+  const categoryOptions = useMemo(() => {
+    if (options?.categories.length) return options.categories;
+    return Array.from(categoryCounts.keys())
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ name, slug: name, icon: null, color: null }));
+  }, [categoryCounts, options]);
 
   const municipalities = useMemo(() => {
     const set = new Set<string>();
@@ -109,7 +106,8 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
       <div className="divide-y divide-line/60 border-t border-line/60">
         <FilterGroup title="Categories" defaultOpen>
           <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
-            {CATEGORIES.map((category) => {
+            {categoryOptions.map((option) => {
+              const category = option.name;
               const count = categoryCounts.get(category) ?? 0;
               const checked = filters.categories.includes(category);
               const disabled = count === 0 && !checked;
@@ -128,6 +126,11 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
                     disabled={disabled}
                     onChange={() => toggleCategory(category)}
                   />
+                  {option.color ? (
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: option.color }} aria-hidden="true" />
+                  ) : (
+                    <OptionIcon icon={option.icon} className="h-4 w-4 shrink-0 text-sea-600" />
+                  )}
                   <span className="flex-1 leading-tight">{category}</span>
                   <span
                     className={cn(

@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 
 const adminNav = [
   { to: "/admin/destinations", label: "Destinations", hint: "Create, edit, archive, and restore places." },
+  { to: "/admin/destination-options", label: "Categories and regions", hint: "Manage the category and region dropdowns." },
   { to: "/admin/reviews", label: "Reviews", hint: "Hide or remove flagged and reported reviews." },
 ];
 

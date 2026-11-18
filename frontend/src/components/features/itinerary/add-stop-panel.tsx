@@ -7,8 +7,8 @@ import { InlineError } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { MapIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
 import { CUSTOM_STOP_CATEGORIES } from "@/components/features/itinerary/itinerary-constants";
-import { DESTINATION_CATEGORIES } from "@/lib/destination-constants";
 import { cn } from "@/lib/cn";
+import { useDestinationOptions } from "@/lib/destination-options";
 import { formatMoney } from "@/lib/format";
 import type { Destination } from "@/lib/types";
 
@@ -99,6 +99,8 @@ export function AddStopPanel({
   onAddCustomStop,
   onMobileSnapChange,
 }: AddStopPanelProps) {
+  const { options: destinationOptions } = useDestinationOptions();
+  const categoryNames = destinationOptions?.categories.map((category) => category.name) ?? [];
   const [searchInput, setSearchInput] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customAddress, setCustomAddress] = useState("");
@@ -332,20 +334,30 @@ export function AddStopPanel({
               >
                 All
               </button>
-              {DESTINATION_CATEGORIES.map((entry) => (
-                <button
-                  key={entry}
-                  type="button"
-                  onClick={() => onCategoryChange(category === entry ? null : entry)}
-                  aria-pressed={category === entry}
-                  className={cn(
-                    "inline-flex min-h-11 shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold transition-colors md:min-h-0 md:px-2.5 md:text-[11px]",
-                    category === entry ? "bg-lagoon-900 text-sand-50" : "bg-sand-100 text-ink-600 hover:bg-sand-200",
-                  )}
-                >
-                  {entry}
-                </button>
-              ))}
+              {categoryNames.map((entry) => {
+                const option = destinationOptions?.categories.find((category) => category.name === entry);
+                return (
+                  <button
+                    key={entry}
+                    type="button"
+                    onClick={() => onCategoryChange(category === entry ? null : entry)}
+                    aria-pressed={category === entry}
+                    className={cn(
+                      "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors md:min-h-0 md:px-2.5 md:text-[11px]",
+                      category === entry ? "bg-lagoon-900 text-sand-50" : "bg-sand-100 text-ink-600 hover:bg-sand-200",
+                    )}
+                  >
+                    {option?.color ? (
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: category === entry ? "#f8fafc" : option.color }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {entry}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

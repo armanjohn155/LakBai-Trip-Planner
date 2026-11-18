@@ -12,7 +12,7 @@ import { CalendarIcon, CheckIcon, MapIcon, PinIcon, StarIcon } from "@/component
 import { apiError, deleteVisit, getVisits, getVisitsMap, getVisitStats } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatCompactNumber, pluralise } from "@/lib/format";
-import { DESTINATION_CATEGORIES, DESTINATION_REGIONS } from "@/lib/destination-constants";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { Paginated, Visit, VisitedMapPlace, VisitStats } from "@/lib/types";
 
 type VerifiedFilter = "" | "true" | "false";
@@ -31,6 +31,7 @@ export default function HistoryPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { options } = useDestinationOptions();
 
   useEffect(() => {
     let active = true;
@@ -73,6 +74,22 @@ export default function HistoryPage() {
   const total = meta?.total ?? visits.length;
 
   const maxMonth = useMemo(() => Math.max(1, ...(stats?.per_month.map((entry) => entry.count) ?? [1])), [stats]);
+
+  // Merge the admin-managed options with the values present in the visit stats,
+  // so historical or hidden values stay selectable.
+  const categoryOptions = useMemo(() => {
+    const names = new Set<string>(options?.categories.map((entry) => entry.name) ?? []);
+    Object.keys(stats?.categories ?? {}).forEach((name) => names.add(name));
+    if (category) names.add(category);
+    return Array.from(names).map((name) => ({ value: name, label: name }));
+  }, [category, options, stats]);
+
+  const regionOptions = useMemo(() => {
+    const names = new Set<string>(options?.regions.map((entry) => entry.name) ?? []);
+    (stats?.regions_covered ?? []).forEach((name) => names.add(name));
+    if (region) names.add(region);
+    return Array.from(names).map((name) => ({ value: name, label: name }));
+  }, [options, region, stats]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -198,14 +215,14 @@ export default function HistoryPage() {
             value={category}
             onChange={resetPage(setCategory)}
             emptyLabel="All categories"
-            options={DESTINATION_CATEGORIES.map((value) => ({ value, label: value }))}
+            options={categoryOptions}
           />
           <Select
             label="Region"
             value={region}
             onChange={resetPage(setRegion)}
             emptyLabel="All regions"
-            options={DESTINATION_REGIONS.map((value) => ({ value, label: value }))}
+            options={regionOptions}
           />
         </div>
       </Card>

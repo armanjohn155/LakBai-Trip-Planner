@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -16,12 +17,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            DestinationOptionSeeder::class,
             DestinationSeeder::class,
             AdminSeeder::class,
             ItineraryTemplateSeeder::class,
         ]);
 
-        if (app()->environment('local') && class_exists(\Database\Factories\UserFactory::class)) {
+        if (app()->environment('local') && class_exists(UserFactory::class)) {
             try {
                 User::factory()->create([
                     'name' => 'Test User',
@@ -33,4 +35,3 @@ class DatabaseSeeder extends Seeder
         }
     }
 }
-

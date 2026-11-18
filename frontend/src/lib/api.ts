@@ -49,7 +49,11 @@ export const apiError = (error: unknown): string => {
       return "Can't reach the server. Check your connection and try again.";
     }
     if (status !== undefined && status >= 500) {
-      return "Something went wrong on our end. Please try again.";
+      // Only point at the server log when running locally; end users cannot read it.
+      const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+      return isLocal
+        ? "Something went wrong on our end. Please try again. Check backend/storage/logs/laravel.log for the exception."
+        : "Something went wrong on our end. Please try again.";
     }
     const message = error.response.data?.message;
     const errors = error.response.data?.errors as Record<string, string[]> | undefined;
@@ -520,6 +524,67 @@ export const restoreAdminDestination = async (id: number) => {
 
 export const forceDeleteAdminDestination = async (id: number) => {
   await api.delete(`/admin/destinations/${id}/force`);
+};
+
+export type DestinationOptionKind = "categories" | "regions";
+
+export interface DestinationOption {
+  name: string;
+  slug: string;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface DestinationOptions {
+  categories: DestinationOption[];
+  regions: DestinationOption[];
+}
+
+export interface AdminDestinationOption extends DestinationOption {
+  id: number;
+  sort_order: number;
+  is_active: boolean;
+  is_system: boolean;
+  destinations_count: number;
+  itinerary_items_count?: number;
+}
+
+export interface DestinationOptionPayload {
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export const getDestinationOptions = async () => {
+  const { data } = await api.get<DestinationOptions>("/destination-options");
+  return data;
+};
+
+export const getAdminDestinationOptions = async (kind: DestinationOptionKind) => {
+  const { data } = await api.get<{ data: AdminDestinationOption[] }>(`/admin/${kind}`);
+  return data.data;
+};
+
+export const createAdminDestinationOption = async (kind: DestinationOptionKind, payload: DestinationOptionPayload) => {
+  const { data } = await api.post<{ data: AdminDestinationOption }>(`/admin/${kind}`, payload);
+  return data.data;
+};
+
+export const updateAdminDestinationOption = async (
+  kind: DestinationOptionKind,
+  id: number,
+  payload: Partial<DestinationOptionPayload> & { is_active?: boolean; sort_order?: number },
+) => {
+  const { data } = await api.put<{ data: AdminDestinationOption }>(`/admin/${kind}/${id}`, payload);
+  return data.data;
+};
+
+export const deleteAdminDestinationOption = async (kind: DestinationOptionKind, id: number, reassignTo?: number) => {
+  await api.delete(`/admin/${kind}/${id}`, { params: reassignTo ? { reassign_to: reassignTo } : undefined });
+};
+
+export const reorderAdminDestinationOptions = async (kind: DestinationOptionKind, items: { id: number; sort_order: number }[]) => {
+  await api.put(`/admin/${kind}/reorder`, { items });
 };
 
 export interface ItineraryConflict {

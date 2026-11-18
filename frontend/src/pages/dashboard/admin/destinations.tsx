@@ -16,6 +16,7 @@ import {
   type AdminDestinationParams,
 } from "@/lib/api";
 import { DESTINATION_CATEGORIES, DESTINATION_REGIONS } from "@/lib/destination-constants";
+import { useDestinationOptions } from "@/lib/destination-options";
 import type { Destination, Paginated } from "@/lib/types";
 
 type StatusFilter = "active" | "trashed" | "all";
@@ -50,6 +51,7 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
 export default function AdminDestinationsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { options } = useDestinationOptions();
   const [filters, setFilters] = useState<ListFilters>({
     search: "",
     category: "",
@@ -191,14 +193,24 @@ export default function AdminDestinationsPage() {
             value={filters.category}
             onChange={(event) => updateFilter({ category: event.target.value })}
             emptyLabel="All categories"
-            options={DESTINATION_CATEGORIES.map((category) => ({ value: category, label: category }))}
+            options={Array.from(
+              new Set([
+                ...(options?.categories.length ? options.categories.map((category) => category.name) : DESTINATION_CATEGORIES),
+                ...(filters.category ? [filters.category] : []),
+              ]),
+            ).map((category) => ({ value: category, label: category }))}
           />
           <Select
             label="Region"
             value={filters.region}
             onChange={(event) => updateFilter({ region: event.target.value })}
             emptyLabel="All regions"
-            options={DESTINATION_REGIONS.map((region) => ({ value: region, label: region }))}
+            options={Array.from(
+              new Set([
+                ...(options?.regions.length ? options.regions.map((region) => region.name) : DESTINATION_REGIONS),
+                ...(filters.region ? [filters.region] : []),
+              ]),
+            ).map((region) => ({ value: region, label: region }))}
           />
           <Select
             label="Status"

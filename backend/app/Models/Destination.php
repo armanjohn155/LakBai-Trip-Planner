@@ -40,6 +40,10 @@ class Destination extends Model
     /** @use HasFactory<DestinationFactory> */
     use HasFactory, SoftDeletes;
 
+    /**
+     * Built-in region names. Deprecated as a validation source; kept as the
+     * initial seed source for destination_regions and for factories.
+     */
     public const REGIONS = [
         'North Cebu Islands',
         'South Cebu: Southwest and Highlands',
@@ -50,6 +54,10 @@ class Destination extends Model
         'Camotes and Cross Region Trip',
     ];
 
+    /**
+     * Built-in category names. Deprecated as a validation source; kept as the
+     * initial seed source for destination_categories and for factories.
+     */
     public const CATEGORIES = [
         'Beach',
         'Waterfall',

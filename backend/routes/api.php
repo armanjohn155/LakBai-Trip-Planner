@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\DestinationController as AdminDestinationController;
+use App\Http\Controllers\Api\Admin\DestinationOptionController as AdminDestinationOptionController;
 use App\Http\Controllers\Api\Admin\ItineraryTemplateController as AdminItineraryTemplateController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DestinationController;
+use App\Http\Controllers\Api\DestinationOptionController;
 use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\GoogleAuthController;
@@ -45,6 +47,9 @@ Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 
 Route::get('/destinations', [DestinationController::class, 'index']);
 Route::get('/destinations/{destination}', [DestinationController::class, 'show']);
+
+// Public category/region option lists for filters, chips, and comboboxes.
+Route::get('/destination-options', [DestinationOptionController::class, 'index']);
 
 // Public review listing; auth (when present) unlocks "can" flags and admin visibility.
 Route::get('/destinations/{destination}/reviews', [ReviewController::class, 'index']);
@@ -239,4 +244,19 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Curate public itinerary templates from any itinerary.
     Route::post('/itineraries/{itinerary}/template', [AdminItineraryTemplateController::class, 'store']);
     Route::delete('/itineraries/{itinerary}/template', [AdminItineraryTemplateController::class, 'destroy']);
+
+    // Admin-managed destination category and region options.
+    Route::middleware('throttle:60,1,admin-destination-options')->group(function () {
+        Route::get('/categories', [AdminDestinationOptionController::class, 'categories']);
+        Route::post('/categories', [AdminDestinationOptionController::class, 'storeCategory']);
+        Route::put('/categories/reorder', [AdminDestinationOptionController::class, 'reorderCategories']);
+        Route::match(['put', 'patch'], '/categories/{category}', [AdminDestinationOptionController::class, 'updateCategory']);
+        Route::delete('/categories/{category}', [AdminDestinationOptionController::class, 'destroyCategory']);
+
+        Route::get('/regions', [AdminDestinationOptionController::class, 'regions']);
+        Route::post('/regions', [AdminDestinationOptionController::class, 'storeRegion']);
+        Route::put('/regions/reorder', [AdminDestinationOptionController::class, 'reorderRegions']);
+        Route::match(['put', 'patch'], '/regions/{region}', [AdminDestinationOptionController::class, 'updateRegion']);
+        Route::delete('/regions/{region}', [AdminDestinationOptionController::class, 'destroyRegion']);
+    });
 });

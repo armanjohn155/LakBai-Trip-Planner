@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Destination;
 use App\Models\ItineraryItem;
+use App\Services\DestinationOptionService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -94,6 +94,13 @@ class UpdateItineraryItemRequest extends FormRequest
      */
     private function allowedCategories(): array
     {
-        return array_merge(Destination::CATEGORIES, ItineraryItem::CUSTOM_CATEGORIES);
+        $item = $this->route('item');
+        $current = is_object($item) ? $item->category : null;
+
+        return array_values(array_unique(array_filter(array_merge(
+            app(DestinationOptionService::class)->activeNames(DestinationOptionService::CATEGORY),
+            ItineraryItem::CUSTOM_CATEGORIES,
+            [$current],
+        ))));
     }
 }
