@@ -1,0 +1,32 @@
+{
+    "timestamp": "2026-11-19T13:07:49+00:00",
+    "connection": "sqlite",
+    "tables": {
+        "cache_locks": 0,
+        "destination_categories": 10,
+        "destination_regions": 7,
+        "destinations": 23,
+        "favorites": 0,
+        "friendships": 2,
+        "itineraries": 15,
+        "itinerary_activities": 36,
+        "itinerary_invites": 0,
+        "itinerary_items": 47,
+        "itinerary_meetups": 1,
+        "itinerary_user": 2,
+        "job_batches": 0,
+        "notification_preferences": 0,
+        "notifications": 15,
+        "personal_access_tokens": 54,
+        "review_photos": 0,
+        "review_reports": 0,
+        "reviews": 0,
+        "tracking_points": 3,
+        "tracking_sessions": 3,
+        "trip_photos": 0,
+        "trip_recaps": 0,
+        "user_settings": 0,
+        "users": 9,
+        "visits": 0
+    }
+}

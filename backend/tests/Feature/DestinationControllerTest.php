@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Destination;
+use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
 
@@ -78,5 +79,59 @@ class DestinationControllerTest extends TestCase
     public function test_returns_404_for_missing_destination(): void
     {
         $this->getJson('/api/destinations/999999')->assertNotFound();
+    }
+
+    public function test_newly_created_destination_is_immediately_visible_in_public_list_and_detail(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $response = $this->actingAs($admin)
+            ->postJson('/api/admin/destinations', [
+                'name' => 'Bojo River',
+                'description' => 'A calm river cruise through mangroves.',
+                'category' => 'Nature & Eco-Tourism',
+                'region' => 'South Cebu: Southwest and Highlands',
+                'municipality' => 'Aloguinsan',
+                'latitude' => 10.2101,
+                'longitude' => 123.5495,
+                'estimated_cost' => 450,
+                'best_time_to_visit' => 'Morning',
+                'tips' => 'Bring a hat.',
+                'highlights' => ['Mangrove cruise'],
+                'entrance_fee_text' => '450',
+                'visit_duration' => '2 hours',
+                'opening_hours' => '8:00 AM - 5:00 PM',
+                'how_to_get_there' => [
+                    ['mode' => 'Bus', 'route' => 'South Bus Terminal', 'duration' => '2 hours', 'price_text' => '120'],
+                ],
+                'travel_tips' => ['Do not litter.'],
+                'gallery' => ['/storage/destinations/bojo-river.jpg'],
+                'image_url' => '/storage/destinations/bojo-river.jpg',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Bojo River');
+
+        $id = $response->json('data.id');
+
+        $this->assertDatabaseHas('destinations', [
+            'id' => $id,
+            'name' => 'Bojo River',
+            'source' => 'admin',
+            'created_by' => $admin->id,
+        ]);
+
+        $this->getJson('/api/destinations')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $id,
+                'name' => 'Bojo River',
+                'category' => 'Nature & Eco-Tourism',
+                'region' => 'South Cebu: Southwest and Highlands',
+            ]);
+
+        $this->getJson("/api/destinations/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $id)
+            ->assertJsonPath('data.name', 'Bojo River');
     }
 }

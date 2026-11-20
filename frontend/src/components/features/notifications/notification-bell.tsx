@@ -176,7 +176,7 @@ export function NotificationBell() {
           aria-label="Notifications"
           className={cn(
             "z-[1200] overflow-hidden border border-line bg-white text-ink-900 shadow-xl",
-            "fixed inset-x-0 top-16 max-h-[calc(100vh-4rem)] rounded-none border-x-0 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:max-h-[520px] sm:rounded-2xl",
+            "fixed inset-x-0 top-16 max-h-[calc(100dvh-4rem)] rounded-none border-x-0 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:max-h-[520px] sm:rounded-2xl",
           )}
         >
           <div className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -192,7 +192,7 @@ export function NotificationBell() {
           </div>
           <div className="h-px bg-line" />
 
-          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto sm:max-h-[380px]">
+          <div className="max-h-[calc(100dvh-12rem)] overflow-y-auto sm:max-h-[380px]">
             {loading && latest.length === 0 ? (
               <div className="space-y-2 p-3" aria-hidden="true">
                 {[0, 1, 2].map((row) => (

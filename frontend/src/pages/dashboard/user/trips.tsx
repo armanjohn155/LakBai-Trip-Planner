@@ -47,6 +47,7 @@ export default function TripsPage() {
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<TripSort>("upcoming");
   const [filter, setFilter] = useState<TripFilter>(() =>
@@ -72,6 +73,9 @@ export default function TripsPage() {
     // Data is fetched on mount; all state updates happen in promise callbacks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
+      .then(() => {
+        if (!cancelled) setLoaded(true);
+      })
       .catch((err) => {
         if (!cancelled) setError(apiError(err));
       })
@@ -230,7 +234,7 @@ export default function TripsPage() {
 
       {error ? <InlineError message={error} /> : null}
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter trips">
+      {loaded ? <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter trips">
         {([
           { id: "all", label: "All trips", count: trips.length + inviteCount },
           { id: "owned", label: "Mine", count: trips.filter((trip) => (trip.my_role ?? "owner") === "owner").length },
@@ -262,9 +266,9 @@ export default function TripsPage() {
             </span>
           </button>
         ))}
-      </div>
+      </div> : null}
 
-      {addDestinationId ? (
+      {loaded && addDestinationId ? (
         <div className="rounded-2xl bg-lagoon-900 p-5 text-sand-50">
           <p className="font-display text-xl font-medium">Add {destinationName} to a trip</p>
           <p className="mt-1 text-sm text-sand-50/70">Pick an existing trip, or start planning a new one.</p>
@@ -289,7 +293,7 @@ export default function TripsPage() {
         </div>
       ) : null}
 
-      {showInvites && pendingInvites.length > 0 ? (
+      {loaded && showInvites && pendingInvites.length > 0 ? (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-xl font-semibold text-lagoon-900">Invitations</h2>
@@ -347,7 +351,7 @@ export default function TripsPage() {
         </section>
       ) : null}
 
-      {showTrips ? (
+      {loaded && showTrips ? (
         filter === "completed" ? (
           completedTrips.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line px-6 py-16 text-center">

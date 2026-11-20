@@ -61,7 +61,7 @@ export default function GoogleCallbackPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-16">
+    <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-md glass rounded-3xl p-8 text-center">
         {busy ? (
           <>

@@ -157,6 +157,34 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const isTablet = !isMobile && !isDesktop;
   const viewportWidth = useViewportWidth();
   const viewportHeight = useViewportHeight();
+  const [bottomNavHeight, setBottomNavHeight] = useState(0);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setBottomNavHeight(0);
+      return;
+    }
+    const measure = () => {
+      const el = document.getElementById("mobile-bottom-nav");
+      setBottomNavHeight(el ? Math.ceil(el.getBoundingClientRect().height) : 0);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    document.addEventListener("focusin", measure);
+    document.addEventListener("focusout", measure);
+    const el = document.getElementById("mobile-bottom-nav");
+    const ro = typeof ResizeObserver !== "undefined" && el ? new ResizeObserver(measure) : null;
+    if (ro && el) ro.observe(el);
+    const mo = el ? new MutationObserver(measure) : null;
+    if (mo && el) mo.observe(el, { attributes: true, attributeFilter: ["class", "style", "aria-hidden"] });
+    return () => {
+      window.removeEventListener("resize", measure);
+      document.removeEventListener("focusin", measure);
+      document.removeEventListener("focusout", measure);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, [isMobile]);
 
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [summary, setSummary] = useState<ItinerarySummary | null>(null);
@@ -234,13 +262,14 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const arrivalDismissedRef = useRef<Set<number>>(new Set());
   const arrivedRecordedRef = useRef<Set<number>>(new Set());
 
+  const bottomNavInset = isMobile ? bottomNavHeight : 0;
   const effectivePanelWidth = isDesktop ? panelWidth : TRIP_PANEL_TABLET;
   const addPanelWidth = isMobile
     ? viewportWidth
     : isTablet
       ? ADD_PANEL_TABLET
       : Math.round(Math.min(420, Math.max(360, viewportWidth * 0.32)));
-  const addMobileHeight = addStopSheetHeight(addMobileSnap, viewportHeight);
+  const addMobileHeight = addStopSheetHeight(addMobileSnap, Math.max(320, viewportHeight - bottomNavInset));
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -588,7 +617,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     return measured ? total : null;
   }, [estimates, groups]);
 
-  const mobileHeight = mobileSheetHeight(mobileSnap, viewportHeight);
+  const mobileHeight = mobileSheetHeight(mobileSnap, viewportHeight, bottomNavInset);
   const maxDay = useMemo(
     () => Math.max(summary?.day_count || 1, ...groups.map((group) => group.day), 1),
     [summary, groups],
@@ -614,12 +643,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const leftMapInset = isMobile ? 16 : panelHidden || panelCollapsed ? 16 : effectivePanelWidth + 40;
   const rightMapInset = isMobile ? 16 : addOpen ? addPanelWidth + 40 : 24;
 
+  const bottomChrome = bottomSheetHeight + bottomNavInset;
   const mapInsets = useMemo(() => {
     if (isMobile) {
-      return { top: 92, right: 16, bottom: bottomSheetHeight + 20, left: 16 };
+      return { top: 92, right: 16, bottom: bottomChrome + 20, left: 16 };
     }
     return { top: 96, right: rightMapInset, bottom: 32, left: leftMapInset };
-  }, [isMobile, bottomSheetHeight, rightMapInset, leftMapInset]);
+  }, [isMobile, bottomChrome, rightMapInset, leftMapInset]);
 
   const visibleMapWidth = viewportWidth - (isMobile ? 32 : leftMapInset + rightMapInset);
   const showLegend = !isMobile && groups.length > 0 && visibleMapWidth > 360;
@@ -1519,7 +1549,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           insets={mapInsets}
           fitKey={`${itinerary.version ?? 0}-${items.length}`}
           fitLiveKey={livePosition ? itineraryId : 0}
-          bottomInset={isMobile ? bottomSheetHeight : 0}
+          bottomInset={isMobile ? bottomChrome : 0}
           rightInset={zoomRightInset}
           livePosition={livePosition}
           traveledPath={isOngoing ? liveTracking.traveled : []}
@@ -1582,7 +1612,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           aria-label={followMap && livePosition ? "Stop following your location" : "Show my location"}
           title={followMap && livePosition ? "Following your location" : "My location"}
           className="absolute z-[930] flex h-12 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-sea-700 shadow-xl ring-1 ring-line/70 transition hover:bg-sand-50"
-          style={isMobile ? { right: 16, bottom: bottomSheetHeight + 18 } : { right: Math.max(16, rightMapInset + 10), bottom: 20 }}
+          style={isMobile ? { right: 16, bottom: bottomChrome + 18 } : { right: Math.max(16, rightMapInset + 10), bottom: 20 }}
         >
           <CrosshairIcon className="h-5 w-5" />
           {followMap && livePosition ? "Following" : "My location"}
@@ -1749,6 +1779,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             isMobile={isMobile}
             mobileSnap={mobileSnap}
             mobileHeight={mobileHeight}
+            mobileBottomInset={bottomNavInset}
             onMobileSnapChange={setMobileSnap}
             onSelectItem={selectItem}
             onHoverItem={setHoveredItemId}
@@ -1779,6 +1810,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
               pickedPoint={addPickedPoint}
               mobileSnap={addMobileSnap}
               mobileHeight={addMobileHeight}
+              mobileBottomInset={bottomNavInset}
               onClose={handleCloseAdd}
               onRetryDestinations={() => void loadDestinations()}
               onModeChange={handleAddModeChange}
@@ -1801,7 +1833,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
           startedAt={itinerary.started_at}
           totalPausedSeconds={itinerary.total_paused_seconds}
           isMobile={isMobile}
-          bottomOffset={isMobile ? bottomSheetHeight : 0}
+          bottomOffset={isMobile ? bottomChrome : 0}
           centerOffset={legendOffset}
           busy={lifecycleBusy}
           message={isGroup ? groupTracking.message : liveTracking.message}
@@ -1836,7 +1868,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         {arrivalItem && lifecycle === "active" && (!isGroup || canEdit) ? (
           <div
             className="pointer-events-none absolute left-1/2 z-[895] -translate-x-1/2"
-            style={isMobile ? { bottom: bottomSheetHeight + 88 } : { top: 82 }}
+            style={isMobile ? { bottom: bottomChrome + 88 } : { top: 82 }}
           >
             <TripArrivalPrompt
               item={arrivalItem}
@@ -1853,7 +1885,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         {finished && !summaryDismissed ? (
           <div
             className="pointer-events-none absolute z-[894]"
-            style={isMobile ? { right: 12, bottom: bottomSheetHeight + 88 } : { right: 16, bottom: 16 }}
+            style={isMobile ? { right: 12, bottom: bottomChrome + 88 } : { right: 16, bottom: 16 }}
           >
             <TripSummaryCard
               itinerary={{ ...itinerary, distance_m: tracking?.distance_m ?? itinerary.distance_m ?? 0 }}
@@ -1866,7 +1898,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         ) : reviewCard && isOngoing ? (
           <div
             className="pointer-events-none absolute z-[894]"
-            style={isMobile ? { right: 12, bottom: bottomSheetHeight + 88 } : { right: 16, bottom: 16 }}
+            style={isMobile ? { right: 12, bottom: bottomChrome + 88 } : { right: 16, bottom: 16 }}
           >
             <TripReviewCard
               destinationId={reviewCard.destinationId}

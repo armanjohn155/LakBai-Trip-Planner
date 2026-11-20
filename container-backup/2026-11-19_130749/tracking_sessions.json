@@ -1,0 +1,53 @@
+[
+    {
+        "id": 2,
+        "itinerary_id": 18,
+        "user_id": 7,
+        "status": "active",
+        "started_at": "2026-11-15 02:01:06",
+        "ended_at": null,
+        "distance_m": 0,
+        "last_lat": null,
+        "last_lng": null,
+        "last_accuracy_m": null,
+        "last_point_at": null,
+        "created_at": "2026-11-15 02:01:06",
+        "updated_at": "2026-11-15 02:01:06",
+        "shared_with_group": 1,
+        "ever_shared_with_group": 0
+    },
+    {
+        "id": 3,
+        "itinerary_id": 18,
+        "user_id": 10,
+        "status": "active",
+        "started_at": "2026-11-15 02:02:40",
+        "ended_at": null,
+        "distance_m": 101,
+        "last_lat": 10.3163,
+        "last_lng": 123.886,
+        "last_accuracy_m": 9,
+        "last_point_at": "2026-11-15 02:04:09",
+        "created_at": "2026-11-15 02:02:40",
+        "updated_at": "2026-11-15 02:04:09",
+        "shared_with_group": 1,
+        "ever_shared_with_group": 0
+    },
+    {
+        "id": 4,
+        "itinerary_id": 10,
+        "user_id": 2,
+        "status": "active",
+        "started_at": "2026-11-15 02:13:55",
+        "ended_at": null,
+        "distance_m": 0,
+        "last_lat": null,
+        "last_lng": null,
+        "last_accuracy_m": null,
+        "last_point_at": null,
+        "created_at": "2026-11-15 02:13:55",
+        "updated_at": "2026-11-15 02:13:55",
+        "shared_with_group": 0,
+        "ever_shared_with_group": 0
+    }
+]

@@ -45,7 +45,7 @@ class ItineraryController extends Controller
             $invites = Itinerary::query()
                 ->pendingFor($user)
                 ->withCount([
-                    'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+                    'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
                 ])
                 ->with([
                     'user:id,name,username,avatar_url',
@@ -62,7 +62,7 @@ class ItineraryController extends Controller
         $query = Itinerary::query()
             ->withCount([
                 'items',
-                'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+                'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
             ])
             ->with([
                 'user:id,name,username,avatar_url',
@@ -125,7 +125,7 @@ class ItineraryController extends Controller
         });
 
         return new ItineraryResource($itinerary->loadForDisplay($user)->loadCount([
-            'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+            'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
         ]));
     }
 
@@ -137,7 +137,7 @@ class ItineraryController extends Controller
         Gate::authorize('view', $itinerary);
 
         return new ItineraryResource($itinerary->loadForDisplay(request()->user())->loadCount([
-            'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+            'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
         ]));
     }
 
@@ -174,7 +174,7 @@ class ItineraryController extends Controller
         });
 
         return new ItineraryResource($itinerary->loadForDisplay($request->user())->loadCount([
-            'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+            'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
         ]));
     }
 
@@ -237,7 +237,7 @@ class ItineraryController extends Controller
         });
 
         return (new ItineraryResource($copy->loadForDisplay($user)->loadCount([
-            'members as members_count' => fn ($query) => $query->wherePivot('status', Itinerary::STATUS_ACCEPTED),
+            'members as members_count' => fn ($query) => $query->where('itinerary_user.status', Itinerary::STATUS_ACCEPTED),
         ])))
             ->response()
             ->setStatusCode(201);

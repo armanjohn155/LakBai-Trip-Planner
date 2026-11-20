@@ -1,8 +1,9 @@
 import { Link } from "react-router";
+import { twMerge } from "tailwind-merge";
 
-export function Footer() {
+export function Footer({ className }: { className?: string }) {
   return (
-    <footer className="border-t border-line bg-white text-ink-600">
+    <footer className={twMerge("border-t border-line bg-white text-ink-600", className)}>
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
         <div>
           <p className="font-display text-2xl font-semibold text-lagoon-900">Lakbai</p>

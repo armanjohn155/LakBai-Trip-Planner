@@ -16,8 +16,8 @@ export type AddStopMode = "destination" | "custom";
 export type AddStopMobileSnap = "half" | "full";
 
 /** Height of the mobile add-stop sheet for each snap point. */
-export function addStopSheetHeight(snap: AddStopMobileSnap, viewportHeight: number): number {
-  const available = Math.max(viewportHeight - 64, 320);
+export function addStopSheetHeight(snap: AddStopMobileSnap, viewportHeight: number, bottomInset = 0): number {
+  const available = Math.max(viewportHeight - 64 - bottomInset, 260);
   return Math.round(available * (snap === "full" ? 0.92 : 0.56));
 }
 
@@ -52,6 +52,7 @@ interface AddStopPanelProps {
   pickedPoint: { lat: number; lng: number } | null;
   mobileSnap: AddStopMobileSnap;
   mobileHeight: number;
+  mobileBottomInset?: number;
   onClose: () => void;
   onRetryDestinations: () => void;
   onModeChange: (mode: AddStopMode) => void;
@@ -86,6 +87,7 @@ export function AddStopPanel({
   pickedPoint,
   mobileSnap,
   mobileHeight,
+  mobileBottomInset = 0,
   onClose,
   onRetryDestinations,
   onModeChange,
@@ -154,7 +156,7 @@ export function AddStopPanel({
       return;
     }
 
-    const available = Math.max(window.innerHeight - 64, 320);
+    const available = Math.max(window.innerHeight - 64 - mobileBottomInset, 260);
     const half = Math.round(available * 0.56);
     const full = Math.round(available * 0.92);
     onMobileSnapChange(Math.abs(currentHeight - half) < Math.abs(currentHeight - full) ? "half" : "full");
@@ -183,7 +185,7 @@ export function AddStopPanel({
   };
 
   const panelStyle = isMobile
-    ? { height: `${dragHeight ?? mobileHeight}px` }
+    ? { height: `${dragHeight ?? mobileHeight}px`, bottom: `${mobileBottomInset}px` }
     : { width: `${width}px` };
 
   return (
@@ -192,7 +194,7 @@ export function AddStopPanel({
       className={cn(
         "pointer-events-auto absolute z-[1050] flex flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-line/60",
         isMobile
-          ? "inset-x-0 bottom-0 rounded-t-3xl rounded-b-none pb-[env(safe-area-inset-bottom)] add-sheet-enter"
+          ? "inset-x-0 rounded-t-3xl rounded-b-none add-sheet-enter"
           : "bottom-4 right-4 top-4 rounded-2xl add-panel-enter",
       )}
       style={panelStyle}
@@ -211,7 +213,7 @@ export function AddStopPanel({
             if (!drag) return;
             const delta = drag.startY - event.clientY;
             if (Math.abs(delta) > 4) drag.moved = true;
-            const available = Math.max(window.innerHeight - 64, 320);
+            const available = Math.max(window.innerHeight - 64 - mobileBottomInset, 260);
             setDragHeight(Math.max(180, Math.min(available - 8, drag.startHeight + delta)));
           }}
           onPointerUp={finishDrag}

@@ -41,9 +41,9 @@ export type MobileSnap = "peek" | "half" | "full";
 
 export const MOBILE_PEEK_HEIGHT = 136;
 
-export function mobileSheetHeight(snap: MobileSnap, viewportHeight: number): number {
-  const available = Math.max(viewportHeight - 64, 320);
-  if (snap === "peek") return MOBILE_PEEK_HEIGHT;
+export function mobileSheetHeight(snap: MobileSnap, viewportHeight: number, bottomInset = 0): number {
+  const available = Math.max(viewportHeight - 64 - bottomInset, 260);
+  if (snap === "peek") return Math.min(MOBILE_PEEK_HEIGHT, available);
   if (snap === "half") return Math.round(available * 0.56);
   return Math.round(available * 0.9);
 }
@@ -100,6 +100,7 @@ interface TripPanelProps {
   isMobile: boolean;
   mobileSnap: MobileSnap;
   mobileHeight: number;
+  mobileBottomInset?: number;
   onMobileSnapChange: (snap: MobileSnap) => void;
   onSelectItem: (item: ItineraryItem) => void;
   onHoverItem: (id: number | null) => void;
@@ -156,6 +157,7 @@ export function TripPanel({
   isMobile,
   mobileSnap,
   mobileHeight,
+  mobileBottomInset = 0,
   onMobileSnapChange,
   onSelectItem,
   onHoverItem,
@@ -251,9 +253,10 @@ export function TripPanel({
       return;
     }
 
-    const available = Math.max(window.innerHeight - 64, 320);
+    const available = Math.max(window.innerHeight - 64 - mobileBottomInset, 260);
+    const peek = Math.min(MOBILE_PEEK_HEIGHT, available);
     const heights: Array<[MobileSnap, number]> = [
-      ["peek", MOBILE_PEEK_HEIGHT],
+      ["peek", peek],
       ["half", Math.round(available * 0.56)],
       ["full", Math.round(available * 0.9)],
     ];
@@ -264,13 +267,13 @@ export function TripPanel({
   };
 
   const sheetStyle = isMobile
-    ? { height: `${dragHeight ?? mobileHeight}px` }
+    ? { height: `${dragHeight ?? mobileHeight}px`, bottom: `${mobileBottomInset}px` }
     : { width: `${width}px` };
 
   const panelClasses = cn(
     "group/panel pointer-events-auto absolute z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-line/60",
     isMobile
-      ? "inset-x-0 bottom-0 rounded-t-3xl rounded-b-none transition-[height] duration-200 ease-out"
+      ? "inset-x-0 rounded-t-3xl rounded-b-none transition-[height] duration-200 ease-out"
       : "bottom-4 left-4 top-4 rounded-2xl",
     !isMobile && isCollapsed && "bottom-auto h-auto",
   );
@@ -332,8 +335,9 @@ export function TripPanel({
             if (!drag) return;
             const delta = drag.startY - event.clientY;
             if (Math.abs(delta) > 4) drag.moved = true;
-            const available = Math.max(window.innerHeight - 64, 320);
-            setDragHeight(Math.max(MOBILE_PEEK_HEIGHT, Math.min(available - 8, drag.startHeight + delta)));
+            const available = Math.max(window.innerHeight - 64 - mobileBottomInset, 260);
+            const peek = Math.min(MOBILE_PEEK_HEIGHT, available);
+            setDragHeight(Math.max(peek, Math.min(available - 8, drag.startHeight + delta)));
           }}
           onPointerUp={finishDrag}
           onPointerCancel={() => {

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type PointerEvent as ReactPointerEvent } from "react";
 
-import { Link, NavLink, useNavigate } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router";
+import { twMerge } from "tailwind-merge";
 
 import { NotificationBell } from "@/components/features/notifications/notification-bell";
 import { Avatar } from "@/components/features/profile/profile-sidebar";
@@ -34,7 +35,6 @@ export function PinIcon({ className }: { className?: string }) {
 export function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
 
   const loggedIn = Boolean(user);
 
@@ -42,10 +42,8 @@ export function Header() {
     { to: "/", label: "Home", exact: true },
     { to: "/destinations", label: "Destinations" },
     { to: "/map", label: "Map" },
-    { to: loggedIn ? "/app/trips" : "/register", label: "Trips" },
+    { to: loggedIn ? "/app/trips" : "/login", label: "Trips" },
   ];
-
-  const closeMenu = () => setOpen(false);
 
   const planTrip = () => {
     if (loggedIn) {
@@ -66,8 +64,8 @@ export function Header() {
       isActive ? "text-lagoon-900" : "text-ink-700",
     );
 
-  const renderCenterLink = (link: CenterLink, onNavigate?: () => void, mobileClassName = "") => (
-    <NavLink key={link.label} to={link.to} end={link.exact} onClick={onNavigate} className={(state) => cn(navItemClass(state), mobileClassName)}>
+  const renderCenterLink = (link: CenterLink) => (
+    <NavLink key={link.label} to={link.to} end={link.exact} className={navItemClass}>
       {({ isActive }) => (
         <>
           {link.label}
@@ -83,94 +81,121 @@ export function Header() {
   );
 
   return (
-    <header className="sticky top-0 z-[1100] border-b border-line bg-white text-ink-900">
-      <div className="mx-auto grid h-14 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-0 px-3 sm:flex sm:h-16 sm:gap-3 sm:px-6">
-        <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2" onClick={closeMenu}>
-          <img src="/Logo-main.png" alt="Manglakaw Logo" className="h-8 w-auto max-w-[5rem] object-contain sm:h-12 sm:max-w-none md:h-20 md:w-35" />
+    <header className="sticky top-0 z-[var(--z-header)] border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] text-ink-900 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:px-6">
+        <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2">
+          <img src="/Logo-main.png" alt="Lakbai" className="h-8 w-auto max-w-[7.5rem] object-contain sm:h-10 sm:max-w-none md:h-12" />
         </Link>
 
-        <nav className="flex justify-center md:hidden" aria-label="Current page">
-          {renderCenterLink(centerLinks[0], undefined, "px-2")}
+        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Main navigation">
+          {centerLinks.map((link) => renderCenterLink(link))}
         </nav>
 
-        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Main navigation">{centerLinks.map((link) => renderCenterLink(link))}</nav>
-
-        <div className="flex items-center justify-end gap-0 sm:ml-auto sm:gap-2 md:ml-0">
-          {user ? (
-            <div className="flex items-center gap-1">
-              <NotificationBell />
-              <AccountDropdown onSignOut={handleSignOut} />
-            </div>
-          ) : (
-            <>
-              <Link to="/login" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:text-ink-900 sm:inline-flex">
-                Sign in
-              </Link>
-              <Link to="/register" className="hidden rounded-full bg-sand-100 px-4 py-2 text-sm font-semibold text-lagoon-900 transition-colors hover:bg-sand-200 sm:inline">
-                Create account
-              </Link>
-            </>
-          )}
+        <div className="flex items-center justify-end gap-1 sm:gap-2">
+          {user ? <NotificationBell /> : null}
+          <AccountMenu onSignOut={handleSignOut} />
 
           <button
             type="button"
             onClick={planTrip}
             aria-label="Plan trip"
-            className="inline-flex items-center gap-1.5 rounded-full bg-surf-400 px-2.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-surf-300 sm:px-4"
+            className="inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full bg-surf-400 px-2.5 text-sm font-semibold text-white transition-colors hover:bg-surf-300 whitespace-nowrap sm:px-4"
           >
             <PinIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Plan Trip</span>
-          </button>
-
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink-700 transition-colors hover:bg-sand-100 md:hidden"
-            onClick={() => setOpen((value) => !value)}
-            aria-label="Toggle menu"
-            aria-expanded={open}
-          >
-            {open ? <XIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+            <span className="hidden md:inline">Plan Trip</span>
           </button>
         </div>
       </div>
-
-      {open ? (
-        <div className="border-t border-line px-4 py-3 md:hidden">
-          <nav className="flex flex-col gap-1">
-            {centerLinks.map((link) => renderCenterLink(link, closeMenu))}
-            {!user ? (
-              <>
-                <Link to="/login" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">Sign in</Link>
-                <Link to="/register" onClick={closeMenu} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-sand-100">Create account</Link>
-              </>
-            ) : null}
-          </nav>
-        </div>
-      ) : null}
     </header>
   );
 }
 
-interface AccountDropdownProps {
+type AccountMenuMode = "dropdown" | "sheet";
+
+interface AccountMenuProps {
   onSignOut: () => void;
 }
 
-interface AccountItem {
+interface AccountMenuItem {
   to: string;
   label: string;
   Icon: ComponentType<{ className?: string }>;
   badge?: number;
+  adminOnly?: boolean;
 }
 
-function AccountDropdown({ onSignOut }: AccountDropdownProps) {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [friendRequestCount, setFriendRequestCount] = useState(0);
-  const rootRef = useRef<HTMLDivElement>(null);
+interface AccountMenuConfig {
+  items: AccountMenuItem[];
+  guest: boolean;
+}
+
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
 
   useEffect(() => {
-    let cancelled = false;
+    const media = window.matchMedia("(min-width: 768px)");
+    const onChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
+    setIsDesktop(media.matches);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
 
+  return isDesktop;
+}
+
+function getFocusable(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  const selectors = [
+    'a[href]',
+    'button:not([disabled])',
+    'textarea:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(",");
+  return Array.from(container.querySelectorAll<HTMLElement>(selectors)).filter(
+    (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true",
+  );
+}
+
+/**
+ * Shared account menu (desktop dropdown + mobile bottom sheet).
+ * Menu content comes from one config (`AccountMenuContent` + items) so both views stay in sync.
+ */
+function AccountMenu({ onSignOut }: AccountMenuProps) {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
+  const [renderSheet, setRenderSheet] = useState(false);
+  const [sheetEntered, setSheetEntered] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const dragRef = useRef<{ startY: number; pointerId: number } | null>(null);
+  const prevPathRef = useRef(location.pathname + location.search + location.hash);
+  const prevDesktopRef = useRef<boolean | null>(null);
+
+  const isDesktop = useIsDesktop();
+  const mode: AccountMenuMode = isDesktop ? "dropdown" : "sheet";
+  const reducedMotion = useMemo(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
     getFriendRequests("incoming")
       .then((requests) => {
         if (!cancelled) setFriendRequestCount(requests.length);
@@ -178,118 +203,372 @@ function AccountDropdown({ onSignOut }: AccountDropdownProps) {
       .catch(() => {
         if (!cancelled) setFriendRequestCount(0);
       });
-
     return () => {
       cancelled = true;
     };
-  }, [user?.id, open]);
+  }, [user?.id, open, user]);
 
+  const menuConfig: AccountMenuConfig = useMemo(() => {
+    if (!user) return { items: [], guest: true };
+    const items: AccountMenuItem[] = [
+      { to: "/app/friends", label: "Friends", Icon: FriendsIcon, badge: friendRequestCount },
+      { to: "/app/notifications", label: "Notifications", Icon: BellIcon },
+      { to: "/app/history", label: "History", Icon: ClockIcon },
+      { to: "/app/trips", label: "My Trips", Icon: PinIcon },
+      { to: "/app/profile", label: "Profile", Icon: UserIcon },
+      ...(user.role === "admin" ? [{ to: "/admin", label: "Admin", Icon: ShieldIcon, adminOnly: true }] : []),
+    ];
+    return { items, guest: false };
+  }, [user, friendRequestCount]);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  // Close on route change after choosing an item / navigation.
+  useEffect(() => {
+    const next = location.pathname + location.search + location.hash;
+    if (prevPathRef.current !== next) {
+      prevPathRef.current = next;
+      if (open) setOpen(false);
+    } else {
+      prevPathRef.current = next;
+    }
+  }, [location.pathname, location.search, location.hash, open]);
+
+  // Close when resizing across the breakpoint.
+  useEffect(() => {
+    if (prevDesktopRef.current === null) {
+      prevDesktopRef.current = isDesktop;
+      return;
+    }
+    if (prevDesktopRef.current !== isDesktop) {
+      prevDesktopRef.current = isDesktop;
+      if (open) setOpen(false);
+    }
+  }, [isDesktop, open]);
+
+  // Mount/unmount animation for mobile sheet.
+  useEffect(() => {
+    if (mode === "sheet" && open) {
+      setRenderSheet(true);
+      setDragOffset(0);
+      const id = window.requestAnimationFrame(() => setSheetEntered(true));
+      return () => window.cancelAnimationFrame(id);
+    }
+    if (mode === "sheet" && !open && renderSheet) {
+      setSheetEntered(false);
+      if (reducedMotion) {
+        setRenderSheet(false);
+        return;
+      }
+      const timer = window.setTimeout(() => setRenderSheet(false), 200);
+      return () => window.clearTimeout(timer);
+    }
+    return;
+  }, [mode, open, renderSheet, reducedMotion]);
+
+  // Focus, scroll lock, escape/focus-trap for open menu (sheet gets full dialog behavior).
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+
+    const focusInitial = () => {
+      const container = mode === "sheet" ? sheetRef.current : dropdownRef.current;
+      const focusable = getFocusable(container);
+      (focusable[0] ?? container)?.focus?.();
     };
+
+    const timer = window.setTimeout(focusInitial, 0);
+    if (mode === "sheet") {
+      document.body.style.overflow = "hidden";
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (mode !== "sheet" || event.key !== "Tab") return;
+      const container = sheetRef.current;
+      const focusable = getFocusable(container);
+      if (focusable.length === 0 || !container) {
+        event.preventDefault();
+        container?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (active && !container.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open, mode, close]);
+
+  // Return focus to the account button on close.
+  useEffect(() => {
+    if (open) return;
+    const prev = previousFocusRef.current;
+    if (prev) {
+      previousFocusRef.current = null;
+      window.requestAnimationFrame(() => {
+        if (buttonRef.current) buttonRef.current.focus();
+        else prev.focus?.();
+      });
+    }
+  }, [open]);
+
+  // Desktop dropdown: outside click closes.
+  useEffect(() => {
+    if (!open || mode !== "dropdown") return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node) && !buttonRef.current?.contains(event.target as Node)) {
+        close();
       }
     };
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open, mode, close]);
 
-  const close = () => setOpen(false);
+  const handleSignOut = async () => {
+    close();
+    await onSignOut();
+  };
 
-  const items: AccountItem[] = [
-    { to: "/app", label: "Dashboard", Icon: GridIcon },
-    { to: "/app/trips", label: "My Trips", Icon: PinIcon },
-    { to: "/app/history", label: "Visiting History", Icon: ClockIcon },
-    { to: "/app/reviews", label: "My Reviews", Icon: StarIcon },
-    { to: "/app/favorites", label: "Favorites", Icon: HeartIcon },
-    { to: "/app/friends", label: "Friends", Icon: FriendsIcon, badge: friendRequestCount },
-    { to: "/app/profile", label: "Profile", Icon: UserIcon },
-    ...(user?.role === "admin" ? [{ to: "/admin", label: "Admin", Icon: ShieldIcon }] : []),
-  ];
+  const onSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (mode !== "sheet") return;
+    dragRef.current = { startY: event.clientY, pointerId: event.pointerId };
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+
+  const onSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const delta = event.clientY - drag.startY;
+    setDragOffset(delta > 0 ? delta : 0);
+  };
+
+  const onSheetPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (dragOffset > 80) {
+      close();
+    }
+    setDragOffset(0);
+  };
+
+  const accountButton = (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={() => setOpen((value) => !value)}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label="Account"
+      className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-100 hover:text-ink-900 md:px-3"
+    >
+      {user ? (
+        <Avatar name={user.name} src={user.avatar_url ?? null} className="h-7 w-7 text-xs ring-1 ring-line md:h-5 md:w-5 md:text-[10px]" />
+      ) : (
+        <UserIcon className="h-4 w-4" />
+      )}
+      <span className="hidden md:inline">Account</span>
+      <ChevronIcon className={cn("hidden h-3.5 w-3.5 transition-transform md:inline", open && "rotate-180")} />
+    </button>
+  );
+
+  const sharedContent = (
+    <AccountMenuContent
+      mode={mode}
+      user={user ? { name: user.name, email: user.email, avatar_url: user.avatar_url ?? null } : null}
+      config={menuConfig}
+      onClose={close}
+      onSignOut={() => void handleSignOut()}
+    />
+  );
 
   return (
-    <div className="relative" ref={rootRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-100 hover:text-ink-900"
-      >
-        <UserIcon className="h-4 w-4" />
-        <span className="hidden sm:inline">Account</span>
-        <ChevronIcon className={cn("hidden h-3.5 w-3.5 transition-transform sm:inline", open && "rotate-180")} />
-      </button>
+    <div className="relative">
+      {accountButton}
 
-      {open ? (
-        <div role="menu" className="glass-frost absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl p-1.5 text-ink-900">
-          {user ? (
-            <div className="flex items-center gap-3 px-3 py-2.5">
-              <Avatar name={user.name} src={user.avatar_url ?? null} className="h-9 w-9 text-sm ring-2 ring-white/30" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-lagoon-900">{user.name}</p>
-                <p className="truncate text-xs text-ink-600">{user.email}</p>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="my-1 h-px bg-line" />
-
-          {items.map(({ to, label, Icon, badge }) => (
-            <Link key={to} to={to} role="menuitem" onClick={close} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100">
-              <Icon className="h-4 w-4 text-ink-600" />
-              {label}
-              {badge ? (
-                <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-mango-400/30 px-1.5 py-0.5 text-[11px] font-bold text-lagoon-900">
-                  {badge > 9 ? "9+" : badge}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-
-          <div className="my-1 h-px bg-line" />
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={onSignOut}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5"
-          >
-            <LogOutIcon className="h-4 w-4" />
-            Sign Out
-          </button>
+      {/* Desktop dropdown (>= md) */}
+      {open && mode === "dropdown" ? (
+        <div
+          ref={dropdownRef}
+          role="menu"
+          aria-label="Account menu"
+          className={twMerge(
+            "glass-frost absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-64 rounded-2xl p-1.5 text-ink-900 shadow-lg",
+          )}
+        >
+          {sharedContent}
         </div>
+      ) : null}
+
+      {/* Mobile bottom sheet (< md) */}
+      {mode === "sheet" && renderSheet ? (
+        <>
+          <div
+            className={twMerge(
+              "fixed inset-0 z-[var(--z-dropdown)] bg-lagoon-950/45 transition-opacity",
+              reducedMotion ? "duration-0" : "duration-200",
+              sheetEntered && open ? "opacity-100" : "opacity-0",
+            )}
+            onClick={close}
+            aria-hidden="true"
+          />
+          <div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Account menu"
+            tabIndex={-1}
+            className={twMerge(
+              "fixed inset-x-0 bottom-0 z-[calc(var(--z-dropdown)+1)] flex max-h-[100dvh] flex-col rounded-t-3xl border-t border-line bg-white text-ink-900 shadow-2xl outline-none",
+              "pb-[env(safe-area-inset-bottom)]",
+              reducedMotion ? "transition-none" : "transition-transform duration-200 ease-out",
+              sheetEntered && open ? "translate-y-0" : "translate-y-full",
+            )}
+            style={dragOffset > 0 && sheetEntered && open ? { transform: `translateY(${dragOffset}px)` } : undefined}
+          >
+            <div
+              className="flex shrink-0 touch-none justify-center pt-2 pb-1"
+              onPointerDown={onSheetPointerDown}
+              onPointerMove={onSheetPointerMove}
+              onPointerUp={onSheetPointerUp}
+              onPointerCancel={onSheetPointerUp}
+              aria-hidden="true"
+            >
+              <div className="h-1.5 w-12 rounded-full bg-sand-300" />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+              {sharedContent}
+            </div>
+          </div>
+        </>
       ) : null}
     </div>
   );
 }
 
-function GridIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
+function AccountMenuContent({
+  mode,
+  user,
+  config,
+  onClose,
+  onSignOut,
+}: {
+  mode: AccountMenuMode;
+  user: { name: string; email: string; avatar_url: string | null } | null;
+  config: AccountMenuConfig;
+  onClose: () => void;
+  onSignOut: () => void;
+}) {
+  const isSheet = mode === "sheet";
 
-function HeartIcon({ className }: { className?: string }) {
+  if (!user) {
+    return (
+      <div className={twMerge(isSheet ? "space-y-1 py-1" : "space-y-1 p-1")}>
+        <p className={twMerge("font-semibold text-lagoon-900", isSheet ? "px-3 py-2 text-base" : "px-3 py-2 text-sm")}>Account</p>
+        <Link
+          to="/login"
+          onClick={onClose}
+          className={twMerge(
+            "flex w-full items-center justify-between rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
+            isSheet ? "min-h-12 py-3" : "py-2",
+          )}
+        >
+          <span>Sign in</span>
+          {isSheet ? <ChevronRightIcon className="h-4 w-4 text-ink-400" /> : null}
+        </Link>
+        <Link
+          to="/register"
+          onClick={onClose}
+          className={twMerge(
+            "flex w-full items-center justify-between rounded-xl px-3 text-sm font-semibold text-sea-700 transition-colors hover:bg-surf-400/15",
+            isSheet ? "min-h-12 bg-surf-400/10 py-3" : "bg-surf-400/10 py-2",
+          )}
+        >
+          <span>Create account</span>
+          {isSheet ? <ChevronRightIcon className="h-4 w-4 text-sea-600" /> : null}
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
-      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-    </svg>
+    <div className={twMerge(isSheet ? "py-1" : "")}>
+      <div className={twMerge("flex items-center gap-3", isSheet ? "px-2 py-3" : "px-3 py-2.5")}>
+        <Avatar
+          name={user.name}
+          src={user.avatar_url}
+          className={twMerge(isSheet ? "h-12 w-12 text-base" : "h-9 w-9 text-sm", "ring-2 ring-white/30")}
+        />
+        <div className="min-w-0">
+          <p className={twMerge("truncate font-semibold text-lagoon-900", isSheet ? "text-base" : "text-sm")}>{user.name}</p>
+          <p className={twMerge("truncate text-ink-600", isSheet ? "text-sm" : "text-xs")}>{user.email}</p>
+        </div>
+      </div>
+
+      <div className="my-1 h-px bg-line" />
+
+      <div className={twMerge(isSheet ? "space-y-0.5" : "")}>
+        {config.items.map(({ to, label, Icon, badge }) => (
+          <Link
+            key={to}
+            to={to}
+            role={isSheet ? undefined : "menuitem"}
+            onClick={onClose}
+            className={twMerge(
+              "flex w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
+              isSheet ? "min-h-12 py-3" : "gap-2.5 py-2",
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0 text-ink-600" />
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {badge ? (
+              <span className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-mango-400/30 px-1.5 py-0.5 text-[11px] font-bold text-lagoon-900">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            ) : null}
+            {isSheet ? <ChevronRightIcon className="h-4 w-4 shrink-0 text-ink-400" /> : null}
+          </Link>
+        ))}
+      </div>
+
+      <div className="my-1 h-px bg-line" />
+
+      <button
+        type="button"
+        role={isSheet ? undefined : "menuitem"}
+        onClick={onSignOut}
+        className={twMerge(
+          "flex w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5",
+          isSheet ? "min-h-12 py-3" : "gap-2.5 py-2",
+        )}
+      >
+        <LogOutIcon className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1 text-left">Sign out</span>
+        {isSheet ? <ChevronRightIcon className="h-4 w-4 shrink-0 text-sinulog-red/60" /> : null}
+      </button>
+    </div>
   );
 }
 
@@ -309,14 +588,6 @@ function ClockIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function StarIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
     </svg>
   );
 }
@@ -357,18 +628,20 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
-function MenuIcon({ className }: { className?: string }) {
+function ChevronRightIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
-      <path d="M4 7h16M4 12h16M4 17h16" />
+      <path d="M9 6l6 6-6 6" />
     </svg>
   );
 }
 
-function XIcon({ className }: { className?: string }) {
+function BellIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
-      <path d="M6 6l12 12M18 6L6 18" />
+      <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+      <path d="M13.73 21a2 2 0 01-3.46 0" />
     </svg>
   );
-}
+}
+

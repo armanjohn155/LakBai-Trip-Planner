@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useCurrentLocation } from "@/hooks/use-current-location";
 import { requestRoute, useLiveRoute, type RouteWaypoint } from "@/hooks/use-route";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { apiError, getDestinations } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import type { Destination, Itinerary, RouteGeometryResponse } from "@/lib/types";
@@ -82,42 +83,63 @@ function SouthCebuRouteCard({
   onTargetChange: (value: string) => void;
   onRetryRoute: () => void;
 }) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [collapsed, setCollapsed] = useState(true);
+  const showBody = isDesktop || !collapsed;
+
   return (
-    <div className="pointer-events-none absolute left-3 top-[4.25rem] z-[1000] max-h-[calc(100%-5rem)] w-[min(92%,20rem)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md sm:left-4 sm:top-[4.5rem] sm:w-80">
+    <div className="pointer-events-auto absolute left-3 top-[4.25rem] z-[1000] max-h-[calc(100%-5rem)] w-[min(92%,20rem)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md sm:left-4 sm:top-[4.5rem] sm:w-80">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">South Cebu road trip</p>
           <h2 className="mt-0.5 text-sm font-bold text-lagoon-950">Cebu City → Kawasan Falls</h2>
         </div>
-        <span className="rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold text-ink-600">Road route</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold text-ink-600">Road route</span>
+          {!isDesktop ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed((value) => !value)}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Expand route card" : "Collapse route card"}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-sand-100 text-ink-700 hover:bg-sand-200"
+            >
+              <svg viewBox="0 0 24 24" className={cn("h-4 w-4 transition-transform", collapsed ? "" : "rotate-180")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {SOUTH_CEBU_STOPS.slice(0, -1).map((stop, index) => {
-          const leg = route?.legs[index];
-          return (
-            <div key={stop.name} className="rounded-xl border border-line/80 bg-white px-2.5 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="min-w-0 truncate text-[11px] font-semibold text-ink-900">
-                  {stop.name} <span className="font-normal text-ink-500">to {SOUTH_CEBU_STOPS[index + 1].name.split(",")[0]}</span>
-                </p>
-                {leg ? <span className="shrink-0 text-[10px] text-ink-500">Leg {index + 1}</span> : null}
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <RouteMetric label="Distance" value={leg ? formatRouteDistance(leg.distance_m) : routeLoading ? "Routing…" : "—"} />
-                <RouteMetric label="Est. time" value={leg ? formatRouteDuration(leg.duration_s) : routeLoading ? "Routing…" : "—"} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {showBody ? (
+        <>
+          <div className="mt-3 space-y-2">
+            {SOUTH_CEBU_STOPS.slice(0, -1).map((stop, index) => {
+              const leg = route?.legs[index];
+              return (
+                <div key={stop.name} className="rounded-xl border border-line/80 bg-white px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-[11px] font-semibold text-ink-900">
+                      {stop.name} <span className="font-normal text-ink-500">to {SOUTH_CEBU_STOPS[index + 1].name.split(",")[0]}</span>
+                    </p>
+                    {leg ? <span className="shrink-0 text-[10px] text-ink-500">Leg {index + 1}</span> : null}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <RouteMetric label="Distance" value={leg ? formatRouteDistance(leg.distance_m) : routeLoading ? "Routing…" : "—"} />
+                    <RouteMetric label="Est. time" value={leg ? formatRouteDuration(leg.duration_s) : routeLoading ? "Routing…" : "—"} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      {route?.approximate ? (
-        <p className="mt-2 text-[10px] leading-relaxed text-amber-800">Approximate fallback estimate; road routing is unavailable right now.</p>
-      ) : null}
-      {routeError ? <p className="mt-2 text-xs text-rose-700">Could not load the road route: {routeError}</p> : null}
+          {route?.approximate ? (
+            <p className="mt-2 text-[10px] leading-relaxed text-amber-800">Approximate fallback estimate; road routing is unavailable right now.</p>
+          ) : null}
+          {routeError ? <p className="mt-2 text-xs text-rose-700">Could not load the road route: {routeError}</p> : null}
 
-      <div className="pointer-events-auto mt-3 border-t border-line pt-3">
+          <div className="mt-3 border-t border-line pt-3">
         <label htmlFor="live-route-target" className="block text-[11px] font-semibold text-ink-700">Navigate to</label>
         <div className="mt-1.5 flex gap-2">
           <select
@@ -154,7 +176,9 @@ function SouthCebuRouteCard({
             {liveRoute?.approximate ? <p className="mt-1 text-[10px] text-amber-800">Approximate route estimate.</p> : null}
           </div>
         ) : null}
-      </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -333,7 +357,7 @@ export default function MapPage() {
     <div className="flex min-h-dvh flex-col">
       <Header />
 
-      <main className="flex flex-1 flex-col md:h-[calc(100dvh-4rem)] md:overflow-hidden">
+      <main className="flex flex-1 flex-col pb-[var(--bottom-nav-h)] md:h-[calc(100dvh-4rem)] md:overflow-hidden md:pb-0">
         {error ? (
           <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
             <InlineError message={error} />
@@ -399,7 +423,7 @@ export default function MapPage() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 border-t border-line bg-white px-4 py-3 sm:px-6">
+                    <div className="sticky bottom-[var(--bottom-nav-h)] z-10 shrink-0 border-t border-line bg-white px-4 py-3 sm:px-6 md:bottom-0">
                       {loggedIn ? (
                         <Button size="lg" className="w-full" onClick={openChooser}>
                           <PlusIcon className="h-4 w-4" />
@@ -426,7 +450,7 @@ export default function MapPage() {
                 </div>
               ) : (
                 <>
-                  <div className="h-[45dvh] overflow-hidden md:h-full relative">
+                  <div className="relative h-[45dvh] overflow-hidden md:h-full">
                     <CebuMap
                       destinations={destinations}
                       activeId={selected?.id ?? null}
@@ -486,7 +510,7 @@ export default function MapPage() {
         )}
       </main>
 
-      <Footer />
+      <Footer className="pb-[calc(var(--bottom-nav-h)+1rem)] md:pb-0" />
 
       {showChooser && selected && loggedIn ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">

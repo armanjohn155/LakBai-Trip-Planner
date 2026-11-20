@@ -1,0 +1,72 @@
+[
+    {
+        "id": 1,
+        "name": "North Cebu Islands",
+        "slug": "north-cebu-islands",
+        "sort_order": 1,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:36",
+        "updated_at": "2026-11-19 12:25:36"
+    },
+    {
+        "id": 2,
+        "name": "South Cebu: Southwest and Highlands",
+        "slug": "south-cebu-southwest-and-highlands",
+        "sort_order": 2,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:37",
+        "updated_at": "2026-11-19 12:25:37"
+    },
+    {
+        "id": 3,
+        "name": "Cebu City and Metro Cebu",
+        "slug": "cebu-city-and-metro-cebu",
+        "sort_order": 3,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:38",
+        "updated_at": "2026-11-19 12:25:38"
+    },
+    {
+        "id": 4,
+        "name": "West Cebu",
+        "slug": "west-cebu",
+        "sort_order": 4,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:39",
+        "updated_at": "2026-11-19 12:25:39"
+    },
+    {
+        "id": 5,
+        "name": "North Cebu Mainland",
+        "slug": "north-cebu-mainland",
+        "sort_order": 5,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:39",
+        "updated_at": "2026-11-19 12:25:39"
+    },
+    {
+        "id": 6,
+        "name": "South Cebu: Southeast and Southern Trip",
+        "slug": "south-cebu-southeast-and-southern-trip",
+        "sort_order": 6,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:40",
+        "updated_at": "2026-11-19 12:25:40"
+    },
+    {
+        "id": 7,
+        "name": "Camotes and Cross Region Trip",
+        "slug": "camotes-and-cross-region-trip",
+        "sort_order": 7,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:41",
+        "updated_at": "2026-11-19 12:25:41"
+    }
+]

@@ -1,8 +1,8 @@
 import { Navigate, Outlet, useLocation } from "react-router";
+import { twMerge } from "tailwind-merge";
 
 import { Footer } from "@/components/common/footer";
 import { Header } from "@/components/common/header";
-import { MobileBottomNav } from "@/components/features/home/mobile-bottom-nav";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function AppLayout() {
@@ -19,20 +19,18 @@ export default function AppLayout() {
   }
 
   return (
-    <div className={isPlanner ? "flex h-screen flex-col overflow-hidden" : "flex min-h-screen flex-col"}>
+    <div className={twMerge("flex min-h-dvh flex-col", isPlanner && "h-dvh overflow-hidden")}>
       <Header />
       <main
-        className={
+        className={twMerge(
           isPlanner
             ? "min-h-0 flex-1"
-            : "mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10"
-        }
+            : "mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-[calc(var(--bottom-nav-h)+2rem)] sm:px-6 sm:py-10 md:pb-10",
+        )}
       >
         <Outlet />
       </main>
-      {isPlanner ? null : <Footer />}
-      {/* Bottom navigation: all logged-in pages except landing page (/app routes are never landing) */}
-      <MobileBottomNav />
+      {isPlanner ? null : <Footer className="pb-[calc(var(--bottom-nav-h)+1rem)] md:pb-0" />}
     </div>
   );
 }

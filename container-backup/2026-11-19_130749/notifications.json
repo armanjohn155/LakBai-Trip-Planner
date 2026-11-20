@@ -1,0 +1,152 @@
+[
+    {
+        "id": "79f015fb-4878-4abb-aa1d-16ede7c4b7cf",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made an update to \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"count\":1,\"last_action\":\"itinerary.updated\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-07 13:36:32",
+        "updated_at": "2026-11-07 13:36:32"
+    },
+    {
+        "id": "bb158a98-cd05-458a-b7c2-fc3a0655bcf2",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made an update to \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"count\":1,\"last_action\":\"itinerary.updated\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-08 02:31:52",
+        "updated_at": "2026-11-08 02:31:52"
+    },
+    {
+        "id": "b4258c4a-69cb-4d06-b616-a55759ae31c9",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made 2 updates to \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"count\":2,\"last_action\":\"stop.deleted\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"updated_at\":\"2026-11-08T02:51:08+00:00\"}",
+        "read_at": null,
+        "created_at": "2026-11-08 02:50:36",
+        "updated_at": "2026-11-08 02:51:08"
+    },
+    {
+        "id": "62d9fa32-cc40-4a40-9725-e67bf97d2155",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made an update to \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"count\":1,\"last_action\":\"stop.created\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-08 03:16:33",
+        "updated_at": "2026-11-08 03:16:33"
+    },
+    {
+        "id": "844b6a07-2825-47b6-b7db-cbd43503f13c",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made 8 updates to \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"count\":8,\"last_action\":\"stop.deleted\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"updated_at\":\"2026-11-09T01:13:50+00:00\"}",
+        "read_at": null,
+        "created_at": "2026-11-09 01:03:46",
+        "updated_at": "2026-11-09 01:13:50"
+    },
+    {
+        "id": "e0233e60-7a59-4083-b411-ed41acbb2a03",
+        "type": "friend.request_received",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"friend.request_received\",\"message\":\"Planner Tester sent you a friend request.\",\"action_url\":\"\\\/app\\\/friends?tab=requests\",\"friendship_id\":1,\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 01:53:17",
+        "updated_at": "2026-11-15 01:53:17"
+    },
+    {
+        "id": "5d8669b3-c19d-4af1-ab41-0c393c20580b",
+        "type": "friend.request_accepted",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 7,
+        "data": "{\"type\":\"friend.request_accepted\",\"message\":\"Viewer Tester accepted your friend request.\",\"action_url\":\"\\\/app\\\/friends\",\"friendship_id\":1,\"actor\":{\"id\":8,\"name\":\"Viewer Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 01:53:17",
+        "updated_at": "2026-11-15 01:53:17"
+    },
+    {
+        "id": "889246ea-d895-4fdd-b6d4-e5e97c8b60bf",
+        "type": "trip.invite_received",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 8,
+        "data": "{\"type\":\"trip.invite_received\",\"message\":\"Planner Tester invited you to \\\"2-Day Metro Cebu: Heritage & Food\\\" as viewer.\",\"action_url\":\"\\\/app\\\/trips?tab=invites\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"role\":\"viewer\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"actionable\":true}",
+        "read_at": null,
+        "created_at": "2026-11-15 01:53:18",
+        "updated_at": "2026-11-15 01:53:18"
+    },
+    {
+        "id": "8c5fca8f-8ec6-4d05-9ee9-7da5e7b43c7a",
+        "type": "trip.invite_accepted",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 7,
+        "data": "{\"type\":\"trip.invite_accepted\",\"message\":\"Viewer Tester joined \\\"2-Day Metro Cebu: Heritage & Food\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/13\",\"itinerary_id\":13,\"itinerary_title\":\"2-Day Metro Cebu: Heritage & Food\",\"start_date\":\"2026-11-20\",\"end_date\":\"2026-11-22\",\"actor\":{\"id\":8,\"name\":\"Viewer Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 01:53:18",
+        "updated_at": "2026-11-15 01:53:18"
+    },
+    {
+        "id": "287029eb-5a75-42d0-a96f-348c38fe92b6",
+        "type": "friend.request_received",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 10,
+        "data": "{\"type\":\"friend.request_received\",\"message\":\"Planner Tester sent you a friend request.\",\"action_url\":\"\\\/app\\\/friends?tab=requests\",\"friendship_id\":2,\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:00:38",
+        "updated_at": "2026-11-15 02:00:38"
+    },
+    {
+        "id": "e204c716-b243-4d70-ba5a-c4ddb2926223",
+        "type": "friend.request_accepted",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 7,
+        "data": "{\"type\":\"friend.request_accepted\",\"message\":\"E2E Member accepted your friend request.\",\"action_url\":\"\\\/app\\\/friends\",\"friendship_id\":2,\"actor\":{\"id\":10,\"name\":\"E2E Member\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:00:53",
+        "updated_at": "2026-11-15 02:00:53"
+    },
+    {
+        "id": "b665c09c-e8d3-48e2-a24a-ef0eb0c9011e",
+        "type": "trip.invite_received",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 10,
+        "data": "{\"type\":\"trip.invite_received\",\"message\":\"Planner Tester invited you to \\\"E2E Group Tracking 1794707981\\\" as viewer.\",\"action_url\":\"\\\/app\\\/trips?tab=invites\",\"itinerary_id\":18,\"itinerary_title\":\"E2E Group Tracking 1794707981\",\"start_date\":\"2026-11-15\",\"end_date\":\"2026-11-15\",\"role\":\"viewer\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"actionable\":true}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:00:54",
+        "updated_at": "2026-11-15 02:00:54"
+    },
+    {
+        "id": "3e66b63e-9948-4f81-9f1c-0fc64a0d7406",
+        "type": "trip.invite_accepted",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 7,
+        "data": "{\"type\":\"trip.invite_accepted\",\"message\":\"E2E Member joined \\\"E2E Group Tracking 1794707981\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/18\",\"itinerary_id\":18,\"itinerary_title\":\"E2E Group Tracking 1794707981\",\"start_date\":\"2026-11-15\",\"end_date\":\"2026-11-15\",\"actor\":{\"id\":10,\"name\":\"E2E Member\",\"avatar_url\":null}}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:00:55",
+        "updated_at": "2026-11-15 02:00:55"
+    },
+    {
+        "id": "4356f686-c076-437e-b03d-10a13e27e2bb",
+        "type": "trip.updated",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 10,
+        "data": "{\"type\":\"trip.updated\",\"message\":\"Planner Tester made 3 updates to \\\"E2E Group Tracking 1794707981\\\".\",\"action_url\":\"\\\/app\\\/trips\\\/18\",\"itinerary_id\":18,\"itinerary_title\":\"E2E Group Tracking 1794707981\",\"start_date\":\"2026-11-15\",\"end_date\":\"2026-11-15\",\"count\":3,\"last_action\":\"stop.arrived\",\"actor\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"updated_at\":\"2026-11-15T02:04:06+00:00\"}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:01:05",
+        "updated_at": "2026-11-15 02:04:06"
+    },
+    {
+        "id": "817d8e62-1c39-4972-bfdf-9e97a99d9191",
+        "type": "trip.member_arrived",
+        "notifiable_type": "App\\Models\\User",
+        "notifiable_id": 10,
+        "data": "{\"type\":\"trip.member_arrived\",\"message\":\"Planner Tester arrived at Bantayan Island.\",\"action_url\":\"\\\/app\\\/trips\\\/18\",\"itinerary_id\":18,\"itinerary_title\":\"E2E Group Tracking 1794707981\",\"member\":{\"id\":7,\"name\":\"Planner Tester\",\"avatar_url\":null},\"stop_id\":83,\"stop_title\":\"Bantayan Island\"}",
+        "read_at": null,
+        "created_at": "2026-11-15 02:05:40",
+        "updated_at": "2026-11-15 02:05:40"
+    }
+]

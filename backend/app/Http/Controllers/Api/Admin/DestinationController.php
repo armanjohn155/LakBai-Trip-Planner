@@ -7,15 +7,19 @@ use App\Http\Requests\Admin\StoreDestinationRequest;
 use App\Http\Requests\Admin\UpdateDestinationRequest;
 use App\Http\Resources\DestinationResource;
 use App\Models\Destination;
+use App\Services\DestinationOptionService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 class DestinationController extends Controller
 {
@@ -125,7 +129,18 @@ class DestinationController extends Controller
             return (new DestinationResource($destination))
                 ->response()
                 ->setStatusCode(201);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
+            $handled = $this->respondToPersistenceFailure($e, 'store', null);
+            if ($handled !== null) {
+                return $handled;
+            }
+
+            Log::error('Failed to create destination.', [
+                'action' => 'store',
+                'admin_id' => $request->user()?->id,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
             report($e);
 
             return response()->json([
@@ -140,6 +155,24 @@ class DestinationController extends Controller
     public function show(Destination $destination): DestinationResource
     {
         return new DestinationResource($destination);
+    }
+
+    /**
+     * Confirm a destination row is persisted in the active database.
+     */
+    public function dbCheck(Destination $destination): JsonResponse
+    {
+        $fresh = Destination::withTrashed()->findOrFail($destination->getKey());
+        $connection = DB::connection();
+
+        return response()->json([
+            'saved_to_database' => true,
+            'id' => $fresh->id,
+            'created_at' => $fresh->created_at?->toAtomString(),
+            'source' => $fresh->source,
+            'database_name' => $connection->getDatabaseName(),
+            'database_driver' => $connection->getDriverName(),
+        ]);
     }
 
     /**
@@ -206,7 +239,19 @@ class DestinationController extends Controller
             $this->clearDestinationCaches();
 
             return new DestinationResource($destination);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
+            $handled = $this->respondToPersistenceFailure($e, 'update', $destination->id);
+            if ($handled !== null) {
+                return $handled;
+            }
+
+            Log::error('Failed to update destination.', [
+                'action' => 'update',
+                'destination_id' => $destination->id,
+                'admin_id' => $request->user()?->id,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
             report($e);
 
             return response()->json([
@@ -263,9 +308,61 @@ class DestinationController extends Controller
         try {
             Cache::forget('destinations:index');
             Cache::forget('destinations:map');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Ignore cache clearing failures
         }
+
+        try {
+            app(DestinationOptionService::class)->forget();
+        } catch (Throwable $e) {
+            // Ignore cache clearing failures
+        }
+    }
+
+    /**
+     * Convert obvious database/input failures into validation-style 422 responses.
+     */
+    private function respondToPersistenceFailure(Throwable $e, string $action, ?int $destinationId): ?JsonResponse
+    {
+        $isQueryFailure = $e instanceof QueryException || $e->getPrevious() instanceof QueryException;
+        if (! $isQueryFailure) {
+            return null;
+        }
+
+        $message = $e->getMessage();
+
+        if (str_contains($message, 'destinations_name_unique')
+            || str_contains($message, 'destinations.name')
+            || str_contains($message, 'UNIQUE constraint failed: destinations.name')) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => [
+                    'name' => ['A destination with this name already exists.'],
+                ],
+            ], 422);
+        }
+
+        if (str_contains($message, 'value too long')
+            || str_contains($message, 'Data too long')
+            || str_contains($message, 'String data, right truncated')) {
+            return response()->json([
+                'message' => 'One or more fields are too long. Please shorten the input and try again.',
+                'errors' => [
+                    'name' => ['One or more fields are too long. Please shorten the input and try again.'],
+                ],
+            ], 422);
+        }
+
+        Log::warning('Destination persistence rejected by the database.', [
+            'action' => $action,
+            'destination_id' => $destinationId,
+            'exception' => $e::class,
+            'message' => $e->getMessage(),
+        ]);
+
+        return response()->json([
+            'message' => 'The destination could not be saved because some values are invalid. Please review the form and try again.',
+        ], 422);
     }
 
     /**

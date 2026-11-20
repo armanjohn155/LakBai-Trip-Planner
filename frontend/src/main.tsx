@@ -6,12 +6,13 @@ import "leaflet/dist/leaflet.css";
 /* eslint-disable react-refresh/only-export-components */
 
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
 import { FavoritesTab } from "@/components/features/profile/favorites-tab";
 import { ProfileSummaryTab } from "@/components/features/profile/profile-summary-tab";
 import { SettingsTab } from "@/components/features/profile/settings-tab";
 import { TripsTab } from "@/components/features/profile/trips-tab";
+import { MobileBottomNav } from "@/components/features/home/mobile-bottom-nav";
 import { AuthProvider } from "@/hooks/use-auth";
 import { NotificationsProvider } from "@/hooks/use-notifications";
 import { FavoritesProvider } from "@/hooks/use-favorites";
@@ -54,12 +55,22 @@ function DestinationDetailRedirect() {
   return <Navigate to={`/destinations/${id}`} replace />;
 }
 
+function RootShell() {
+  return (
+    <>
+      <Outlet />
+      <MobileBottomNav />
+    </>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <AuthProvider>
     <NotificationsProvider>
       <FavoritesProvider>
       <BrowserRouter>
         <Routes>
+          <Route element={<RootShell />}>
           <Route element={<GuestLayout />}>
             <Route index element={<HomePage />} />
             <Route path="about" element={<AboutPage />} />
@@ -117,6 +128,7 @@ createRoot(document.getElementById("root")!).render(
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Routes>
       </BrowserRouter>
       </FavoritesProvider>

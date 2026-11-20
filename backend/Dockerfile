@@ -9,8 +9,9 @@
             freetype-dev \
             libjpeg-turbo-dev \
             libpng-dev \
+            libpq-dev \
         && docker-php-ext-configure gd --with-freetype --with-jpeg \
-        && docker-php-ext-install -j"$(nproc)" gd pcntl \
+        && docker-php-ext-install -j"$(nproc)" gd pcntl pdo_pgsql pgsql \
         && docker-php-ext-enable opcache
 
     COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

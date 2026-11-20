@@ -230,6 +230,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/destinations', [AdminDestinationController::class, 'index']);
     Route::post('/destinations', [AdminDestinationController::class, 'store']);
     Route::get('/destinations/{destination}', [AdminDestinationController::class, 'show'])->withTrashed();
+    Route::get('/destinations/{destination}/db-check', [AdminDestinationController::class, 'dbCheck'])->withTrashed();
     Route::match(['put', 'patch'], '/destinations/{destination}', [AdminDestinationController::class, 'update'])->withTrashed();
     Route::delete('/destinations/{destination}', [AdminDestinationController::class, 'destroy'])->withTrashed();
     Route::post('/destinations/{destination}/restore', [AdminDestinationController::class, 'restore'])->withTrashed();

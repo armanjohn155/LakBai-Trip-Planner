@@ -10,7 +10,6 @@ import { FeatureHighlights } from "@/components/features/home/feature-highlights
 import { ForYouRecommendations } from "@/components/features/home/for-you-recommendations";
 import { HomepageBannerSection } from "@/components/features/home/homepage-banner-section";
 import { LakbaiFeatures } from "@/components/features/home/lakbai-features";
-import { MobileHomeTopSection } from "@/components/features/home/mobile-home-top-section";
 import { NearByYou } from "@/components/features/home/near-by-you";
 import { ProfileSection } from "@/components/features/home/profile-section";
 import { TrendingDestinations } from "@/components/features/home/trending-destinations";
@@ -105,7 +104,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col pb-[calc(90px+env(safe-area-inset-bottom))] md:pb-0">
+    <div className="flex flex-col pb-[calc(var(--bottom-nav-h)+1rem)] md:pb-0">
       {/* Hero banner: visible for both logged-in and logged-out users */}
       <div className="order-1">
         <HomepageBannerSection
@@ -125,17 +124,9 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {/* Mobile-only top section + personalized sections: logged-in only */}
+      {/* Mobile-only personalized sections: logged-in only */}
       {user ? (
         <>
-          <div className="md:hidden">
-            <MobileHomeTopSection
-              user={user}
-              onProfilePress={() => navigate("/app/profile")}
-              onNotificationsPress={() => navigate("/app/notifications")}
-            />
-          </div>
-
           <div className="order-3 md:hidden">
             <TrendingDestinations
               destinations={destinations}

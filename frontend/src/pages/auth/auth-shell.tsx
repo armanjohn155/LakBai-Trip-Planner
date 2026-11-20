@@ -18,7 +18,7 @@ interface AuthShellProps {
 
 export function AuthShell({ title, detail, children, footerText, footerTo, footerLabel }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
       <Header />
       <main className="flex flex-1 items-center justify-center px-4 py-16">
         <div className="w-full max-w-md">

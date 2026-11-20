@@ -1,30 +1,17 @@
-import { Outlet, useLocation } from "react-router";
+import { Outlet } from "react-router";
 
 import { Footer } from "@/components/common/footer";
 import { Header } from "@/components/common/header";
-import { MobileBottomNav } from "@/components/features/home/mobile-bottom-nav";
-import { useAuth } from "@/hooks/use-auth";
 
 export default function GuestLayout() {
-  const { user } = useAuth();
-  const { pathname } = useLocation();
-  const loggedIn = Boolean(user);
-  const isLandingPage = pathname === "/";
-
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Desktop/tablet: site-wide header (always shown). Hidden on mobile. */}
-      <div className="hidden md:block">
-        <Header />
-      </div>
+    <div className="flex min-h-dvh flex-col">
+      <Header />
 
-      <main className="flex-1">
+      <main className="flex-1 pb-[var(--bottom-nav-h)] md:pb-0">
         <Outlet />
       </main>
-      <Footer />
-
-      {/* Bottom navigation: logged-in users on all pages except the landing page. */}
-      {loggedIn && !isLandingPage && <MobileBottomNav />}
+      <Footer className="pb-[calc(var(--bottom-nav-h)+1rem)] md:pb-0" />
     </div>
   );
 }

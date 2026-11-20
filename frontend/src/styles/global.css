@@ -207,6 +207,26 @@
   --glass-border: 1px solid rgba(255, 255, 255, 0.25);
   --glass-blur: blur(20px);
   --glass-shadow: 0 8px 32px rgba(0, 40, 35, 0.15);
+
+  /* Layout / mobile chrome */
+  --bottom-nav-h: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  --header-h: 3.5rem;
+
+  /* Z-index scale: map < map overlays < panels/sheets < bottom nav < header/dropdowns < modals/drawers < toasts */
+  --z-map: 0;
+  --z-map-overlay: 600;
+  --z-panel: 900;
+  --z-bottom-nav: 1100;
+  --z-header: 1110;
+  --z-dropdown: 1120;
+  --z-modal: 1200;
+  --z-toast: 1300;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --header-h: 4rem;
+  }
 }
 
 /* Ambient colour blob placed behind a frosted panel so the */

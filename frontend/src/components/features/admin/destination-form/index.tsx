@@ -178,11 +178,22 @@ export function DestinationForm({ destination }: { destination?: Destination }) 
     if (items.length > 0) fd.append("cover_index", "0");
     try {
       if (destination) {
-        await updateAdminDestination(destination.id, fd);
+        const saved = await updateAdminDestination(destination.id, fd);
+        nav("/admin/destinations", {
+          replace: true,
+          state: {
+            toast: `Updated '${saved.name}' (#${saved.id}).`,
+          },
+        });
       } else {
-        await createAdminDestination(fd);
+        const saved = await createAdminDestination(fd);
+        nav("/admin/destinations", {
+          replace: true,
+          state: {
+            toast: `Created '${saved.name}' (#${saved.id}).`,
+          },
+        });
       }
-      nav("/admin/destinations", { replace: true, state: { toast: edit ? `${v.name} was updated.` : `${v.name} was added.` } });
     } catch (err) {
       const fe = apiFieldErrors(err);
       setErrs(fe);

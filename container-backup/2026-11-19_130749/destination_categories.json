@@ -1,0 +1,122 @@
+[
+    {
+        "id": 1,
+        "name": "Beach",
+        "slug": "beach",
+        "icon": null,
+        "color": null,
+        "sort_order": 1,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:31",
+        "updated_at": "2026-11-19 12:25:31"
+    },
+    {
+        "id": 2,
+        "name": "Waterfall",
+        "slug": "waterfall",
+        "icon": null,
+        "color": null,
+        "sort_order": 2,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:31",
+        "updated_at": "2026-11-19 12:25:31"
+    },
+    {
+        "id": 3,
+        "name": "Mountains & Hiking",
+        "slug": "mountains-hiking",
+        "icon": null,
+        "color": null,
+        "sort_order": 3,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:31",
+        "updated_at": "2026-11-19 12:25:31"
+    },
+    {
+        "id": 4,
+        "name": "Historical & Cultural",
+        "slug": "historical-cultural",
+        "icon": null,
+        "color": null,
+        "sort_order": 4,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:32",
+        "updated_at": "2026-11-19 12:25:32"
+    },
+    {
+        "id": 5,
+        "name": "Religious Sites",
+        "slug": "religious-sites",
+        "icon": null,
+        "color": null,
+        "sort_order": 5,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:32",
+        "updated_at": "2026-11-19 12:25:32"
+    },
+    {
+        "id": 6,
+        "name": "Food & Restaurants",
+        "slug": "food-restaurants",
+        "icon": null,
+        "color": null,
+        "sort_order": 6,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:32",
+        "updated_at": "2026-11-19 12:25:32"
+    },
+    {
+        "id": 7,
+        "name": "Diving & Water Activities",
+        "slug": "diving-water-activities",
+        "icon": null,
+        "color": null,
+        "sort_order": 7,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:33",
+        "updated_at": "2026-11-19 12:25:33"
+    },
+    {
+        "id": 8,
+        "name": "Nature & Eco-Tourism",
+        "slug": "nature-eco-tourism",
+        "icon": null,
+        "color": null,
+        "sort_order": 8,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:34",
+        "updated_at": "2026-11-19 12:25:34"
+    },
+    {
+        "id": 9,
+        "name": "Islands",
+        "slug": "islands",
+        "icon": null,
+        "color": null,
+        "sort_order": 9,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:35",
+        "updated_at": "2026-11-19 12:25:35"
+    },
+    {
+        "id": 10,
+        "name": "Cave",
+        "slug": "cave",
+        "icon": null,
+        "color": null,
+        "sort_order": 10,
+        "is_active": 1,
+        "is_system": 1,
+        "created_at": "2026-11-19 12:25:36",
+        "updated_at": "2026-11-19 12:25:36"
+    }
+]
