@@ -20,3 +20,5 @@ container-backup/
 *.sqlite.bak
 backend/storage/app/backups/
 docker.env
+backend/test-results.txt
+frontend/public/__routecard-test.html
