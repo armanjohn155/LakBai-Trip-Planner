@@ -95,18 +95,32 @@ function FavoriteButton({ favorited, onToggle, className }: { favorited: boolean
   );
 }
 
-export function RatingLine({ destination, className, light = false }: { destination: Destination; className?: string; light?: boolean }) {
+export function RatingLine({
+  destination,
+  className,
+  light = false,
+  compact = false,
+}: {
+  destination: Destination;
+  className?: string;
+  light?: boolean;
+  /** Tighter type and a shortened review count for small cards. */
+  compact?: boolean;
+}) {
   const rating = toNumber(destination.rating);
   const reviewCount = destination.review_count;
   if (!rating && reviewCount === null) {
     return null;
   }
   return (
-    <p className={cn("flex items-center gap-1.5 text-sm", className)}>
-      <StarIcon className={cn("h-4 w-4", light ? "text-surf-300" : "text-mango-400")} />
+    <p className={cn("flex items-center gap-1.5 text-sm", compact && "gap-1", className)}>
+      <StarIcon className={cn("h-4 w-4", compact && "h-3 w-3", light ? "text-surf-300" : "text-mango-400")} />
       <span className={cn("font-semibold", light ? "text-sand-50" : "text-lagoon-900")}>{rating ? rating.toFixed(1) : "—"}</span>
       {reviewCount !== null ? (
-        <span className={light ? "text-sand-50/80" : "text-ink-600"}>({formatCompactNumber(reviewCount)} reviews)</span>
+        <span className={light ? "text-sand-50/80" : "text-ink-600"}>
+          ({formatCompactNumber(reviewCount)}
+          {compact ? "" : " reviews"})
+        </span>
       ) : null}
     </p>
   );
@@ -145,27 +159,27 @@ function DestinationShowcaseCard({
     <div
       ref={containerRef}
       className={cn(
-        "group relative flex h-full flex-col rounded-2xl border border-line bg-white p-2 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+        "group relative flex h-full min-w-0 flex-col rounded-xl border border-line bg-white p-1.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
         highlighted && "ring-2 ring-surf-400",
       )}
     >
       <Link
         to={`/destinations/${destination.id}`}
         aria-label={`View ${destination.name}`}
-        className="absolute inset-0 z-10 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
+        className="absolute inset-0 z-10 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
       />
 
-      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-sand-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-sand-100">
         <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
           <CoverImage destination={destination} />
         </div>
-        <span className="absolute left-2.5 top-2.5 rounded-md bg-white/90 px-2 py-0.5 text-xs font-semibold text-lagoon-900 shadow-sm">
+        <span className="absolute left-1.5 top-1.5 max-w-[calc(100%-2.5rem)] truncate rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold text-lagoon-900 shadow-sm">
           {categoryTag(destination.category)}
         </span>
         <FavoriteButton
           favorited={favorited}
           onToggle={onToggleFavorite}
-          className="right-2.5 top-2.5 h-8 w-8 bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line hover:bg-white"
+          className="right-1.5 top-1.5 h-7 w-7 bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line hover:bg-white [&>svg]:h-3.5 [&>svg]:w-3.5"
         />
         <button
           type="button"
@@ -175,27 +189,25 @@ function DestinationShowcaseCard({
             onAdd();
           }}
           aria-label="Add to trip"
-          className="absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line transition-colors hover:bg-white"
+          className="absolute bottom-1.5 right-1.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-lagoon-900 shadow-sm ring-1 ring-line transition-colors hover:bg-white"
         >
-          <PlusIcon className="h-4 w-4" />
+          <PlusIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col p-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sea-600">
+      <div className="flex min-w-0 flex-1 flex-col px-0.5 pb-0.5 pt-1.5">
+        <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-sea-600">
           {categoryTag(destination.category)}
         </span>
-        <h3 className="mt-1 truncate text-base font-bold leading-tight text-lagoon-900">{destination.name}</h3>
-        <p className="mt-1 flex items-center gap-1 text-xs text-ink-600">
-          <PinIcon className="h-3.5 w-3.5 shrink-0" />
+        <h3 className="mt-1 line-clamp-2 text-[13px] font-bold leading-tight text-lagoon-900">{destination.name}</h3>
+        <p className="mt-0.5 flex min-w-0 items-center gap-0.5 text-[11px] text-ink-600">
+          <PinIcon className="h-3 w-3 shrink-0" />
           <span className="truncate">{destinationLocation(destination)}</span>
         </p>
 
-        <div className="my-3 border-t border-line/70" />
-
-        <div className="flex items-center justify-between gap-2">
-          <RatingLine destination={destination} className="text-[13px]" />
-          <span className="shrink-0 text-sm font-bold text-lagoon-900">{formatMoney(destination.estimated_cost)}</span>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5 pt-1.5">
+          <RatingLine destination={destination} compact className="shrink-0 text-[11px]" />
+          <span className="shrink-0 text-[11px] font-bold text-lagoon-900">{formatMoney(destination.estimated_cost)}</span>
         </div>
       </div>
     </div>

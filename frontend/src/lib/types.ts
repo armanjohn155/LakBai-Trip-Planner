@@ -191,11 +191,22 @@ export interface ItineraryRouteEstimate {
 
 export type RouteProfile = "driving" | "motorcycle" | "walking" | "cycling";
 
+export interface RouteInstruction {
+  instruction: string;
+  distance_m: number;
+  duration_s: number;
+  location?: [number, number] | null;
+  type?: string;
+  modifier?: string | null;
+  street?: string | null;
+}
+
 export interface RouteGeometryResponse {
   geometry: { type: "LineString"; coordinates: [number, number][] };
   distance_m: number;
   duration_s: number;
   legs: { distance_m: number; duration_s: number }[];
+  instructions?: RouteInstruction[];
   provider: string;
   approximate: boolean;
   reason?: "no_road_route" | "provider_unavailable" | "rate_limited";

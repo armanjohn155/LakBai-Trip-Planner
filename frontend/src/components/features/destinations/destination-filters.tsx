@@ -44,9 +44,16 @@ interface DestinationFiltersProps {
   filters: ExplorerFilters;
   allDestinations: Destination[];
   onFiltersChange: (filters: ExplorerFilters) => void;
+  /** Hide the built-in header when the component is embedded in a custom shell (e.g. the mobile drawer). */
+  showHeader?: boolean;
 }
 
-export function DestinationFilters({ filters, allDestinations, onFiltersChange }: DestinationFiltersProps) {
+export function DestinationFilters({
+  filters,
+  allDestinations,
+  onFiltersChange,
+  showHeader = true,
+}: DestinationFiltersProps) {
   const { options } = useDestinationOptions();
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -93,17 +100,19 @@ export function DestinationFilters({ filters, allDestinations, onFiltersChange }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line/70 bg-white shadow-sm">
-      <div className="flex items-center justify-between px-4 py-3.5">
-        <h2 className="flex items-center gap-2 font-display text-base font-bold text-lagoon-900">
-          <SlidersIcon className="h-4 w-4 text-sea-600" />
-          Filters
-        </h2>
-        <button type="button" onClick={clearAll} className="text-xs font-semibold text-sea-600 transition-colors hover:text-sea-500">
-          Clear all
-        </button>
-      </div>
+      {showHeader ? (
+        <div className="flex items-center justify-between px-4 py-3.5">
+          <h2 className="flex items-center gap-2 font-display text-base font-bold text-lagoon-900">
+            <SlidersIcon className="h-4 w-4 text-sea-600" />
+            Filters
+          </h2>
+          <button type="button" onClick={clearAll} className="text-xs font-semibold text-sea-600 transition-colors hover:text-sea-500">
+            Clear all
+          </button>
+        </div>
+      ) : null}
 
-      <div className="divide-y divide-line/60 border-t border-line/60">
+      <div className={cn("divide-y divide-line/60", showHeader && "border-t border-line/60")}>
         <FilterGroup title="Categories" defaultOpen>
           <div className="max-h-60 space-y-0.5 overflow-y-auto pr-1">
             {categoryOptions.map((option) => {

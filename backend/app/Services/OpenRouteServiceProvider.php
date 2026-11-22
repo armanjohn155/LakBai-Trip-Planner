@@ -21,7 +21,7 @@ class OpenRouteServiceProvider implements RoutingProvider
             ->withHeaders(['Authorization' => $this->apiKey])
             ->post('https://api.openrouteservice.org/v2/directions/'.$routeProfile.'/geojson', [
                 'coordinates' => array_map(fn ($point) => [(float) $point['lng'], (float) $point['lat']], $waypoints),
-                'instructions' => false,
+                'instructions' => true,
                 'geometry_simplify' => false,
             ]);
         if ($response->status() === 429) throw new RuntimeException('rate_limited');
@@ -41,6 +41,23 @@ class OpenRouteServiceProvider implements RoutingProvider
                 'distance_m' => (int) round((float) ($leg['distance'] ?? 0)),
                 'duration_s' => (int) round((float) ($leg['duration'] ?? 0)),
             ], $segments),
+            'instructions' => collect($segments)->flatMap(fn ($segment) => collect($segment['steps'] ?? [])->map(function ($step) use ($coordinates) {
+                $startIdx = $step['way_points'][0] ?? null;
+                $location = ($startIdx !== null && isset($coordinates[$startIdx]) && is_array($coordinates[$startIdx]))
+                    ? [(float) $coordinates[$startIdx][0], (float) $coordinates[$startIdx][1]]
+                    : null;
+                $street = trim((string) ($step['name'] ?? ''));
+
+                return [
+                    'instruction' => (string) ($step['instruction'] ?? 'Continue'),
+                    'distance_m' => (int) round((float) ($step['distance'] ?? 0)),
+                    'duration_s' => (int) round((float) ($step['duration'] ?? 0)),
+                    'location' => $location,
+                    'type' => isset($step['type']) ? (string) $step['type'] : 'continue',
+                    'modifier' => null,
+                    'street' => $street !== '' ? $street : null,
+                ];
+            }))->values()->all(),
         ];
     }
 }

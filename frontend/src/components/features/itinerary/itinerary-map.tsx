@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import L from "leaflet";
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
@@ -19,7 +19,7 @@ interface ItineraryMapProps {
   followActive?: boolean;
 }
 
-function FitToStops({ points }: { points: [number, number][] }) {
+function FitToStops({ points, pointKey }: { points: [number, number][]; pointKey: string }) {
   const map = useMap();
 
   useEffect(() => {
@@ -32,7 +32,8 @@ function FitToStops({ points }: { points: [number, number][] }) {
       return;
     }
     map.fitBounds(L.latLngBounds(points).pad(0.2), { animate: false });
-  }, [points, map]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointKey, map]);
 
   return null;
 }
@@ -67,21 +68,43 @@ export function ItineraryMap({
   interactive = true,
   followActive = false,
 }: ItineraryMapProps) {
-  const located = items.filter((item) => item.latitude !== null && item.longitude !== null);
-  const points: [number, number][] = located.map((item) => [Number(item.latitude), Number(item.longitude)]);
+  const located = useMemo(
+    () => items.filter((item) => item.latitude !== null && item.longitude !== null),
+    [items],
+  );
+  const points: [number, number][] = useMemo(
+    () => located.map((item) => [Number(item.latitude), Number(item.longitude)]),
+    [located],
+  );
+  const pointKey = useMemo(
+    () => located.map((item) => `${Number(item.latitude).toFixed(5)},${Number(item.longitude).toFixed(5)}`).join("|"),
+    [located],
+  );
   const activeItem = located.find((item) => item.id === activeItemId) ?? null;
 
-  // Sequence markers 1..n across all days so a stop's number matches the list.
-  const ordered = [...items].sort((a, b) => a.day_number - b.day_number || a.order - b.order);
-  const sequence = new Map<number, number>();
-  ordered.forEach((item, index) => sequence.set(item.id, index + 1));
+  // Sequence markers 1..n across located items so pins never skip numbers on the map.
+  const orderedLocated = useMemo(
+    () => [...located].sort((a, b) => a.day_number - b.day_number || a.order - b.order),
+    [located],
+  );
+  const sequence = useMemo(() => {
+    const seq = new Map<number, number>();
+    orderedLocated.forEach((item, index) => seq.set(item.id, index + 1));
+    return seq;
+  }, [orderedLocated]);
 
   const days = [...new Set(located.map((item) => item.day_number))].sort((a, b) => a - b);
 
   const paths = days
-    .map((day) => located.filter((item) => item.day_number === day))
-    .filter((dayItems) => dayItems.length > 1)
-    .map((dayItems, index) => ({ day: days[index], points: dayItems.map((item) => [Number(item.latitude), Number(item.longitude)] as [number, number]) }));
+    .map((day) => ({
+      day,
+      items: located.filter((item) => item.day_number === day),
+    }))
+    .filter(({ items: dayItems }) => dayItems.length > 1)
+    .map(({ day, items: dayItems }) => ({
+      day,
+      points: dayItems.map((item) => [Number(item.latitude), Number(item.longitude)] as [number, number]),
+    }));
 
   return (
     <div className={className}>
@@ -99,7 +122,7 @@ export function ItineraryMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        <FitToStops points={points} />
+        <FitToStops points={points} pointKey={pointKey} />
         <FollowActive item={activeItem} enabled={followActive} />
         {onPickPoint ? <ClickToPick onPickPoint={onPickPoint} /> : null}
 

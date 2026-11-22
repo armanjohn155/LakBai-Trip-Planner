@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiError, getRoadRoute } from "@/lib/api";
+import { haversineKm, profileFallbackSpeedKmh } from "@/lib/geo";
 import type { ItineraryItem, RouteGeometryResponse, RouteProfile } from "@/lib/types";
 
 const CLIENT_CACHE_MS = 24 * 60 * 60 * 1000;
@@ -8,7 +9,13 @@ const routeCache = new Map<string, { value: RouteGeometryResponse; expiresAt: nu
 
 export type RouteWaypoint = { lat: number; lng: number };
 
-function straightFallback(points: RouteWaypoint[], reason: RouteGeometryResponse["reason"] = "provider_unavailable"): RouteGeometryResponse {
+export function straightFallback(
+  points: RouteWaypoint[],
+  reason: RouteGeometryResponse["reason"] = "provider_unavailable",
+  profile: RouteProfile = "driving",
+): RouteGeometryResponse {
+  const speedKmh = profileFallbackSpeedKmh(profile);
+  const speedMs = (speedKmh * 1000) / 3600;
   const legs: RouteGeometryResponse["legs"] = [];
   for (let index = 1; index < points.length; index += 1) {
     const a = points[index - 1]; const b = points[index];
@@ -16,13 +23,14 @@ function straightFallback(points: RouteWaypoint[], reason: RouteGeometryResponse
     const dLat = lat2 - lat1; const dLng = (b.lng - a.lng) * Math.PI / 180;
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
     const distance_m = Math.round(6_371_000 * 2 * Math.asin(Math.min(1, Math.sqrt(h))));
-    legs.push({ distance_m, duration_s: Math.round(distance_m / (30_000 / 3600)) });
+    legs.push({ distance_m, duration_s: Math.max(1, Math.round(distance_m / speedMs)) });
   }
   return {
     geometry: { type: "LineString", coordinates: points.map(({ lat, lng }) => [lng, lat]) },
     distance_m: legs.reduce((sum, leg) => sum + leg.distance_m, 0),
     duration_s: legs.reduce((sum, leg) => sum + leg.duration_s, 0),
     legs,
+    instructions: [],
     provider: "haversine",
     approximate: true,
     reason,
@@ -96,7 +104,7 @@ export function useRoute({
         .then((next) => { if (!cancelled) setRoute(next); })
         .catch((reason: unknown) => {
           if (!cancelled && !(reason instanceof DOMException && reason.name === "AbortError")) {
-            setRoute(straightFallback(requestPoints));
+            setRoute(straightFallback(requestPoints, "provider_unavailable", profile));
             setError(apiError(reason));
           }
         })
@@ -125,12 +133,24 @@ export interface PlannedRoadRoute {
   reason?: RouteGeometryResponse["reason"];
 }
 
-export function useLiveRoute(from: RouteWaypoint | null, to: RouteWaypoint | null, enabled: boolean) {
+export interface UseLiveRouteOptions {
+  profile?: RouteProfile;
+  forceRerouteNonce?: number;
+}
+
+export function useLiveRoute(
+  from: RouteWaypoint | null,
+  to: RouteWaypoint | null,
+  enabled: boolean,
+  options?: UseLiveRouteOptions,
+) {
+  const profile = options?.profile ?? "driving";
+  const forceRerouteNonce = options?.forceRerouteNonce ?? 0;
   const [routedFrom, setRoutedFrom] = useState<RouteWaypoint | null>(null);
   const [routedTo, setRoutedTo] = useState<RouteWaypoint | null>(null);
   const [requestTime, setRequestTime] = useState(0);
-  const lastOriginRef = useRef<{ point: RouteWaypoint | null; destination: string; at: number }>(
-    { point: null, destination: "", at: 0 },
+  const lastStateRef = useRef<{ point: RouteWaypoint | null; destination: string; profile: string; at: number; nonce: number }>(
+    { point: null, destination: "", profile, at: 0, nonce: forceRerouteNonce },
   );
   const fromLat = from?.lat;
   const fromLng = from?.lng;
@@ -140,48 +160,69 @@ export function useLiveRoute(from: RouteWaypoint | null, to: RouteWaypoint | nul
 
   useEffect(() => {
     if (!enabled || fromLat == null || fromLng == null || toLat == null || toLng == null) {
-      lastOriginRef.current.point = null;
-      lastOriginRef.current.destination = "";
+      lastStateRef.current.point = null;
+      lastStateRef.current.destination = "";
       return;
     }
     const currentFrom = { lat: fromLat, lng: fromLng };
     const currentTo = { lat: toLat, lng: toLng };
     const now = Date.now();
-    const moved = lastOriginRef.current.point === null
-      ? Number.POSITIVE_INFINITY
-      : Math.hypot(
-          (currentFrom.lat - lastOriginRef.current.point.lat) * 111_000,
-          (currentFrom.lng - lastOriginRef.current.point.lng) * 111_000 * Math.cos(currentFrom.lat * Math.PI / 180),
-        );
-    const destinationChanged = lastOriginRef.current.destination !== destinationKey;
-    if (lastOriginRef.current.point === null || ((destinationChanged || moved >= 50) && now - lastOriginRef.current.at >= 15_000)) {
-      lastOriginRef.current.point = currentFrom;
-      lastOriginRef.current.destination = destinationKey;
-      lastOriginRef.current.at = now;
+    const last = lastStateRef.current;
+    const destinationChanged = last.destination !== destinationKey;
+    const profileChanged = last.profile !== profile;
+    const forceReroute = last.nonce !== forceRerouteNonce;
+    const isInitial = last.point === null;
+
+    const publish = (at: number) => {
+      lastStateRef.current = { point: currentFrom, destination: destinationKey, profile, at, nonce: forceRerouteNonce };
       setRoutedFrom(currentFrom);
       setRoutedTo(currentTo);
-      setRequestTime(now);
+      setRequestTime(at);
+    };
+
+    if (isInitial || destinationChanged || profileChanged) {
+      publish(now);
       return;
     }
-    if (!destinationChanged && moved < 50) return;
-    const wait = Math.max(0, 15_000 - (now - lastOriginRef.current.at));
-    const timer = window.setTimeout(() => {
-      lastOriginRef.current.point = currentFrom;
-      lastOriginRef.current.destination = destinationKey;
-      lastOriginRef.current.at = Date.now();
-      setRoutedFrom(currentFrom);
-      setRoutedTo(currentTo);
-      setRequestTime(Date.now());
-    }, wait);
-    return () => window.clearTimeout(timer);
-  }, [enabled, fromLat, fromLng, toLat, toLng, destinationKey]);
 
-  const result = useRoute({ from: routedFrom, to: routedTo, enabled: enabled && routedFrom !== null && routedTo !== null, retryToken: requestTime });
+    const schedule = (wait: number) => {
+      const timer = window.setTimeout(() => publish(Date.now()), wait);
+      return () => window.clearTimeout(timer);
+    };
+
+    if (forceReroute) {
+      const elapsed = now - last.at;
+      if (elapsed >= 10_000) {
+        publish(now);
+        return;
+      }
+      return schedule(10_000 - elapsed);
+    }
+
+    const lastPoint = last.point;
+    if (!lastPoint) return;
+    const movedM = haversineKm(lastPoint.lat, lastPoint.lng, currentFrom.lat, currentFrom.lng) * 1000;
+    if (movedM < 50) return;
+    const elapsed = now - last.at;
+    if (elapsed >= 15_000) {
+      publish(now);
+      return;
+    }
+    return schedule(15_000 - elapsed);
+  }, [enabled, fromLat, fromLng, toLat, toLng, destinationKey, profile, forceRerouteNonce]);
+
+  const result = useRoute({
+    from: routedFrom,
+    to: routedTo,
+    profile,
+    enabled: enabled && routedFrom !== null && routedTo !== null,
+    retryToken: requestTime,
+  });
   return result;
 }
 
 /** One road route per day, split into overlapping chunks for days over 25 stops. */
-export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean) {
+export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean, profile: RouteProfile = "driving") {
   const stopsByDay = useMemo(() => {
     const grouped = new Map<number, RouteWaypoint[]>();
     [...items]
@@ -194,7 +235,7 @@ export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean) {
       });
     return [...grouped.entries()].filter(([, stops]) => stops.length > 1);
   }, [items]);
-  const signature = JSON.stringify(stopsByDay);
+  const signature = `${profile}:${JSON.stringify(stopsByDay)}`;
   const [routes, setRoutes] = useState<PlannedRoadRoute[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -209,7 +250,7 @@ export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean) {
         for (let start = 0; start < stops.length - 1; start += 24) {
           chunks.push(stops.slice(start, Math.min(start + 25, stops.length)));
         }
-        const results = await Promise.all(chunks.map((chunk) => requestRoute(chunk, "driving", controller.signal)));
+        const results = await Promise.all(chunks.map((chunk) => requestRoute(chunk, profile, controller.signal)));
         return {
           day,
           coordinates: results.flatMap((result, index) => result.geometry.coordinates
@@ -223,7 +264,7 @@ export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean) {
         .catch(() => {
           if (cancelled) return;
           setRoutes(stopsByDay.map(([day, stops]) => {
-            const fallback = straightFallback(stops);
+            const fallback = straightFallback(stops, "provider_unavailable", profile);
             return {
               day,
               coordinates: fallback.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
@@ -236,7 +277,7 @@ export function usePlannedRoutes(items: ItineraryItem[], enabled: boolean) {
         .finally(() => { if (!cancelled) setLoading(false); });
     }, 500);
     return () => { cancelled = true; window.clearTimeout(timer); controller.abort(); };
-    // signature captures the ordered day/stop coordinates.
+    // signature captures profile and ordered day/stop coordinates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, signature]);
 

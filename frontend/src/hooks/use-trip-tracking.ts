@@ -210,10 +210,13 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
     queueRef.current = readQueue(itineraryId);
     setPendingCount(queueRef.current.length);
 
+    let permissionStatus: PermissionStatus | null = null;
+
     if (navigator.permissions?.query) {
       navigator.permissions
         .query({ name: "geolocation" as PermissionName })
         .then((status) => {
+          permissionStatus = status;
           setPermission(status.state);
           status.onchange = () => {
             setPermission(status.state);
@@ -323,6 +326,10 @@ export function useTripTracking({ itineraryId, enabled, onUploaded }: UseTripTra
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      if (permissionStatus) {
+        permissionStatus.onchange = null;
+        permissionStatus = null;
+      }
       document.removeEventListener("visibilitychange", onVisibility);
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ChevronLeftIcon, ChevronRightIcon, ExpandIcon, XIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -15,6 +15,15 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
 
   const current = index % images.length;
   const go = (delta: number) => setIndex((prev) => (prev + delta + images.length) % images.length);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen]);
 
   const gallery = (
     <GalleryItem src={images[current]} name={name} fallbackTone={fallbackTone} className="h-full w-full object-cover" />
@@ -95,17 +104,27 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
       ) : null}
 
       {fullscreen ? (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-lagoon-950/95 p-4" role="dialog" aria-modal="true" aria-label={`${name} photos`}>
+        <div
+          className="fixed inset-0 z-[1300] flex items-center justify-center bg-lagoon-950/95 p-4 pt-[calc(3.5rem_+_env(safe-area-inset-top))] sm:p-5 sm:pt-20"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${name} photos`}
+          onClick={() => setFullscreen(false)}
+        >
           <button
             type="button"
-            onClick={() => setFullscreen(false)}
-            aria-label="Close fullscreen"
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-sand-50 transition-colors hover:bg-white/20"
+            onClick={(event) => {
+              event.stopPropagation();
+              setFullscreen(false);
+            }}
+            aria-label="Close photo viewer"
+            className="fixed right-[max(12px,env(safe-area-inset-right))] top-[max(12px,env(safe-area-inset-top))] z-20 flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-lagoon-950/20 bg-white text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-150 hover:scale-105 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-2 focus-visible:ring-offset-lagoon-950 active:scale-95 sm:right-5 sm:top-5 sm:h-12 sm:w-auto sm:px-4"
           >
-            <XIcon className="h-5 w-5" />
+            <XIcon className="h-[22px] w-[22px] shrink-0 sm:h-6 sm:w-6" />
+            <span className="hidden text-sm font-semibold sm:inline">Close</span>
           </button>
 
-          <div className="relative w-full max-w-5xl">
+          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
             <div className="overflow-hidden rounded-2xl">
               <div className="h-[80vh]">{gallery}</div>
             </div>

@@ -327,3 +327,53 @@ export function MoreIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function WalkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M13 4a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z" />
+      <path d="M7 21l3-7 2 2v6" />
+      <path d="M11 9l-2 4 4 1-1-5" />
+      <path d="M14 9l2 2 3-1" />
+      <path d="M9 13l-3-1" />
+    </svg>
+  );
+}
+
+export function BikeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <circle cx="5.5" cy="17.5" r="3.5" />
+      <circle cx="18.5" cy="17.5" r="3.5" />
+      <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" />
+      <path d="M12 17.5V14l-3-3 4-3 2 3h3" />
+    </svg>
+  );
+}
+
+export function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+export function TurnRightIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M7 19V9a3 3 0 0 1 3-3h7" />
+      <path d="M14 3l4 3-4 3" />
+    </svg>
+  );
+}
+
+export function TurnLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
+      <path d="M17 19V9a3 3 0 0 0-3-3H7" />
+      <path d="M10 3L6 6l4 3" />
+    </svg>
+  );
+}

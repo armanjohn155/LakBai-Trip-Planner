@@ -20,176 +20,49 @@ import { useAddToTrip } from "@/hooks/use-add-to-trip";
 import { useAuth } from "@/hooks/use-auth";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useCurrentLocation } from "@/hooks/use-current-location";
-import { requestRoute, useLiveRoute, type RouteWaypoint } from "@/hooks/use-route";
+import { requestRoute, straightFallback, useLiveRoute, type RouteWaypoint } from "@/hooks/use-route";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { apiError, getDestinations } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { haversineKm } from "@/lib/geo";
 import type { Destination, Itinerary, RouteGeometryResponse } from "@/lib/types";
 
-const SOUTH_CEBU_STOPS = [
-  { name: "Cebu City", lat: 10.3157, lng: 123.8854 },
-  { name: "Moalboal", lat: 9.95, lng: 123.3833 },
-  { name: "Kawasan Falls, Badian", lat: 9.8019444, lng: 123.3738889 },
-] satisfies { name: string; lat: number; lng: number }[];
+import {
+  CEBU_CITY_COORDS,
+  MapRouteCard,
+  PRESET_SOUTH_CEBU,
+  type RouteStop,
+} from "@/components/features/map/map-route-card";
 
-function formatRouteDistance(meters: number): string {
-  return `${(meters / 1000).toFixed(meters >= 100_000 ? 0 : 1)} km`;
+const MAX_ROUTE_POINTS = 25;
+
+function destinationPoint(destination: Destination): RouteStop | null {
+  const lat = Number(destination.latitude);
+  const lng = Number(destination.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    id: destination.id,
+    name: destination.name,
+    municipality: destination.municipality,
+    lat,
+    lng,
+  };
 }
 
-function formatRouteDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return hours > 0 ? `${hours} hr${hours === 1 ? "" : "s"}${remainingMinutes ? ` ${remainingMinutes} min` : ""}` : `${minutes} min`;
+function samePoint(a: RouteStop, b: RouteStop): boolean {
+  return a.name === b.name && a.lat === b.lat && a.lng === b.lng;
 }
 
-function RouteMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-sky-50 px-2.5 py-2 text-center ring-1 ring-inset ring-sky-100">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{label}</p>
-      <p className="mt-0.5 text-xs font-bold text-sky-950">{value}</p>
-    </div>
-  );
+function isCanceled(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (typeof error !== "object" || error === null) return false;
+  const name = "name" in error ? String(error.name) : "";
+  const code = "code" in error ? String(error.code) : "";
+  return name === "CanceledError" || name === "AbortError" || code === "ERR_CANCELED";
 }
 
-function SouthCebuRouteCard({
-  route,
-  routeLoading,
-  routeError,
-  liveRoute,
-  liveRouteLoading,
-  liveRouteError,
-  livePosition,
-  gpsStatus,
-  gpsError,
-  onStartGps,
-  onStopGps,
-  targetIndex,
-  onTargetChange,
-  onRetryRoute,
-}: {
-  route: RouteGeometryResponse | null;
-  routeLoading: boolean;
-  routeError: string | null;
-  liveRoute: RouteGeometryResponse | null;
-  liveRouteLoading: boolean;
-  liveRouteError: string | null;
-  livePosition: { lat: number; lng: number; accuracy: number | null } | null;
-  gpsStatus: string;
-  gpsError: string | null;
-  onStartGps: () => void;
-  onStopGps: () => void;
-  targetIndex: number;
-  onTargetChange: (value: string) => void;
-  onRetryRoute: () => void;
-}) {
-  const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [collapsed, setCollapsed] = useState(true);
-  const showBody = isDesktop || !collapsed;
-
-  return (
-    <div className="pointer-events-auto absolute left-3 top-[4.25rem] z-[1000] max-h-[calc(100%-5rem)] w-[min(92%,20rem)] overflow-y-auto rounded-2xl border border-white/80 bg-white/95 p-3.5 shadow-xl backdrop-blur-md sm:left-4 sm:top-[4.5rem] sm:w-80">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">South Cebu road trip</p>
-          <h2 className="mt-0.5 text-sm font-bold text-lagoon-950">Cebu City → Kawasan Falls</h2>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold text-ink-600">Road route</span>
-          {!isDesktop ? (
-            <button
-              type="button"
-              onClick={() => setCollapsed((value) => !value)}
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? "Expand route card" : "Collapse route card"}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-sand-100 text-ink-700 hover:bg-sand-200"
-            >
-              <svg viewBox="0 0 24 24" className={cn("h-4 w-4 transition-transform", collapsed ? "" : "rotate-180")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {showBody ? (
-        <>
-          <div className="mt-3 space-y-2">
-            {SOUTH_CEBU_STOPS.slice(0, -1).map((stop, index) => {
-              const leg = route?.legs[index];
-              return (
-                <div key={stop.name} className="rounded-xl border border-line/80 bg-white px-2.5 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-[11px] font-semibold text-ink-900">
-                      {stop.name} <span className="font-normal text-ink-500">to {SOUTH_CEBU_STOPS[index + 1].name.split(",")[0]}</span>
-                    </p>
-                    {leg ? <span className="shrink-0 text-[10px] text-ink-500">Leg {index + 1}</span> : null}
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <RouteMetric label="Distance" value={leg ? formatRouteDistance(leg.distance_m) : routeLoading ? "Routing…" : "—"} />
-                    <RouteMetric label="Est. time" value={leg ? formatRouteDuration(leg.duration_s) : routeLoading ? "Routing…" : "—"} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {route?.approximate ? (
-            <p className="mt-2 text-[10px] leading-relaxed text-amber-800">Approximate fallback estimate; road routing is unavailable right now.</p>
-          ) : null}
-          {routeError ? <p className="mt-2 text-xs text-rose-700">Could not load the road route: {routeError}</p> : null}
-
-          <div className="mt-3 border-t border-line pt-3">
-        <label htmlFor="live-route-target" className="block text-[11px] font-semibold text-ink-700">Navigate to</label>
-        <div className="mt-1.5 flex gap-2">
-          <select
-            id="live-route-target"
-            value={targetIndex}
-            onChange={(event) => onTargetChange(event.target.value)}
-            className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-white px-3 text-xs font-medium text-ink-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
-          >
-            <option value={1}>Moalboal</option>
-            <option value={2}>Kawasan Falls, Badian</option>
-          </select>
-          <button
-            type="button"
-            onClick={gpsStatus === "active" ? onStopGps : onStartGps}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 text-xs font-semibold text-white transition-colors hover:bg-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2"
-          >
-            <GpsIcon />
-            {gpsStatus === "active" ? "Stop GPS" : gpsStatus === "locating" ? "Locating…" : "Start GPS"}
-          </button>
-        </div>
-        {gpsError ? <p className="mt-1.5 text-[11px] leading-relaxed text-rose-700">{gpsError}</p> : null}
-        {gpsStatus === "active" && livePosition ? (
-          <div className="mt-2 rounded-xl bg-sky-50 px-3 py-2 ring-1 ring-inset ring-sky-100">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">Remaining to {SOUTH_CEBU_STOPS[targetIndex].name.split(",")[0]}</p>
-            <p className="mt-0.5 text-xs font-bold text-sky-950">
-              {liveRouteLoading ? "Updating route…" : liveRoute ? `${formatRouteDistance(liveRoute.distance_m)} · ${formatRouteDuration(liveRoute.duration_s)}` : "Finding road route…"}
-            </p>
-            {liveRouteError ? (
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-[10px] text-rose-700">Could not update route.</p>
-                <button type="button" onClick={onRetryRoute} className="text-[10px] font-semibold text-sky-800 underline">Retry</button>
-              </div>
-            ) : null}
-            {liveRoute?.approximate ? <p className="mt-1 text-[10px] text-amber-800">Approximate route estimate.</p> : null}
-          </div>
-        ) : null}
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function GpsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
-    </svg>
-  );
+function fallbackReason(error: unknown): "provider_unavailable" | "rate_limited" {
+  return apiError(error).toLowerCase().includes("too many") ? "rate_limited" : "provider_unavailable";
 }
 
 export default function MapPage() {
@@ -208,10 +81,40 @@ export default function MapPage() {
   const [query, setQuery] = useState("");
   const [showChooser, setShowChooser] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [southRoute, setSouthRoute] = useState<RouteGeometryResponse | null>(null);
-  const [southRouteLoading, setSouthRouteLoading] = useState(true);
-  const [southRouteError, setSouthRouteError] = useState<string | null>(null);
-  const [routeTargetIndex, setRouteTargetIndex] = useState(2);
+
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isMobile = !isDesktop;
+  const fitPadding = useMemo(
+    () => isMobile
+      ? { top: 72, right: 56, bottom: 8, left: 12 }
+      : { top: 96, right: 56, bottom: 16, left: 36 },
+    [isMobile],
+  );
+
+  // Origin management
+  const [originType, setOriginType] = useState<"cebu_city" | "my_location" | "custom">(() => {
+    try {
+      const saved = window.sessionStorage.getItem("lakbai.map.origin_type");
+      if (saved === "my_location" || saved === "cebu_city" || saved === "custom") return saved;
+    } catch {
+      // sessionStorage unavailable
+    }
+    return "cebu_city";
+  });
+  const [customOrigin, setCustomOrigin] = useState<Destination | null>(null);
+
+  // Multi-stop route list
+  const [stops, setStops] = useState<RouteStop[]>([]);
+  const [activeTargetIndex, setActiveTargetIndex] = useState(1);
+
+  // Dynamic route states
+  const [route, setRoute] = useState<RouteGeometryResponse | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeRetryToken, setRouteRetryToken] = useState(0);
+  const [missingDestination, setMissingDestination] = useState(false);
+  const [highlightedStopIndex, setHighlightedStopIndex] = useState<number | null>(null);
+  const [gpsOriginHold, setGpsOriginHold] = useState(0);
 
   const panelScrollRef = useRef<HTMLDivElement>(null);
 
@@ -243,56 +146,271 @@ export default function MapPage() {
   }, []);
 
   useEffect(() => {
-    if (destinations.length === 0 || paramId === null) return;
-    const match = destinations.find((destination) => destination.id === paramId);
-    if (match) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelected(match);
-      setFocusId(match.id);
+    if (loading || customOrigin !== null) return;
+    try {
+      const savedId = Number(window.sessionStorage.getItem("lakbai.map.custom_origin_id"));
+      if (savedId > 0) {
+        const match = destinations.find((destination) => destination.id === savedId);
+        if (match) setCustomOrigin(match);
+      }
+    } catch {
+      // sessionStorage unavailable
     }
-  }, [destinations, paramId]);
+  }, [loading, destinations, customOrigin]);
 
-  const loggedIn = Boolean(user);
-  const routeTarget: RouteWaypoint = SOUTH_CEBU_STOPS[routeTargetIndex];
-  const liveRoute = useLiveRoute(
-    currentLocation.position ? { lat: currentLocation.position.lat, lng: currentLocation.position.lng } : null,
-    routeTarget,
-    currentLocation.status === "active",
-  );
+  const effectiveOrigin: RouteStop = useMemo(() => {
+    if (originType === "my_location" && currentLocation.position) {
+      return {
+        name: "My location",
+        municipality: "Current GPS Location",
+        lat: currentLocation.position.lat,
+        lng: currentLocation.position.lng,
+        isOrigin: true,
+      };
+    }
+    if (originType === "custom" && customOrigin) {
+      const point = destinationPoint(customOrigin);
+      if (point) return { ...point, isOrigin: true };
+    }
+    return CEBU_CITY_COORDS;
+  }, [originType, currentLocation.position, customOrigin]);
+
+  const originAnchor = useRef<RouteStop>(CEBU_CITY_COORDS);
+  const originUpdatedAt = useRef(0);
+  const stableOrigin = useMemo(() => {
+    const next = effectiveOrigin;
+    const previous = originAnchor.current;
+    const samePlace = previous.id === next.id && previous.name === next.name;
+    const movedM = haversineKm(previous.lat, previous.lng, next.lat, next.lng) * 1000;
+    const gpsOrigin = next.name === "My location" && previous.name === "My location";
+    if (samePlace && movedM < 50) return previous;
+    if (gpsOrigin && Date.now() - originUpdatedAt.current < 15_000) return previous;
+    originUpdatedAt.current = Date.now();
+    originAnchor.current = next;
+    return next;
+  }, [effectiveOrigin, gpsOriginHold]);
 
   useEffect(() => {
+    if (originType !== "my_location") return;
+    const timer = window.setInterval(() => setGpsOriginHold((value) => value + 1), 15_000);
+    return () => window.clearInterval(timer);
+  }, [originType]);
+
+  useEffect(() => {
+    if (loading || destinations.length === 0) return;
+    if (paramId === null) {
+      setMissingDestination(false);
+      if (selected !== null) {
+        setSelected(null);
+        setFocusId(null);
+      }
+      setStops([]);
+      return;
+    }
+    if (selected?.id === paramId) {
+      setMissingDestination(false);
+      return;
+    }
+    const match = destinations.find((destination) => destination.id === paramId);
+    if (!match) {
+      setMissingDestination(true);
+      setSelected(null);
+      setFocusId(null);
+      return;
+    }
+    setMissingDestination(false);
+    setSelected(match);
+    setFocusId(match.id);
+  }, [destinations, loading, paramId, selected, stops.length]);
+
+  useEffect(() => {
+    if (!selected) {
+      setStops((prev) => (prev.length > 2 ? prev : prev.length === 0 ? prev : []));
+      return;
+    }
+    const point = destinationPoint(selected);
+    setStops((prev) => {
+      const onThisTrip = point != null && prev.length > 2 && prev.slice(1).some((stop) => stop.id === point.id || samePoint(stop, point));
+      if (onThisTrip) {
+        const origin = prev[0];
+        if (origin && samePoint(origin, stableOrigin)) return prev;
+        return [stableOrigin, ...prev.slice(1)];
+      }
+      if (!point) return prev.length === 0 ? prev : [];
+      const origin = prev[0];
+      const current = prev[1];
+      if (prev.length === 2 && origin && current && samePoint(origin, stableOrigin) && current.id === point.id && samePoint(current, point)) {
+        return prev;
+      }
+      return [stableOrigin, point];
+    });
+  }, [selected, stableOrigin]);
+
+  useEffect(() => {
+    if (!selected || stops.length <= 2) {
+      setActiveTargetIndex(1);
+      return;
+    }
+    const found = stops.findIndex((stop) => stop.id === selected.id);
+    if (found > 0) setActiveTargetIndex(found);
+  }, [selected, stops]);
+
+  const routeRequest = useMemo(() => {
+    const waypoints = stops
+      .filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lng))
+      .slice(0, MAX_ROUTE_POINTS)
+      .map((stop) => ({ lat: stop.lat, lng: stop.lng }));
+    return { waypoints };
+  }, [stops]);
+  const missingCoordinates = selected != null && destinationPoint(selected) == null && routeRequest.waypoints.length < 2;
+
+  useEffect(() => {
+    const { waypoints } = routeRequest;
+    if (waypoints.length < 2) {
+      setRoute(null);
+      setRouteLoading(false);
+      setRouteError(missingCoordinates ? "This destination has no map coordinates." : null);
+      return;
+    }
+
     const controller = new AbortController();
-    requestRoute(SOUTH_CEBU_STOPS.map(({ lat, lng }) => ({ lat, lng })), "driving", controller.signal)
-      .then((route) => {
-        setSouthRoute(route);
-        setSouthRouteError(null);
-      })
-      .catch((err: unknown) => {
-        if (!(err instanceof DOMException && err.name === "AbortError")) setSouthRouteError(apiError(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setSouthRouteLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
+    let cancelled = false;
+    setRoute(null);
+    setRouteLoading(true);
+    setRouteError(null);
+
+    const timer = window.setTimeout(() => {
+      requestRoute(waypoints, "driving", controller.signal)
+        .then((res) => {
+          if (cancelled) return;
+          setRoute(res);
+          setRouteError(null);
+        })
+        .catch((err: unknown) => {
+          if (cancelled || isCanceled(err)) return;
+          setRoute(straightFallback(waypoints, fallbackReason(err)));
+          setRouteError(apiError(err));
+        })
+        .finally(() => {
+          if (!cancelled) setRouteLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [routeRequest, routeRetryToken, missingCoordinates]);
+
+  const loggedIn = Boolean(user);
+  const activeTargetStop: RouteStop | null = stops[activeTargetIndex] ?? stops[stops.length - 1] ?? null;
+  const liveTargetPoint: RouteWaypoint | null = activeTargetStop
+    ? { lat: activeTargetStop.lat, lng: activeTargetStop.lng }
+    : null;
+
+  const liveRoute = useLiveRoute(
+    currentLocation.position ? { lat: currentLocation.position.lat, lng: currentLocation.position.lng } : null,
+    liveTargetPoint,
+    currentLocation.status === "active" && liveTargetPoint !== null,
+  );
 
   const handleSelect = (destination: Destination) => {
     setSelected(destination);
-    setSearchParams({ d: String(destination.id) }, { replace: true });
+    setFocusId(destination.id);
+    setSearchParams({ d: String(destination.id) });
   };
 
   const handleSearchSelect = (destination: Destination) => {
     setSelected(destination);
     setFocusId(destination.id);
     setQuery("");
-    setSearchParams({ d: String(destination.id) }, { replace: true });
+    setSearchParams({ d: String(destination.id) });
   };
 
   const handleClear = () => {
     setSelected(null);
     setFocusId(null);
     setQuery("");
-    setSearchParams({}, { replace: true });
+    setStops([]);
+    setSearchParams({});
+  };
+
+  const handleLoadPreset = () => {
+    const resolved = PRESET_SOUTH_CEBU.map((stop, index) => {
+      if (index === 0) return { ...stop, isOrigin: true as const };
+      const stopName = stop.name.toLowerCase();
+      const match = destinations.find((destination) => destination.name.toLowerCase() === stopName)
+        ?? destinations.find((destination) => destination.name.toLowerCase().includes(stopName));
+      const point = match ? destinationPoint(match) : null;
+      return point ?? stop;
+    });
+    setStops(resolved);
+    setActiveTargetIndex(Math.max(1, resolved.length - 1));
+    const last = resolved[resolved.length - 1];
+    const target = last?.id == null ? null : destinations.find((destination) => destination.id === last.id);
+    if (target) {
+      setSelected(target);
+      setFocusId(target.id);
+      setSearchParams({ d: String(target.id) });
+    }
+  };
+
+  const handleAddStop = (dest: Destination) => {
+    const newStop = destinationPoint(dest);
+    if (!newStop) {
+      setRouteError("This destination has no map coordinates.");
+      return;
+    }
+    setStops((prev) => {
+      if (prev.length >= MAX_ROUTE_POINTS) return prev;
+      const selectedPoint = selected ? destinationPoint(selected) : null;
+      const base = prev.length >= 2 ? prev : [stableOrigin, ...(selectedPoint ? [selectedPoint] : [])];
+      if (base.length >= MAX_ROUTE_POINTS) return prev;
+      if (base.some((stop) => stop.id === newStop.id)) return base;
+      return [...base, newStop];
+    });
+    setSelected(dest);
+    setFocusId(dest.id);
+    setSearchParams({ d: String(dest.id) });
+  };
+
+  const handleRemoveStop = (index: number) => {
+    const next = stops.filter((_, stopIndex) => stopIndex !== index);
+    if (next.length <= 1) {
+      setStops([]);
+      setSelected(null);
+      setFocusId(null);
+      setSearchParams({});
+      return;
+    }
+    setStops(next);
+    const fallback = next[Math.min(index, next.length - 1)];
+    const match = fallback?.id == null ? null : destinations.find((destination) => destination.id === fallback.id);
+    if (match) {
+      setSelected(match);
+      setFocusId(match.id);
+      setSearchParams({ d: String(match.id) });
+    }
+  };
+
+  const handleReorderStops = (from: number, to: number) => {
+    setStops((prev) => {
+      if (from <= 0 || to <= 0 || from >= prev.length || to >= prev.length) return prev;
+      const copy = [...prev];
+      const [item] = copy.splice(from, 1);
+      copy.splice(to, 0, item);
+      return copy;
+    });
+  };
+
+  const handleOriginTypeChange = (type: "cebu_city" | "my_location" | "custom") => {
+    setOriginType(type);
+    try {
+      window.sessionStorage.setItem("lakbai.map.origin_type", type);
+    } catch {
+      // sessionStorage unavailable
+    }
   };
 
   useEffect(() => {
@@ -456,15 +574,19 @@ export default function MapPage() {
                       activeId={selected?.id ?? null}
                       focusId={focusId}
                       onSelect={handleSelect}
-                      route={southRoute}
-                      liveRoute={liveRoute.route}
-                      routeStops={SOUTH_CEBU_STOPS}
+                      route={route}
+                      liveRoute={originType === "my_location" && stops.length <= 2 ? null : liveRoute.route}
+                      fitPadding={fitPadding}
+                      routeStops={stops}
+                      highlightedStopIndex={highlightedStopIndex}
                       livePosition={currentLocation.status === "active" ? currentLocation.position : null}
                       className="h-full w-full"
+                      zoomControlPosition={isMobile ? "topright" : "bottomright"}
+                      bottomInset={isMobile ? 120 : 0}
                     />
                     <button
                       type="button"
-                      onClick={() => currentLocation.start()}
+                      onClick={() => (currentLocation.status === "active" ? currentLocation.stop() : currentLocation.start())}
                       aria-label={currentLocation.status === "active" ? "Stop location tracking" : "Use my current location"}
                       className={`absolute left-3 top-3 z-[600] flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-sand-50 ${currentLocation.status === "active" ? "text-lagoon-900 bg-lagoon-100" : "text-ink-600"}`}
                     >
@@ -487,21 +609,59 @@ export default function MapPage() {
                     onSelect={handleSearchSelect}
                     total={destinations.length}
                   />
-                  <SouthCebuRouteCard
-                    route={southRoute}
-                    routeLoading={southRouteLoading}
-                    routeError={southRouteError}
-                    liveRoute={liveRoute.route}
-                    liveRouteLoading={liveRoute.loading}
-                    liveRouteError={liveRoute.error}
-                    livePosition={currentLocation.position}
+                  <MapRouteCard
+                    selectedDestination={selected}
+                    destinations={destinations}
+                    route={route}
+                    routeLoading={routeLoading}
+                    routeError={routeError}
+                    onRetryRoute={() => setRouteRetryToken((t) => t + 1)}
+                    originType={originType}
+                    onChangeOriginType={handleOriginTypeChange}
+                    customOrigin={customOrigin}
+                    onSelectCustomOrigin={(dest) => {
+                      setCustomOrigin(dest);
+                      if (dest) {
+                        setOriginType("custom");
+                        try {
+                          window.sessionStorage.setItem("lakbai.map.custom_origin_id", String(dest.id));
+                        } catch {
+                          // sessionStorage unavailable
+                        }
+                      }
+                    }}
+                    stops={stops}
+                    onAddStop={handleAddStop}
+                    onRemoveStop={handleRemoveStop}
+                    onReorderStops={handleReorderStops}
+                    onHighlightStop={setHighlightedStopIndex}
+                    selectionNotice={missingDestination ? "That destination is no longer available." : null}
+                    activeTargetIndex={activeTargetIndex}
+                    onSelectTargetIndex={(idx) => {
+                      setActiveTargetIndex(idx);
+                      const targetStop = stops[idx];
+                      if (targetStop?.id) {
+                        const dest = destinations.find((d) => d.id === targetStop.id);
+                        if (dest) {
+                          setSelected(dest);
+                          setFocusId(dest.id);
+                          setSearchParams({ d: String(dest.id) });
+                        }
+                      }
+                    }}
+                    onLoadPreset={handleLoadPreset}
+                    onClearRoute={handleClear}
+                    onAddToTrip={openChooser}
                     gpsStatus={currentLocation.status}
                     gpsError={currentLocation.error}
                     onStartGps={currentLocation.start}
                     onStopGps={currentLocation.stop}
-                    targetIndex={routeTargetIndex}
-                    onTargetChange={(value) => setRouteTargetIndex(Number(value))}
-                    onRetryRoute={liveRoute.retry}
+                    liveRoute={liveRoute.route}
+                    liveRouteLoading={liveRoute.loading}
+                    liveRouteError={liveRoute.error}
+                    onRetryLiveRoute={liveRoute.retry}
+                    livePosition={currentLocation.position}
+                    isMobile={isMobile}
                   />
                 </>
               )}

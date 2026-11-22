@@ -67,3 +67,104 @@ export function formatDistance(distanceM: number | null): string | null {
   if (distanceM >= 1000) return `${(distanceM / 1000).toFixed(1)} km`;
   return `${Math.round(distanceM)} m`;
 }
+
+export function profileFallbackSpeedKmh(profile?: string): number {
+  switch (profile) {
+    case "walking":
+      return 5;
+    case "cycling":
+      return 15;
+    default:
+      return 30;
+  }
+}
+
+const EARTH_RADIUS_M = 6_371_000;
+
+/**
+ * Distance in meters from a point {lat, lng} to a line segment A -> B.
+ * Returns perpendicular distance, parameter t (0..1), and projected coordinate.
+ */
+export function pointSegmentDistanceMeters(
+  point: { lat: number; lng: number },
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): { distanceM: number; t: number; point: { lat: number; lng: number } } {
+  const lat0 = (point.lat * Math.PI) / 180;
+  const scaleX = Math.cos(lat0) * EARTH_RADIUS_M;
+  const scaleY = EARTH_RADIUS_M;
+
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const px = toRad(point.lng) * scaleX;
+  const py = toRad(point.lat) * scaleY;
+  const ax = toRad(a.lng) * scaleX;
+  const ay = toRad(a.lat) * scaleY;
+  const bx = toRad(b.lng) * scaleX;
+  const by = toRad(b.lat) * scaleY;
+
+  const dx = bx - ax;
+  const dy = by - ay;
+  const denom = dx * dx + dy * dy;
+  const t = denom === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / denom));
+
+  const projLat = a.lat + t * (b.lat - a.lat);
+  const projLng = a.lng + t * (b.lng - a.lng);
+  const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+
+  return { distanceM: dist, t, point: { lat: projLat, lng: projLng } };
+}
+
+/**
+ * Snaps a point to a GeoJSON LineString coordinates array ([[lng, lat], ...])
+ * finding minimum distance in meters and segment index.
+ */
+export function snapToPolyline(
+  point: { lat: number; lng: number },
+  coordinates: [number, number][],
+): { minDistanceM: number; segmentIndex: number; projectedPoint: { lat: number; lng: number } } | null {
+  if (coordinates.length < 2) return null;
+
+  let minDistanceM = Number.POSITIVE_INFINITY;
+  let segmentIndex = 0;
+  let bestPoint = { lat: coordinates[0][1], lng: coordinates[0][0] };
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const a = { lat: coordinates[i][1], lng: coordinates[i][0] };
+    const b = { lat: coordinates[i + 1][1], lng: coordinates[i + 1][0] };
+    const result = pointSegmentDistanceMeters(point, a, b);
+
+    if (result.distanceM < minDistanceM) {
+      minDistanceM = result.distanceM;
+      segmentIndex = i;
+      bestPoint = result.point;
+    }
+  }
+
+  return { minDistanceM, segmentIndex, projectedPoint: bestPoint };
+}
+
+/**
+ * Calculates remaining distance in meters along the polyline from
+ * segmentIndex and projectedPoint to the end of the route.
+ */
+export function remainingDistanceOnPolyline(
+  coordinates: [number, number][],
+  segmentIndex: number,
+  projectedPoint: { lat: number; lng: number },
+): number {
+  if (coordinates.length < 2) return 0;
+  if (segmentIndex >= coordinates.length - 1) return 0;
+
+  // First partial segment: from projectedPoint to coordinates[segmentIndex + 1]
+  const nextPt = { lat: coordinates[segmentIndex + 1][1], lng: coordinates[segmentIndex + 1][0] };
+  let remainingM = haversineKm(projectedPoint.lat, projectedPoint.lng, nextPt.lat, nextPt.lng) * 1000;
+
+  // Remaining full segments
+  for (let i = segmentIndex + 1; i < coordinates.length - 1; i++) {
+    const p1 = { lat: coordinates[i][1], lng: coordinates[i][0] };
+    const p2 = { lat: coordinates[i + 1][1], lng: coordinates[i + 1][0] };
+    remainingM += haversineKm(p1.lat, p1.lng, p2.lat, p2.lng) * 1000;
+  }
+
+  return Math.round(remainingM);
+}

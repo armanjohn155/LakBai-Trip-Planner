@@ -35,7 +35,7 @@ class RouteApiTest extends TestCase
 
         $first = $this->postJson('/api/routes', $body)->assertOk()
             ->assertJsonPath('data.geometry.type', 'LineString')
-            ->assertJsonPath('data.geometry.coordinates.0.0', 123.0)
+            ->assertJsonPath('data.geometry.coordinates.0.0', 123)
             ->assertJsonPath('data.distance_m', 2400)
             ->assertJsonPath('data.approximate', false);
         $this->postJson('/api/routes', $body)->assertOk()->assertExactJson($first->json());

@@ -42,6 +42,9 @@ export default function DestinationsPage() {
   const [openChooser, setOpenChooser] = useState<Destination | null>(null);
 
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const drawerWasOpenRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +110,53 @@ export default function DestinationsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFocusedId((current) => (current && !destinations.some((d) => d.id === current) ? null : current));
   }, [destinations]);
+
+  // Close the drawer if the viewport reaches the desktop sidebar breakpoint.
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setDrawerOpen(false);
+    };
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
+
+  // Move focus into the drawer on open, and back to the Filters button on close.
+  useEffect(() => {
+    if (drawerOpen) {
+      drawerWasOpenRef.current = true;
+      drawerCloseRef.current?.focus();
+      return;
+    }
+    if (drawerWasOpenRef.current) {
+      drawerWasOpenRef.current = false;
+      filtersButtonRef.current?.focus();
+    }
+  }, [drawerOpen]);
+
+  // Escape closes the drawer.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [drawerOpen]);
+
+  // Lock page scroll while the drawer is open, restoring it on close or unmount.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [drawerOpen]);
 
   const renderCard = (destination: Destination) => {
     const common = {
@@ -196,8 +246,11 @@ export default function DestinationsPage() {
 
             <div className="flex items-center gap-2">
               <button
+                ref={filtersButtonRef}
                 type="button"
-                onClick={() => setDrawerOpen(true)}
+                onClick={() => setDrawerOpen((value) => !value)}
+                aria-expanded={drawerOpen}
+                aria-controls="destination-filters-drawer"
                 className="inline-flex h-9 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-lagoon-900 lg:hidden"
               >
                 <SlidersIcon className="h-4 w-4" />
@@ -274,7 +327,7 @@ export default function DestinationsPage() {
               }
             />
           ) : view === "grid" ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{visible.map(renderCard)}</div>
+            <div className="grid grid-cols-2 gap-2.5 min-[600px]:grid-cols-3">{visible.map(renderCard)}</div>
           ) : (
             <div className="space-y-4">{visible.map(renderCard)}</div>
           )}
@@ -292,24 +345,79 @@ export default function DestinationsPage() {
         </div>
       </div>
 
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-[1200] lg:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-lagoon-950/50" onClick={() => setDrawerOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-sand-50 p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-end">
+      {/* Mobile filters drawer: slides in from the left, 75vw capped at 420px. */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[1200] lg:hidden",
+          drawerOpen ? "pointer-events-auto" : "pointer-events-none",
+        )}
+      >
+        <div
+          className={cn(
+            "absolute inset-0 bg-lagoon-950/50 transition-opacity duration-300",
+            drawerOpen ? "opacity-100" : "opacity-0",
+          )}
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden="true"
+        />
+
+        <aside
+          id="destination-filters-drawer"
+          role="dialog"
+          aria-modal={drawerOpen ? true : undefined}
+          aria-label="Filters"
+          aria-hidden={!drawerOpen}
+          inert={!drawerOpen}
+          className={cn(
+            "absolute inset-y-0 left-0 flex h-dvh w-3/4 max-w-[420px] flex-col bg-sand-50 shadow-2xl transition-transform duration-300 ease-out",
+            drawerOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line/60 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <h2 className="flex items-center gap-2 font-display text-lg font-bold text-lagoon-900">
+              <SlidersIcon className="h-4 w-4 text-sea-600" />
+              Filters
+            </h2>
+            <button
+              ref={drawerCloseRef}
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Hide filters"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-sand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+            <DestinationFilters
+              filters={filters}
+              allDestinations={destinations}
+              onFiltersChange={setFilters}
+              showHeader={false}
+            />
+          </div>
+
+          <div className="shrink-0 border-t border-line/60 bg-sand-50 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFilters({ ...EMPTY_EXPLORER_FILTERS })}
+                className="h-11 flex-1 rounded-xl border border-line bg-white text-sm font-semibold text-ink-900 transition-colors hover:bg-sand-100"
+              >
+                Clear all
+              </button>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                aria-label="Close filters"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-sand-200"
+                className="h-11 flex-[1.4] rounded-xl bg-surf-400 text-sm font-semibold text-white transition-colors hover:bg-surf-300"
               >
-                <XIcon className="h-5 w-5" />
+                Show results
               </button>
             </div>
-            <DestinationFilters filters={filters} allDestinations={destinations} onFiltersChange={setFilters} />
           </div>
-        </div>
-      ) : null}
+        </aside>
+      </div>
 
       {openChooser ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
