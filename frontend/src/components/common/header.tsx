@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type PointerEvent as ReactPointerEvent } from "react";
-
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { createPortal } from "react-dom";
 import { Link, NavLink, useLocation, useNavigate } from "react-router";
 import { twMerge } from "tailwind-merge";
 
 import { NotificationBell } from "@/components/features/notifications/notification-bell";
 import { Avatar } from "@/components/features/profile/profile-sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotifications } from "@/hooks/use-notifications";
 import { getFriendRequests } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
@@ -110,8 +111,6 @@ export function Header() {
   );
 }
 
-type AccountMenuMode = "dropdown" | "sheet";
-
 interface AccountMenuProps {
   onSignOut: () => void;
 }
@@ -138,7 +137,6 @@ function useIsDesktop(): boolean {
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
     const onChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
-    setIsDesktop(media.matches);
     if (typeof media.addEventListener === "function") {
       media.addEventListener("change", onChange);
       return () => media.removeEventListener("change", onChange);
@@ -166,32 +164,26 @@ function getFocusable(container: HTMLElement | null): HTMLElement[] {
 }
 
 /**
- * Shared account menu (desktop dropdown + mobile bottom sheet).
- * Menu content comes from one config (`AccountMenuContent` + items) so both views stay in sync.
+ * One account menu for every breakpoint.
+ *
+ * Desktop renders a dropdown anchored under the trigger. Mobile renders the
+ * exact same content in a floating card pinned under the header, constrained
+ * to the viewport with internal scrolling. There is only one account UI, and
+ * only one place (`AccountMenuContent`) that defines its rows.
  */
 function AccountMenu({ onSignOut }: AccountMenuProps) {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
-  const [renderSheet, setRenderSheet] = useState(false);
-  const [sheetEntered, setSheetEntered] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
 
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-  const dragRef = useRef<{ startY: number; pointerId: number } | null>(null);
   const prevPathRef = useRef(location.pathname + location.search + location.hash);
-  const prevDesktopRef = useRef<boolean | null>(null);
 
   const isDesktop = useIsDesktop();
-  const mode: AccountMenuMode = isDesktop ? "dropdown" : "sheet";
-  const reducedMotion = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -212,61 +204,45 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
     if (!user) return { items: [], guest: true };
     const items: AccountMenuItem[] = [
       { to: "/app/friends", label: "Friends", Icon: FriendsIcon, badge: friendRequestCount },
-      { to: "/app/notifications", label: "Notifications", Icon: BellIcon },
+      { to: "/app/notifications", label: "Notifications", Icon: BellIcon, badge: unreadCount },
       { to: "/app/history", label: "History", Icon: ClockIcon },
       { to: "/app/trips", label: "My Trips", Icon: PinIcon },
       { to: "/app/profile", label: "Profile", Icon: UserIcon },
       ...(user.role === "admin" ? [{ to: "/admin", label: "Admin", Icon: ShieldIcon, adminOnly: true }] : []),
     ];
     return { items, guest: false };
-  }, [user, friendRequestCount]);
+  }, [user, friendRequestCount, unreadCount]);
 
   const close = useCallback(() => setOpen(false), []);
 
   // Close on route change after choosing an item / navigation.
   useEffect(() => {
     const next = location.pathname + location.search + location.hash;
-    if (prevPathRef.current !== next) {
-      prevPathRef.current = next;
-      if (open) setOpen(false);
-    } else {
-      prevPathRef.current = next;
-    }
+    if (prevPathRef.current === next) return;
+    prevPathRef.current = next;
+    if (!open) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setOpen(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname, location.search, location.hash, open]);
 
-  // Close when resizing across the breakpoint.
+  // Close when the layout crosses the desktop breakpoint.
   useEffect(() => {
-    if (prevDesktopRef.current === null) {
-      prevDesktopRef.current = isDesktop;
-      return;
+    const media = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setOpen(false);
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
     }
-    if (prevDesktopRef.current !== isDesktop) {
-      prevDesktopRef.current = isDesktop;
-      if (open) setOpen(false);
-    }
-  }, [isDesktop, open]);
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
 
-  // Mount/unmount animation for mobile sheet.
-  useEffect(() => {
-    if (mode === "sheet" && open) {
-      setRenderSheet(true);
-      setDragOffset(0);
-      const id = window.requestAnimationFrame(() => setSheetEntered(true));
-      return () => window.cancelAnimationFrame(id);
-    }
-    if (mode === "sheet" && !open && renderSheet) {
-      setSheetEntered(false);
-      if (reducedMotion) {
-        setRenderSheet(false);
-        return;
-      }
-      const timer = window.setTimeout(() => setRenderSheet(false), 200);
-      return () => window.clearTimeout(timer);
-    }
-    return;
-  }, [mode, open, renderSheet, reducedMotion]);
-
-  // Focus, scroll lock, escape/focus-trap for open menu (sheet gets full dialog behavior).
+  // Focus into the menu, lock page scroll on mobile, close on Escape, trap Tab on mobile.
   useEffect(() => {
     if (!open) return;
 
@@ -274,13 +250,12 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
     const previousOverflow = document.body.style.overflow;
 
     const focusInitial = () => {
-      const container = mode === "sheet" ? sheetRef.current : dropdownRef.current;
-      const focusable = getFocusable(container);
-      (focusable[0] ?? container)?.focus?.();
+      const focusable = getFocusable(menuRef.current);
+      (focusable[0] ?? menuRef.current)?.focus?.();
     };
 
     const timer = window.setTimeout(focusInitial, 0);
-    if (mode === "sheet") {
+    if (!isDesktop) {
       document.body.style.overflow = "hidden";
     }
 
@@ -290,12 +265,13 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
         close();
         return;
       }
-      if (mode !== "sheet" || event.key !== "Tab") return;
-      const container = sheetRef.current;
+      if (isDesktop || event.key !== "Tab") return;
+      const container = menuRef.current;
+      if (!container) return;
       const focusable = getFocusable(container);
-      if (focusable.length === 0 || !container) {
+      if (focusable.length === 0) {
         event.preventDefault();
-        container?.focus();
+        container.focus();
         return;
       }
       const first = focusable[0];
@@ -319,59 +295,33 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, mode, close]);
+  }, [open, isDesktop, close]);
 
   // Return focus to the account button on close.
   useEffect(() => {
     if (open) return;
     const prev = previousFocusRef.current;
-    if (prev) {
-      previousFocusRef.current = null;
-      window.requestAnimationFrame(() => {
-        if (buttonRef.current) buttonRef.current.focus();
-        else prev.focus?.();
-      });
-    }
+    if (!prev) return;
+    previousFocusRef.current = null;
+    if (buttonRef.current) buttonRef.current.focus();
+    else prev.focus?.();
   }, [open]);
 
-  // Desktop dropdown: outside click closes.
+  // Outside pointer/tap closes the menu on both layouts.
   useEffect(() => {
-    if (!open || mode !== "dropdown") return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!dropdownRef.current?.contains(event.target as Node) && !buttonRef.current?.contains(event.target as Node)) {
-        close();
-      }
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
+      close();
     };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open, mode, close]);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, close]);
 
   const handleSignOut = async () => {
     close();
     await onSignOut();
-  };
-
-  const onSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (mode !== "sheet") return;
-    dragRef.current = { startY: event.clientY, pointerId: event.pointerId };
-    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  };
-
-  const onSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const delta = event.clientY - drag.startY;
-    setDragOffset(delta > 0 ? delta : 0);
-  };
-
-  const onSheetPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    dragRef.current = null;
-    if (dragOffset > 80) {
-      close();
-    }
-    setDragOffset(0);
   };
 
   const accountButton = (
@@ -379,10 +329,10 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
       ref={buttonRef}
       type="button"
       onClick={() => setOpen((value) => !value)}
-      aria-haspopup="dialog"
+      aria-haspopup="menu"
       aria-expanded={open}
       aria-label="Account"
-      className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-100 hover:text-ink-900 md:px-3"
+      className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-100 hover:text-ink-900 md:px-3"
     >
       {user ? (
         <Avatar name={user.name} src={user.avatar_url ?? null} className="h-7 w-7 text-xs ring-1 ring-line md:h-5 md:w-5 md:text-[10px]" />
@@ -396,7 +346,7 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
 
   const sharedContent = (
     <AccountMenuContent
-      mode={mode}
+      compact={isDesktop}
       user={user ? { name: user.name, email: user.email, avatar_url: user.avatar_url ?? null } : null}
       config={menuConfig}
       onClose={close}
@@ -404,141 +354,117 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
     />
   );
 
+  const mobileMenu =
+    open && !isDesktop && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label="Account menu"
+            tabIndex={-1}
+            className={twMerge(
+              "glass-frost fixed right-4 z-[var(--z-dropdown)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl p-1.5 text-ink-900 shadow-lg outline-none",
+              "top-[calc(env(safe-area-inset-top)+var(--header-h)+0.25rem)]",
+              "max-h-[calc(100dvh-var(--header-h)-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]",
+              "pb-[max(0.375rem,env(safe-area-inset-bottom))]",
+            )}
+          >
+            {sharedContent}
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className="relative">
       {accountButton}
 
       {/* Desktop dropdown (>= md) */}
-      {open && mode === "dropdown" ? (
+      {open && isDesktop ? (
         <div
-          ref={dropdownRef}
+          ref={menuRef}
           role="menu"
           aria-label="Account menu"
-          className={twMerge(
-            "glass-frost absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-64 rounded-2xl p-1.5 text-ink-900 shadow-lg",
-          )}
+          tabIndex={-1}
+          className="glass-frost absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-64 rounded-2xl p-1.5 text-ink-900 shadow-lg outline-none"
         >
           {sharedContent}
         </div>
       ) : null}
 
-      {/* Mobile bottom sheet (< md) */}
-      {mode === "sheet" && renderSheet ? (
-        <>
-          <div
-            className={twMerge(
-              "fixed inset-0 z-[var(--z-dropdown)] bg-lagoon-950/45 transition-opacity",
-              reducedMotion ? "duration-0" : "duration-200",
-              sheetEntered && open ? "opacity-100" : "opacity-0",
-            )}
-            onClick={close}
-            aria-hidden="true"
-          />
-          <div
-            ref={sheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Account menu"
-            tabIndex={-1}
-            className={twMerge(
-              "fixed inset-x-0 bottom-0 z-[calc(var(--z-dropdown)+1)] flex max-h-[100dvh] flex-col rounded-t-3xl border-t border-line bg-white text-ink-900 shadow-2xl outline-none",
-              "pb-[env(safe-area-inset-bottom)]",
-              reducedMotion ? "transition-none" : "transition-transform duration-200 ease-out",
-              sheetEntered && open ? "translate-y-0" : "translate-y-full",
-            )}
-            style={dragOffset > 0 && sheetEntered && open ? { transform: `translateY(${dragOffset}px)` } : undefined}
-          >
-            <div
-              className="flex shrink-0 touch-none justify-center pt-2 pb-1"
-              onPointerDown={onSheetPointerDown}
-              onPointerMove={onSheetPointerMove}
-              onPointerUp={onSheetPointerUp}
-              onPointerCancel={onSheetPointerUp}
-              aria-hidden="true"
-            >
-              <div className="h-1.5 w-12 rounded-full bg-sand-300" />
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-              {sharedContent}
-            </div>
-          </div>
-        </>
-      ) : null}
+      {mobileMenu}
     </div>
   );
 }
 
 function AccountMenuContent({
-  mode,
+  compact,
   user,
   config,
   onClose,
   onSignOut,
 }: {
-  mode: AccountMenuMode;
+  compact: boolean;
   user: { name: string; email: string; avatar_url: string | null } | null;
   config: AccountMenuConfig;
   onClose: () => void;
   onSignOut: () => void;
 }) {
-  const isSheet = mode === "sheet";
+  const rowClass = compact ? "py-2" : "min-h-11 py-2.5";
 
   if (!user) {
     return (
-      <div className={twMerge(isSheet ? "space-y-1 py-1" : "space-y-1 p-1")}>
-        <p className={twMerge("font-semibold text-lagoon-900", isSheet ? "px-3 py-2 text-base" : "px-3 py-2 text-sm")}>Account</p>
+      <div className="space-y-1 p-1">
+        <p className="px-3 py-2 text-sm font-semibold text-lagoon-900">Account</p>
         <Link
           to="/login"
+          role="menuitem"
           onClick={onClose}
           className={twMerge(
-            "flex w-full items-center justify-between rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
-            isSheet ? "min-h-12 py-3" : "py-2",
+            "flex w-full items-center rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
+            rowClass,
           )}
         >
-          <span>Sign in</span>
-          {isSheet ? <ChevronRightIcon className="h-4 w-4 text-ink-400" /> : null}
+          <span className="truncate">Sign in</span>
         </Link>
         <Link
           to="/register"
+          role="menuitem"
           onClick={onClose}
           className={twMerge(
-            "flex w-full items-center justify-between rounded-xl px-3 text-sm font-semibold text-sea-700 transition-colors hover:bg-surf-400/15",
-            isSheet ? "min-h-12 bg-surf-400/10 py-3" : "bg-surf-400/10 py-2",
+            "flex w-full items-center rounded-xl px-3 text-sm font-semibold text-sea-700 transition-colors hover:bg-surf-400/15",
+            "bg-surf-400/10",
+            rowClass,
           )}
         >
-          <span>Create account</span>
-          {isSheet ? <ChevronRightIcon className="h-4 w-4 text-sea-600" /> : null}
+          <span className="truncate">Create account</span>
         </Link>
       </div>
     );
   }
 
   return (
-    <div className={twMerge(isSheet ? "py-1" : "")}>
-      <div className={twMerge("flex items-center gap-3", isSheet ? "px-2 py-3" : "px-3 py-2.5")}>
-        <Avatar
-          name={user.name}
-          src={user.avatar_url}
-          className={twMerge(isSheet ? "h-12 w-12 text-base" : "h-9 w-9 text-sm", "ring-2 ring-white/30")}
-        />
+    <div>
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <Avatar name={user.name} src={user.avatar_url} className="h-9 w-9 text-sm ring-2 ring-white/30" />
         <div className="min-w-0">
-          <p className={twMerge("truncate font-semibold text-lagoon-900", isSheet ? "text-base" : "text-sm")}>{user.name}</p>
-          <p className={twMerge("truncate text-ink-600", isSheet ? "text-sm" : "text-xs")}>{user.email}</p>
+          <p className="truncate text-sm font-semibold text-lagoon-900">{user.name}</p>
+          <p className="truncate text-xs text-ink-600">{user.email}</p>
         </div>
       </div>
 
       <div className="my-1 h-px bg-line" />
 
-      <div className={twMerge(isSheet ? "space-y-0.5" : "")}>
+      <div>
         {config.items.map(({ to, label, Icon, badge }) => (
           <Link
             key={to}
             to={to}
-            role={isSheet ? undefined : "menuitem"}
+            role="menuitem"
             onClick={onClose}
             className={twMerge(
-              "flex w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
-              isSheet ? "min-h-12 py-3" : "gap-2.5 py-2",
+              "flex w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
+              rowClass,
             )}
           >
             <Icon className="h-4 w-4 shrink-0 text-ink-600" />
@@ -548,7 +474,6 @@ function AccountMenuContent({
                 {badge > 9 ? "9+" : badge}
               </span>
             ) : null}
-            {isSheet ? <ChevronRightIcon className="h-4 w-4 shrink-0 text-ink-400" /> : null}
           </Link>
         ))}
       </div>
@@ -557,16 +482,15 @@ function AccountMenuContent({
 
       <button
         type="button"
-        role={isSheet ? undefined : "menuitem"}
+        role="menuitem"
         onClick={onSignOut}
         className={twMerge(
-          "flex w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5",
-          isSheet ? "min-h-12 py-3" : "gap-2.5 py-2",
+          "flex w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5",
+          rowClass,
         )}
       >
         <LogOutIcon className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 text-left">Sign out</span>
-        {isSheet ? <ChevronRightIcon className="h-4 w-4 shrink-0 text-sinulog-red/60" /> : null}
+        <span className="min-w-0 flex-1 truncate text-left">Sign out</span>
       </button>
     </div>
   );
@@ -628,14 +552,6 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
-      <path d="M9 6l6 6-6 6" />
-    </svg>
-  );
-}
-
 function BellIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} {...svgIconProps} aria-hidden="true">
@@ -643,5 +559,4 @@ function BellIcon({ className }: { className?: string }) {
       <path d="M13.73 21a2 2 0 01-3.46 0" />
     </svg>
   );
-}
-
+}

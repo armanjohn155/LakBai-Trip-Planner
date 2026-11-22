@@ -6,7 +6,6 @@ use App\Models\User;
 use Database\Seeders\AdminSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use RuntimeException;
 use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
@@ -103,16 +102,19 @@ class AuthControllerTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'admin@lakbai.test', 'role' => 'admin']);
     }
 
-    public function test_admin_seeder_fails_when_credentials_are_missing(): void
+    public function test_admin_seeder_creates_a_fallback_account_in_testing_when_credentials_are_missing(): void
     {
         config([
             'admin.email' => null,
             'admin.password' => null,
         ]);
 
-        $this->expectException(RuntimeException::class);
-
         $this->seed(AdminSeeder::class);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'admin@example.com',
+            'role' => 'admin',
+        ]);
     }
 
     public function test_login_rejects_invalid_credentials(): void

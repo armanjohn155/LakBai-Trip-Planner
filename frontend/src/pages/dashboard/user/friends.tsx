@@ -545,7 +545,7 @@ export default function FriendsPage() {
       </Modal>
 
       {toast ? (
-        <div className="fixed bottom-6 right-6 z-[1300] max-w-sm rounded-xl bg-lagoon-900 px-4 py-3 text-sm font-medium text-sand-50 shadow-lg" role="status">
+      <div className="fixed inset-x-4 bottom-[calc(var(--bottom-nav-h)+1rem)] z-[1300] mx-auto w-fit max-w-sm rounded-xl bg-lagoon-900 px-4 py-3 text-sm font-medium text-sand-50 shadow-lg sm:inset-x-auto sm:bottom-6 sm:right-6 sm:mx-0" role="status">
           {toast}
         </div>
       ) : null}

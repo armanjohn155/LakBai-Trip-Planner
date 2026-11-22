@@ -14,18 +14,28 @@ class RouteEstimatorTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'lakbai.routing.enabled' => false,
+            'lakbai.routing.provider' => 'osrm',
+            'lakbai.routing.osrm_url' => 'https://router.project-osrm.org',
+        ]);
+    }
+
     public function test_uses_osrm_distance_and_duration_when_available(): void
     {
-        Http::fake([
-            'router.project-osrm.org/*' => Http::response([
-                'routes' => [[
-                    'distance' => 4200.0,
-                    'duration' => 600.0,
-                    'geometry' => ['type' => 'LineString', 'coordinates' => [[123.0, 10.0], [123.1, 10.1]]],
-                    'legs' => [['distance' => 4200.0, 'duration' => 600.0]],
-                ]],
-            ]),
-        ]);
+        Http::fake(fn () => Http::response([
+            'code' => 'Ok',
+            'routes' => [[
+                'distance' => 4200.0,
+                'duration' => 600.0,
+                'geometry' => ['type' => 'LineString', 'coordinates' => [[123.0, 10.0], [123.1, 10.1]]],
+                'legs' => [['distance' => 4200.0, 'duration' => 600.0]],
+            ]],
+        ]));
 
         $estimator = new RouteEstimator(enabled: true);
 

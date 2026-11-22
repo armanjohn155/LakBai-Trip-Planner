@@ -142,6 +142,7 @@ class RouteEstimator
             'distance_m' => $distance,
             'duration_s' => array_sum(array_column($legs, 'duration_s')),
             'legs' => $legs,
+            'instructions' => [],
             'provider' => 'haversine',
             'approximate' => true,
             'reason' => $reason,

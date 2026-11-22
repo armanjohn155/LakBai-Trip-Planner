@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 
-import { ClockIcon, PinIcon, RouteIcon } from "@/components/icons";
+import {
+  BellIcon,
+  BikeIcon,
+  CarIcon,
+  ClockIcon,
+  PinIcon,
+  RouteIcon,
+  TurnLeftIcon,
+  TurnRightIcon,
+  WalkIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { formatDistance } from "@/lib/geo";
-import type { TripLifecycleStatus, TripTrackingSummary } from "@/lib/types";
+import type { RouteProfile, TripLifecycleStatus, TripTrackingSummary } from "@/lib/types";
+import type { NavigationManeuver } from "@/hooks/use-navigation";
 
 interface TripLiveBarProps {
   lifecycle: TripLifecycleStatus;
@@ -29,6 +40,12 @@ interface TripLiveBarProps {
   routeHint?: string | null;
   routeRetry?: (() => void) | null;
   locationStatus?: string | null;
+  profile?: RouteProfile;
+  onChangeProfile?: (profile: RouteProfile) => void;
+  nextManeuver?: NavigationManeuver | null;
+  isOffRoute?: boolean;
+  alertsEnabled?: boolean;
+  onToggleAlerts?: () => void;
   onToggleFollow?: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -74,6 +91,12 @@ export function TripLiveBar({
   routeHint = null,
   routeRetry = null,
   locationStatus = null,
+  profile = "driving",
+  onChangeProfile,
+  nextManeuver = null,
+  isOffRoute = false,
+  alertsEnabled = false,
+  onToggleAlerts,
   onToggleFollow,
   onPause,
   onResume,
@@ -212,13 +235,66 @@ export function TripLiveBar({
             <button type="button" onClick={routeRetry} className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-sea-700 hover:bg-surf-400/10">Retry route</button>
           ) : null}
 
+          {onChangeProfile ? (
+            <div className="inline-flex items-center rounded-full bg-sand-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => onChangeProfile("driving")}
+                title="Driving"
+                className={cn(
+                  "rounded-full p-1 text-[10px] transition-colors",
+                  profile === "driving" ? "bg-white text-sea-700 shadow-xs" : "text-ink-500 hover:text-ink-800",
+                )}
+              >
+                <CarIcon className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeProfile("walking")}
+                title="Walking"
+                className={cn(
+                  "rounded-full p-1 text-[10px] transition-colors",
+                  profile === "walking" ? "bg-white text-sea-700 shadow-xs" : "text-ink-500 hover:text-ink-800",
+                )}
+              >
+                <WalkIcon className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeProfile("cycling")}
+                title="Cycling"
+                className={cn(
+                  "rounded-full p-1 text-[10px] transition-colors",
+                  profile === "cycling" ? "bg-white text-sea-700 shadow-xs" : "text-ink-500 hover:text-ink-800",
+                )}
+              >
+                <BikeIcon className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null}
+
+          {onToggleAlerts ? (
+            <button
+              type="button"
+              onClick={onToggleAlerts}
+              title={alertsEnabled ? "Proximity alerts active" : "Enable proximity alerts"}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors",
+                alertsEnabled ? "bg-amber-100 text-amber-800" : "text-ink-500 hover:bg-sand-100",
+              )}
+            >
+              <BellIcon className={cn("h-3 w-3", alertsEnabled && "fill-amber-500")} />
+              <span className="hidden xs:inline">{alertsEnabled ? "Alerts on" : "Alerts"}</span>
+            </button>
+          ) : null}
+
           {onToggleFollow ? (
             <button
               type="button"
               onClick={onToggleFollow}
               aria-pressed={following}
               className={cn(
-                "hidden rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors sm:inline-flex",
+                "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors",
                 following ? "bg-surf-400/15 text-sea-600" : "text-ink-500 hover:bg-sand-100",
               )}
             >
@@ -251,6 +327,30 @@ export function TripLiveBar({
             ) : null}
           </div>
         </div>
+
+        {nextManeuver ? (
+          <div className="flex items-center gap-2 border-t border-line/40 bg-surf-400/10 px-3 py-1.5 text-xs text-lagoon-900">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sea-600 text-white">
+              {nextManeuver.modifier?.includes("left") ? (
+                <TurnLeftIcon className="h-3 w-3 stroke-[2.5]" />
+              ) : nextManeuver.modifier?.includes("right") ? (
+                <TurnRightIcon className="h-3 w-3 stroke-[2.5]" />
+              ) : (
+                <RouteIcon className="h-3 w-3" />
+              )}
+            </span>
+            <span className="font-semibold text-sea-800">
+              {formatDistance(nextManeuver.distance_m)}:
+            </span>
+            <span className="truncate font-medium text-ink-800">{nextManeuver.instruction}</span>
+          </div>
+        ) : null}
+
+        {isOffRoute ? (
+          <div className="flex items-center justify-between border-t border-mango-300 bg-mango-100/90 px-3 py-1 text-[11px] font-semibold text-mango-900">
+            <span>Off route — recalculating directions…</span>
+          </div>
+        ) : null}
 
         {notice ? (
           <p

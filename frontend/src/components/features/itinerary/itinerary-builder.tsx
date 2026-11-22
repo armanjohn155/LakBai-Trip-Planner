@@ -36,12 +36,14 @@ import { formatTripDateRange } from "@/components/features/itinerary/itinerary-c
 import { dayColor } from "@/components/features/map/map-pin";
 import {
   ArrowLeftIcon,
+  BellIcon,
   ChevronIcon,
   ClockIcon,
   CrosshairIcon,
   LayersIcon,
   PlusIcon,
   RouteIcon,
+  XIcon,
 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { InlineError, Spinner } from "@/components/ui/feedback";
@@ -53,6 +55,8 @@ import { useCurrentLocation } from "@/hooks/use-current-location";
 import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
 import { useTripTracking, type LivePosition } from "@/hooks/use-trip-tracking";
 import { useLiveRoute, usePlannedRoutes } from "@/hooks/use-route";
+import { useNavigation } from "@/hooks/use-navigation";
+import { useRouteAlerts } from "@/hooks/use-route-alerts";
 import { haversineMeters } from "@/lib/geo";
 import {
   addItineraryItem,
@@ -90,6 +94,7 @@ import type {
   ItineraryRouteEstimate,
   ItineraryRouteLeg,
   ItinerarySummary,
+  RouteProfile,
   TripTrackingSummary,
 } from "@/lib/types";
 
@@ -485,14 +490,38 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
       .sort((a, b) => a.day_number - b.day_number || a.order - b.order)[0] ?? null;
   }, [items, tracking]);
 
-  const roadRoutes = usePlannedRoutes(items, true);
+  const [routeProfile, setRouteProfile] = useState<RouteProfile>("driving");
+  const [forceRerouteNonce, setForceRerouteNonce] = useState(0);
+  const triggerReroute = useCallback(() => setForceRerouteNonce((n) => n + 1), []);
+
+  const roadRoutes = usePlannedRoutes(items, true, routeProfile);
   const liveRoute = useLiveRoute(
     livePosition ? { lat: livePosition.lat, lng: livePosition.lng } : null,
     nextStopItem?.latitude != null && nextStopItem.longitude != null
       ? { lat: Number(nextStopItem.latitude), lng: Number(nextStopItem.longitude) }
       : null,
     lifecycle === "active" && livePosition !== null && nextStopItem !== null,
+    {
+      profile: routeProfile,
+      forceRerouteNonce,
+    },
   );
+
+  const navigation = useNavigation({
+    livePosition,
+    route: liveRoute.route,
+    enabled: lifecycle === "active" && livePosition !== null && nextStopItem !== null,
+    profile: routeProfile,
+    onOffRoute: triggerReroute,
+  });
+
+  const alerts = useRouteAlerts({
+    itineraryId,
+    activeStop: nextStopItem,
+    remainingDistanceM: navigation.remainingDistanceM,
+    remainingDurationS: navigation.remainingDurationS,
+    enabled: lifecycle === "active",
+  });
 
   useEffect(() => {
     itemsRef.current = items;
@@ -1852,18 +1881,50 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
                 }
               : null
           }
-          routeDistanceM={liveRoute.route?.distance_m ?? null}
-          routeDurationS={liveRoute.route?.duration_s ?? null}
+          routeDistanceM={navigation.remainingDistanceM ?? liveRoute.route?.distance_m ?? null}
+          routeDurationS={navigation.remainingDurationS ?? liveRoute.route?.duration_s ?? null}
           routeApproximate={liveRoute.route?.approximate ?? false}
           routeLoading={liveRoute.loading}
           routeHint={islandRouteHint}
           routeRetry={routeNeedsRetry ? liveRoute.retry : null}
           locationStatus={locationStatus}
+          profile={routeProfile}
+          onChangeProfile={setRouteProfile}
+          nextManeuver={navigation.nextManeuver}
+          isOffRoute={navigation.isOffRoute}
+          alertsEnabled={alerts.notificationPermission === "granted"}
+          onToggleAlerts={() => {
+            if (alerts.notificationPermission !== "granted") {
+              void alerts.requestNotificationPermission();
+            }
+          }}
           onToggleFollow={() => setFollowMap((value) => !value)}
           onPause={() => void handlePauseTrip()}
           onResume={() => void handleResumeTrip()}
           onFinish={handleOpenFinish}
         />
+
+        {alerts.lastAlert ? (
+          <div
+            className="pointer-events-auto absolute left-1/2 z-[896] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-lagoon-900/95 px-3 py-2 text-white shadow-xl backdrop-blur transition-all"
+            style={isMobile ? { bottom: bottomChrome + 120 } : { top: 96 }}
+            role="alert"
+          >
+            <BellIcon className="h-4 w-4 shrink-0 text-amber-400" />
+            <div className="text-xs">
+              <span className="font-semibold">{alerts.lastAlert.title}: </span>
+              <span className="text-white/80">{alerts.lastAlert.body}</span>
+            </div>
+            <button
+              type="button"
+              onClick={alerts.dismissLastAlert}
+              className="ml-2 rounded-full p-1 text-white/60 hover:bg-white/10 hover:text-white"
+              aria-label="Dismiss alert"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
 
         {arrivalItem && lifecycle === "active" && (!isGroup || canEdit) ? (
           <div
