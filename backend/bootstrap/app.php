@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,7 +24,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
         ]);
 
+        $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
+        if ($trustedProxies === '' && env('APP_ENV', 'production') === 'production') {
+            $trustedProxies = '*';
+        }
+
+        if ($trustedProxies !== '') {
+            $middleware->trustProxies(
+                $trustedProxies === '*' ? '*' : array_values(array_filter(array_map('trim', explode(',', $trustedProxies)))),
+                Request::HEADER_X_FORWARDED_FOR
+                    | Request::HEADER_X_FORWARDED_HOST
+                    | Request::HEADER_X_FORWARDED_PROTO
+                    | Request::HEADER_X_FORWARDED_PORT
+                    | Request::HEADER_X_FORWARDED_PREFIX,
+            );
+        }
+
         $middleware->append(HandleCors::class);
+        $middleware->append(AddSecurityHeaders::class);
 
         $middleware->redirectGuestsTo(
             fn (Request $request) => $request->is('api/*') ? null : '/login',

@@ -47,7 +47,7 @@ export function QuickActions({ destination, favorited, onToggleFavorite, onAddTo
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-600">Location</p>
-        <div className="mt-2 h-40 overflow-hidden rounded-xl ring-1 ring-line">
+        <div className="relative z-0 isolate mt-2 h-40 overflow-hidden rounded-xl ring-1 ring-line">
           <CebuMap destinations={[destination]} activeId={destination.id} interactive={false} className="h-full w-full" />
         </div>
         <p className="mt-2.5 font-mono text-xs text-ink-600">

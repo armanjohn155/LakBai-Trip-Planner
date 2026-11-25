@@ -1,0 +1,345 @@
+# Render Blueprint for LakBai.
+# Real secrets are entered in the Render dashboard (sync: false) or generated
+# by Render (generateValue: true). Never commit connection strings or keys.
+
+previews:
+  generation: off
+
+envVarGroups:
+  - name: lakbai-reverb
+    envVars:
+      - key: REVERB_APP_ID
+        value: lakbai
+      - key: REVERB_APP_KEY
+        generateValue: true
+      - key: REVERB_APP_SECRET
+        generateValue: true
+
+services:
+  # Laravel API. Migrations run only here, and only with RUN_MIGRATIONS=true.
+  - type: web
+    name: lakbai-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /up
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_NAME
+        value: LakBai
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        value: https://lakbai-api.onrender.com
+      - key: APP_FORCE_HTTPS
+        value: "true"
+      - key: TRUSTED_PROXIES
+        value: "*"
+      - key: FRONTEND_URL
+        value: https://lakbai-web.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://lakbai-web.onrender.com
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: lakbai-web.onrender.com
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        sync: false
+      - key: DB_URL_DIRECT
+        sync: false
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: SESSION_SAME_SITE
+        value: lax
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: FILESYSTEM_DISK
+        value: s3
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        sync: false
+      - key: AWS_BUCKET
+        sync: false
+      - key: AWS_URL
+        sync: false
+      - key: AWS_ENDPOINT
+        sync: false
+      - key: AWS_USE_PATH_STYLE_ENDPOINT
+        value: "false"
+      - key: BROADCAST_CONNECTION
+        value: reverb
+      - fromGroup: lakbai-reverb
+      - key: REVERB_HOST
+        fromService:
+          type: web
+          name: lakbai-reverb
+          property: host
+      # The API publishes over Render's private network to the Reverb listener.
+      - key: REVERB_PORT
+        value: "10000"
+      - key: REVERB_SCHEME
+        value: http
+      - key: REVERB_ALLOWED_ORIGINS
+        value: https://lakbai-web.onrender.com
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_SCHEME
+        value: tls
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: LakBai
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://lakbai-api.onrender.com/api/auth/google/callback
+      - key: GOOGLE_FRONTEND_CALLBACK
+        value: https://lakbai-web.onrender.com/auth/google/callback
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_NAME
+        value: Administrator
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  # Static React build. Vite bakes these public URLs into the bundle at build
+  # time; a static site cannot resolve Render's private fromService hostnames.
+  - type: web
+    name: lakbai-web
+    runtime: static
+    rootDir: ./frontend
+    buildCommand: |
+      export VITE_API_URL="https://${LAKBAI_API_HOST}/api"
+      export VITE_APP_NAME="LakBai"
+      export VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
+      export VITE_REVERB_HOST="${LAKBAI_REVERB_HOST}"
+      export VITE_REVERB_PORT="443"
+      export VITE_REVERB_SCHEME="https"
+      npm ci
+      npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: LAKBAI_API_HOST
+        value: lakbai-api.onrender.com
+      - key: LAKBAI_REVERB_HOST
+        value: lakbai-reverb.onrender.com
+      - fromGroup: lakbai-reverb
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: sameorigin
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(self), camera=(), microphone=()
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Laravel Reverb WebSocket server. Uses the same image as the API but never
+  # runs migrations or seeds.
+  - type: web
+    name: lakbai-reverb
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./backend
+    dockerCommand: php artisan reverb:start --host=0.0.0.0 --port=10000
+    envVars:
+      - key: APP_NAME
+        value: LakBai
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: PORT
+        value: "10000"
+      - key: APP_URL
+        value: https://lakbai-api.onrender.com
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        sync: false
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: RUN_CACHES
+        value: "true"
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: FILESYSTEM_DISK
+        value: s3
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        sync: false
+      - key: AWS_BUCKET
+        sync: false
+      - key: AWS_URL
+        sync: false
+      - key: AWS_ENDPOINT
+        sync: false
+      - key: BROADCAST_CONNECTION
+        value: reverb
+      - fromGroup: lakbai-reverb
+      - key: REVERB_HOST
+        value: lakbai-reverb.onrender.com
+      - key: REVERB_PORT
+        value: "443"
+      - key: REVERB_SCHEME
+        value: https
+      - key: REVERB_SERVER_HOST
+        value: 0.0.0.0
+      - key: REVERB_SERVER_PORT
+        value: "10000"
+      - key: REVERB_ALLOWED_ORIGINS
+        value: https://lakbai-web.onrender.com
+
+  # Optional background worker. Uncomment when queued jobs are enabled.
+  # - type: worker
+  #   name: lakbai-worker
+  #   runtime: docker
+  #   plan: 0.5c-512mb
+  #   region: oregon
+  #   dockerfilePath: ./Dockerfile
+  #   dockerContext: ./backend
+  #   dockerCommand: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+  #   envVars:
+  #     - key: APP_NAME
+  #       value: LakBai
+  #     - key: APP_ENV
+  #       value: production
+  #     - key: APP_DEBUG
+  #       value: "false"
+  #     - key: APP_KEY
+  #       sync: false
+  #     - key: APP_URL
+  #       value: https://lakbai-api.onrender.com
+  #     - key: LOG_CHANNEL
+  #       value: stderr
+  #     - key: DB_CONNECTION
+  #       value: pgsql
+  #     - key: DB_URL
+  #       sync: false
+  #     - key: RUN_MIGRATIONS
+  #       value: "false"
+  #     - key: QUEUE_CONNECTION
+  #       value: database
+  #     - key: CACHE_STORE
+  #       value: database
+  #     - key: FILESYSTEM_DISK
+  #       value: s3
+  #     - key: BROADCAST_CONNECTION
+  #       value: reverb
+  #     - fromGroup: lakbai-reverb
+  #     - key: REVERB_HOST
+  #       fromService:
+  #         type: web
+  #         name: lakbai-reverb
+  #         property: host
+  #     - key: REVERB_PORT
+  #       value: "10000"
+  #     - key: REVERB_SCHEME
+  #       value: http
+
+  # Optional scheduler. Run Laravel's schedule:run every minute.
+  # - type: cron
+  #   name: lakbai-cron
+  #   runtime: docker
+  #   plan: 0.5c-512mb
+  #   region: oregon
+  #   schedule: "* * * * *"
+  #   dockerfilePath: ./Dockerfile
+  #   dockerContext: ./backend
+  #   dockerCommand: php artisan schedule:run
+  #   envVars:
+  #     - key: APP_NAME
+  #       value: LakBai
+  #     - key: APP_ENV
+  #       value: production
+  #     - key: APP_DEBUG
+  #       value: "false"
+  #     - key: APP_KEY
+  #       sync: false
+  #     - key: APP_URL
+  #       value: https://lakbai-api.onrender.com
+  #     - key: LOG_CHANNEL
+  #       value: stderr
+  #     - key: DB_CONNECTION
+  #       value: pgsql
+  #     - key: DB_URL
+  #       sync: false
+  #     - key: RUN_MIGRATIONS
+  #       value: "false"
+  #     - key: QUEUE_CONNECTION
+  #       value: database
+  #     - key: CACHE_STORE
+  #       value: database
+  #     - key: FILESYSTEM_DISK
+  #       value: s3
+  #     - key: BROADCAST_CONNECTION
+  #       value: reverb
+  #     - fromGroup: lakbai-reverb
+  #     - key: REVERB_HOST
+  #       fromService:
+  #         type: web
+  #         name: lakbai-reverb
+  #         property: host
+  #     - key: REVERB_PORT
+  #       value: "10000"
+  #     - key: REVERB_SCHEME
+  #       value: http

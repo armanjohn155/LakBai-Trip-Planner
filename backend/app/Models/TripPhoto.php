@@ -53,7 +53,7 @@ class TripPhoto extends Model
 
     public function absoluteUrl(): string
     {
-        return asset('storage/'.ltrim($this->path, '/'));
+        return Storage::disk(self::DISK)->url(ltrim($this->path, '/'));
     }
 
     public function thumbnailPath(): string
@@ -69,7 +69,7 @@ class TripPhoto extends Model
 
     public function thumbnailUrl(): string
     {
-        return asset('storage/'.ltrim($this->thumbnailPath(), '/'));
+        return Storage::disk(self::DISK)->url(ltrim($this->thumbnailPath(), '/'));
     }
 
     public function discardFiles(): void

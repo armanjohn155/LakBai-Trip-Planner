@@ -22,6 +22,7 @@ class VisitHistoryController extends Controller
 
         $visits = Visit::query()
             ->forUser($request->user())
+            ->notSuperseded()
             ->with('destination')
             ->when($request->filled('verified'), fn (Builder $query) => $query->where('verified', $request->boolean('verified')))
             ->when($request->filled('category'), fn (Builder $query) => $query->whereHas('destination', fn (Builder $inner) => $inner->where('category', $request->string('category')->toString())))
@@ -39,7 +40,7 @@ class VisitHistoryController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $visits = Visit::query()->forUser($request->user())->with('destination')->get();
+        $visits = Visit::query()->forUser($request->user())->notSuperseded()->with('destination')->get();
 
         $verified = $visits->where('verified', true);
         $destinations = $visits->map(fn (Visit $visit) => $visit->destination)->filter();
@@ -78,6 +79,7 @@ class VisitHistoryController extends Controller
     {
         $places = Visit::query()
             ->forUser($request->user())
+            ->notSuperseded()
             ->with('destination')
             ->get()
             ->filter(fn (Visit $visit) => $visit->destination !== null)

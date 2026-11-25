@@ -1,24 +1,21 @@
- .env
- .env.*
- !.env.example
- .idea
- .DS_Store
- backend/.env.env
-backend/.env
-container-backup/
-*.sqlite.bak
-# Secrets: never commit
 .env
 .env.*
 !.env.example
 **/.env
 **/.env.*
 !**/.env.example
+.idea
+.DS_Store
+backend/.env.env
+container-backup/
+*.sqlite
+*.sqlite3
+*.sqlite.bak
 *.pem
 *.key
-container-backup/
-*.sqlite.bak
 backend/storage/app/backups/
 docker.env
-backend/test-results.txt
-frontend/public/__routecard-test.html
+test-results.txt
+**/test-results.txt
+public/__*test*.html
+**/public/__*test*.html

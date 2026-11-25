@@ -23,6 +23,10 @@ class ItineraryItemResource extends JsonResource
         // budget values; default to visible for standalone use (owner/editor).
         $budgetVisible = $this->budgetVisible ?? true;
 
+        $reviewDestinationId = $this->review_destination_id
+            ?? $this->destination_id
+            ?? $this->visit?->destination_id;
+
         return [
             'id' => $this->id,
             'itinerary_id' => $this->itinerary_id,
@@ -49,8 +53,18 @@ class ItineraryItemResource extends JsonResource
             'visit_id' => $this->visit_id,
             'unavailable' => $unavailable,
             'verified' => (bool) ($this->verified ?? false),
+            'review_destination_id' => $reviewDestinationId,
+            'review_destination_name' => $this->review_destination_name
+                ?? $this->destination?->name
+                ?? $this->visit?->destination?->name,
+            'can_review' => (bool) ($this->can_review ?? false),
+            'visit' => $this->whenLoaded('visit', fn () => $this->visit !== null
+                ? new VisitResource($this->visit)
+                : null),
             'updated_by' => $this->whenLoaded('updatedBy', fn () => $this->updatedBy?->name, fn () => null),
-            'destination' => new DestinationResource($this->whenLoaded('destination')),
+            'destination' => $this->whenLoaded('destination', fn () => $this->destination !== null
+                ? new DestinationResource($this->destination)
+                : null),
         ];
     }
 }

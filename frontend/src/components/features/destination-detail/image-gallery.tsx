@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ChevronLeftIcon, ChevronRightIcon, ExpandIcon, XIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -103,58 +104,61 @@ export function ImageGallery({ images, name, fallbackTone }: ImageGalleryProps) 
         </div>
       ) : null}
 
-      {fullscreen ? (
-        <div
-          className="fixed inset-0 z-[1300] flex items-center justify-center bg-lagoon-950/95 p-4 pt-[calc(3.5rem_+_env(safe-area-inset-top))] sm:p-5 sm:pt-20"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${name} photos`}
-          onClick={() => setFullscreen(false)}
-        >
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setFullscreen(false);
-            }}
-            aria-label="Close photo viewer"
-            className="fixed right-[max(12px,env(safe-area-inset-right))] top-[max(12px,env(safe-area-inset-top))] z-20 flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-lagoon-950/20 bg-white text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-150 hover:scale-105 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-2 focus-visible:ring-offset-lagoon-950 active:scale-95 sm:right-5 sm:top-5 sm:h-12 sm:w-auto sm:px-4"
-          >
-            <XIcon className="h-[22px] w-[22px] shrink-0 sm:h-6 sm:w-6" />
-            <span className="hidden text-sm font-semibold sm:inline">Close</span>
-          </button>
+      {fullscreen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[1300] flex items-center justify-center bg-lagoon-950/95 p-4 pt-[calc(3.5rem_+_env(safe-area-inset-top))] sm:p-5 sm:pt-20"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${name} photos`}
+              onClick={() => setFullscreen(false)}
+            >
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setFullscreen(false);
+                }}
+                aria-label="Close photo viewer"
+                className="fixed right-[max(12px,env(safe-area-inset-right))] top-[max(12px,env(safe-area-inset-top))] z-20 flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-lagoon-950/20 bg-white text-[#111] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-150 hover:scale-105 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#14b8a6] focus-visible:ring-offset-2 focus-visible:ring-offset-lagoon-950 active:scale-95 sm:right-5 sm:top-5 sm:h-12 sm:w-auto sm:px-4"
+              >
+                <XIcon className="h-[22px] w-[22px] shrink-0 sm:h-6 sm:w-6" />
+                <span className="hidden text-sm font-semibold sm:inline">Close</span>
+              </button>
 
-          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <div className="overflow-hidden rounded-2xl">
-              <div className="h-[80vh]">{gallery}</div>
-            </div>
-            {images.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => go(-1)}
-                  aria-label="Previous photo"
-                  className="absolute -left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-sand-50 backdrop-blur-sm transition-colors hover:bg-white/20 sm:-left-6"
-                >
-                  <ChevronLeftIcon className="h-6 w-6" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => go(1)}
-                  aria-label="Next photo"
-                  className="absolute -right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-sand-50 backdrop-blur-sm transition-colors hover:bg-white/20 sm:-right-6"
-                >
-                  <ChevronRightIcon className="h-6 w-6" />
-                </button>
-              </>
-            ) : null}
-            <p className="mt-4 text-center text-sm font-semibold text-sand-50/80">
-              {name} — photo {current + 1} of {images.length}
-            </p>
-            <div className="mt-2 flex justify-center gap-1.5">{dots}</div>
-          </div>
-        </div>
-      ) : null}
+              <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+                <div className="overflow-hidden rounded-2xl">
+                  <div className="h-[80vh]">{gallery}</div>
+                </div>
+                {images.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => go(-1)}
+                      aria-label="Previous photo"
+                      className="absolute -left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-sand-50 backdrop-blur-sm transition-colors hover:bg-white/20 sm:-left-6"
+                    >
+                      <ChevronLeftIcon className="h-6 w-6" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => go(1)}
+                      aria-label="Next photo"
+                      className="absolute -right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-sand-50 backdrop-blur-sm transition-colors hover:bg-white/20 sm:-right-6"
+                    >
+                      <ChevronRightIcon className="h-6 w-6" />
+                    </button>
+                  </>
+                ) : null}
+                <p className="mt-4 text-center text-sm font-semibold text-sand-50/80">
+                  {name} — photo {current + 1} of {images.length}
+                </p>
+                <div className="mt-2 flex justify-center gap-1.5">{dots}</div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

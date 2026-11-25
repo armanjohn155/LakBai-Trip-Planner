@@ -9,6 +9,8 @@ x-backend-environment: &backend-environment
   LOG_CHANNEL: stderr
   DB_CONNECTION: pgsql
   DB_URL: ${NEON_DB_URL}
+  DB_URL_DIRECT: ${NEON_DB_URL_DIRECT:-}
+  RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
   SESSION_DRIVER: database
   SESSION_LIFETIME: 120
   QUEUE_CONNECTION: database
@@ -39,13 +41,15 @@ services:
     env_file:
       - path: ./.env
         required: false
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
     ports:
       - "8000:8080"
     volumes:
       - suroy-storage:/var/www/html/storage
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/up"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${PORT:-8080}/up || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -80,6 +84,7 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: /api
+        VITE_APP_NAME: ${APP_NAME:-LakBai}
         VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-lakbai-local-key}
         VITE_REVERB_HOST: ${REVERB_HOST:-localhost}
         VITE_REVERB_PORT: ${REVERB_PORT:-6001}

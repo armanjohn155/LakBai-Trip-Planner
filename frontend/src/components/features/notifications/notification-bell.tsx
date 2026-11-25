@@ -175,7 +175,7 @@ export function NotificationBell() {
           role="dialog"
           aria-label="Notifications"
           className={cn(
-            "z-[1200] overflow-hidden border border-line bg-white text-ink-900 shadow-xl",
+            "z-[var(--z-dropdown)] overflow-hidden border border-line bg-white text-ink-900 shadow-xl",
             "fixed inset-x-0 top-16 max-h-[calc(100dvh-4rem)] rounded-none border-x-0 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:max-h-[520px] sm:rounded-2xl",
           )}
         >

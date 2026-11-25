@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Database\Seeders\AdminSeeder;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
@@ -160,5 +163,77 @@ class AuthControllerTest extends TestCase
     public function test_logout_returns_401_when_no_token_is_provided(): void
     {
         $this->postJson('/api/logout')->assertUnauthorized();
+    }
+
+    public function test_forgot_password_sends_reset_notification_for_existing_user(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create(['email' => 'jane@example.com']);
+
+        $response = $this->postJson('/api/forgot-password', [
+            'email' => 'jane@example.com',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['message']);
+
+        Notification::assertSentTo($user, ResetPassword::class);
+    }
+
+    public function test_forgot_password_returns_validation_error_for_unknown_email(): void
+    {
+        $this->postJson('/api/forgot-password', [
+            'email' => 'unknown@example.com',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+    }
+
+    public function test_reset_password_updates_user_password_with_valid_token(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'jane@example.com',
+            'password' => Hash::make('old-password'),
+        ]);
+
+        $token = Password::createToken($user);
+
+        $response = $this->postJson('/api/reset-password', [
+            'token' => $token,
+            'email' => 'jane@example.com',
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['message']);
+
+        $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
+    }
+
+    public function test_reset_password_rejects_invalid_token(): void
+    {
+        User::factory()->create(['email' => 'jane@example.com']);
+
+        $this->postJson('/api/reset-password', [
+            'token' => 'invalid-token',
+            'email' => 'jane@example.com',
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+    }
+
+    public function test_reset_password_requires_matching_password_confirmation(): void
+    {
+        User::factory()->create(['email' => 'jane@example.com']);
+
+        $this->postJson('/api/reset-password', [
+            'token' => 'some-token',
+            'email' => 'jane@example.com',
+            'password' => 'new-password-123',
+            'password_confirmation' => 'different-password',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('password');
     }
 }

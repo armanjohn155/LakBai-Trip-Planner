@@ -82,7 +82,7 @@ export function Header() {
   );
 
   return (
-    <header className="sticky top-0 z-[var(--z-header)] border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] text-ink-900 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+    <header className="sticky top-0 z-[var(--z-header)] border-b border-line bg-white pt-[env(safe-area-inset-top)] text-ink-900">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:px-6">
         <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2">
           <img src="/Logo-main.png" alt="Lakbai" className="h-8 w-auto max-w-[7.5rem] object-contain sm:h-10 sm:max-w-none md:h-12" />
@@ -319,6 +319,18 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open, close]);
 
+  // Page scroll closes the menu on both layouts, unless scrolling inside the menu itself.
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && menuRef.current?.contains(target)) return;
+      close();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", onScroll, { capture: true });
+  }, [open, close]);
+
   const handleSignOut = async () => {
     close();
     await onSignOut();
@@ -363,7 +375,7 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
             aria-label="Account menu"
             tabIndex={-1}
             className={twMerge(
-              "glass-frost fixed right-4 z-[var(--z-dropdown)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl p-1.5 text-ink-900 shadow-lg outline-none",
+              "fixed right-4 z-[var(--z-dropdown)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-white p-1.5 text-ink-900 shadow-lg outline-none",
               "top-[calc(env(safe-area-inset-top)+var(--header-h)+0.25rem)]",
               "max-h-[calc(100dvh-var(--header-h)-1rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]",
               "pb-[max(0.375rem,env(safe-area-inset-bottom))]",
@@ -386,7 +398,7 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
           role="menu"
           aria-label="Account menu"
           tabIndex={-1}
-          className="glass-frost absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-64 rounded-2xl p-1.5 text-ink-900 shadow-lg outline-none"
+          className="absolute right-0 top-full z-[var(--z-dropdown)] mt-2 w-64 rounded-2xl border border-line bg-white p-1.5 text-ink-900 shadow-lg outline-none"
         >
           {sharedContent}
         </div>
@@ -398,32 +410,26 @@ function AccountMenu({ onSignOut }: AccountMenuProps) {
 }
 
 function AccountMenuContent({
-  compact,
   user,
   config,
   onClose,
   onSignOut,
 }: {
-  compact: boolean;
+  compact?: boolean;
   user: { name: string; email: string; avatar_url: string | null } | null;
   config: AccountMenuConfig;
   onClose: () => void;
   onSignOut: () => void;
 }) {
-  const rowClass = compact ? "py-2" : "min-h-11 py-2.5";
-
   if (!user) {
     return (
       <div className="space-y-1 p-1">
-        <p className="px-3 py-2 text-sm font-semibold text-lagoon-900">Account</p>
+        <p className="px-3 py-2 text-sm font-semibold text-ink-900">Account</p>
         <Link
           to="/login"
           role="menuitem"
           onClick={onClose}
-          className={twMerge(
-            "flex w-full items-center rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
-            rowClass,
-          )}
+          className="flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
         >
           <span className="truncate">Sign in</span>
         </Link>
@@ -431,11 +437,7 @@ function AccountMenuContent({
           to="/register"
           role="menuitem"
           onClick={onClose}
-          className={twMerge(
-            "flex w-full items-center rounded-xl px-3 text-sm font-semibold text-sea-700 transition-colors hover:bg-surf-400/15",
-            "bg-surf-400/10",
-            rowClass,
-          )}
+          className="flex w-full items-center rounded-lg bg-surf-50 px-3 py-2.5 text-sm font-semibold text-surf-700 transition-colors hover:bg-surf-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
         >
           <span className="truncate">Create account</span>
         </Link>
@@ -446,14 +448,14 @@ function AccountMenuContent({
   return (
     <div>
       <div className="flex items-center gap-3 px-3 py-2.5">
-        <Avatar name={user.name} src={user.avatar_url} className="h-9 w-9 text-sm ring-2 ring-white/30" />
+        <Avatar name={user.name} src={user.avatar_url} className="h-9 w-9 text-sm ring-1 ring-line" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-lagoon-900">{user.name}</p>
+          <p className="truncate text-sm font-semibold text-ink-900">{user.name}</p>
           <p className="truncate text-xs text-ink-600">{user.email}</p>
         </div>
       </div>
 
-      <div className="my-1 h-px bg-line" />
+      <div className="my-1 border-t border-line" />
 
       <div>
         {config.items.map(({ to, label, Icon, badge }) => (
@@ -462,10 +464,7 @@ function AccountMenuContent({
             to={to}
             role="menuitem"
             onClick={onClose}
-            className={twMerge(
-              "flex w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-100",
-              rowClass,
-            )}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
           >
             <Icon className="h-4 w-4 shrink-0 text-ink-600" />
             <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -478,16 +477,13 @@ function AccountMenuContent({
         ))}
       </div>
 
-      <div className="my-1 h-px bg-line" />
+      <div className="my-1 border-t border-line" />
 
       <button
         type="button"
         role="menuitem"
         onClick={onSignOut}
-        className={twMerge(
-          "flex w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-sinulog-red transition-colors hover:bg-sinulog-red/5",
-          rowClass,
-        )}
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-sinulog-red transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400"
       >
         <LogOutIcon className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate text-left">Sign out</span>

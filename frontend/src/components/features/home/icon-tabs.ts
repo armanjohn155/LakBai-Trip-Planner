@@ -5,6 +5,6 @@
  * tab means adding its action here (and its panel to PANEL_DEFINITIONS in
  * feature-section.tsx); indexes are derived, never hard-coded.
  */
-export type IconAction = "map" | "route" | "pricing" | "list" | "assistant";
+export type IconAction = "map" | "route" | "collaborations" | "list" | "assistant";
 
-export const ICON_ORDER: IconAction[] = ["map", "route", "pricing", "list", "assistant"];
+export const ICON_ORDER: IconAction[] = ["map", "route", "collaborations", "list", "assistant"];

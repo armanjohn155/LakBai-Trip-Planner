@@ -118,7 +118,7 @@ export function RecapMap({
   const hasRoute = points.length > 0;
 
   return (
-    <div className={cn("relative h-full w-full overflow-hidden bg-sand-100", className)}>
+    <div className={cn("relative z-0 isolate h-full w-full overflow-hidden bg-sand-100", className)}>
       <MapContainer
         center={hasRoute ? points[0] : CEBU_CENTER}
         zoom={11}

@@ -41,10 +41,10 @@ class ProfileController extends Controller
 
         $user = $request->user();
         $path = $request->file('avatar')->store('avatars', 'public');
-        $url = '/storage/'.ltrim($path, '/');
+        $url = Storage::disk('public')->url(ltrim($path, '/'));
 
         if ($user->avatar_url) {
-            Storage::disk('public')->delete('avatars/'.basename($user->avatar_url));
+            Storage::disk('public')->delete('avatars/'.basename(parse_url($user->avatar_url, PHP_URL_PATH) ?: $user->avatar_url));
         }
 
         $user->update(['avatar_url' => $url]);

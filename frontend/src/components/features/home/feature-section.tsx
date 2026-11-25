@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { ICON_ORDER, type IconAction } from "./icon-tabs";
 import { InteractiveIconSection } from "./interactive-icon";
 import { AssistantPanel } from "./panels/assistant-panel";
-import { BudgetPanel } from "./panels/budget-panel";
+import { CollaborationsPanel } from "./panels/collaborations-panel";
 import { ItineraryPanel } from "./panels/itinerary-panel";
 import { MapPanel } from "./panels/map-panel";
 import { RoutePanel } from "./panels/route-panel";
@@ -23,7 +23,7 @@ interface PanelDefinition {
 const PANEL_DEFINITIONS: Record<IconAction, PanelDefinition> = {
   map: { heading: "View your trip on a map", Panel: MapPanel },
   route: { heading: "Optimize your route", Panel: RoutePanel },
-  pricing: { heading: "Track your budget", Panel: BudgetPanel },
+  collaborations: { heading: "Plan with your friends", Panel: CollaborationsPanel },
   list: { heading: "Plan your itinerary", Panel: ItineraryPanel },
   assistant: { heading: "Ask the assistant", Panel: AssistantPanel },
 };

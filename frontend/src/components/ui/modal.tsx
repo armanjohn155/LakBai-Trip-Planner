@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { XIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -39,13 +40,26 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   }, [open, busy, onClose]);
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-[1200] flex items-end justify-center p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="absolute inset-0 bg-lagoon-950/50 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1000] flex items-end justify-center p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        className="fixed inset-0 z-0 bg-lagoon-950/50 backdrop-blur-sm"
+        aria-hidden="true"
+        onClick={busy ? undefined : onClose}
+      />
       <div
         className={cn(
-          "relative flex max-h-[92vh] w-full flex-col overflow-hidden glass rounded-t-3xl sm:rounded-2xl",
+          "relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden glass rounded-t-3xl sm:rounded-2xl",
           sizeClasses[size],
         )}
       >
@@ -69,6 +83,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
 
         {footer ? <div className="flex items-center justify-end gap-2 border-t border-line/60 px-5 py-4">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

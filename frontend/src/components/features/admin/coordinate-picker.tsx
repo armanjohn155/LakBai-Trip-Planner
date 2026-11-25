@@ -41,7 +41,7 @@ export function CoordinatePicker({ latitude, longitude, onChange, className }: C
 
   return (
     <div className={className}>
-      <div className="h-64 overflow-hidden rounded-xl ring-1 ring-inset ring-line">
+      <div className="relative z-0 isolate h-64 overflow-hidden rounded-xl ring-1 ring-inset ring-line">
         <MapContainer center={position ?? CEBU_CENTER} zoom={position ? 11 : 9} scrollWheelZoom className="h-full w-full">
           <TileLayer
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"

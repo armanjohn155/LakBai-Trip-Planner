@@ -1,12 +1,19 @@
+import type { ComponentType } from "react";
+
+import { CollaborationIllustration } from "./collaboration-illustration";
+
 interface Highlight {
+  tag: string;
   title: string;
   description: string;
-  image: string;
+  image?: string;
+  illustration?: ComponentType<{ className?: string }>;
   alt: string;
 }
 
 const HIGHLIGHTS: Highlight[] = [
   {
+    tag: "Your trip, organized",
     title: "Build your itinerary to see every stop in one place.",
     description:
       "Add the places you want to visit, organize them by day, and add times and notes. Reorder stops as your plans change and keep the whole trip easy to follow.",
@@ -14,6 +21,7 @@ const HIGHLIGHTS: Highlight[] = [
     alt: "Lakbai itinerary preview beside a map of Cebu with numbered trip stops",
   },
   {
+    tag: "Plan the route",
     title: "Plan a road trip, stop by stop.",
     description:
       "View your destinations on a map and plan the journey between them. Keep route details and each stop together as you shape your Cebu trip.",
@@ -21,11 +29,12 @@ const HIGHLIGHTS: Highlight[] = [
     alt: "Lakbai route preview showing a Cebu map and a trip route across several destinations",
   },
   {
-    title: "Keep your budget and trip progress in view.",
+    tag: "Travel together",
+    title: "Plan your Cebu trip with your friends, in one place.",
     description:
-      "Compare estimated stop costs with your trip budget, mark itinerary stops as done, and look back at the places you have visited.",
-    image: "/features-images/expense-tracking.png",
-    alt: "Illustration representing trip budget planning",
+      "Invite friends to your trip, plan stops together, and keep everyone on the same itinerary.",
+    illustration: CollaborationIllustration,
+    alt: "Illustration representing collaborating on a trip with friends",
   },
 ];
 
@@ -43,18 +52,24 @@ export function FeatureHighlights() {
             >
               <div className={imageFirst ? "lg:order-1" : "lg:order-2"}>
                 <div className="overflow-hidden rounded-[1.75rem] border border-white/80 bg-white p-3 shadow-[0_16px_40px_rgba(10,51,48,0.08)] sm:rounded-[2rem] sm:p-5">
-                  <img
-                    src={highlight.image}
-                    alt={highlight.alt}
-                    className="aspect-[16/10] w-full rounded-2xl object-contain sm:rounded-3xl"
-                    loading="lazy"
-                  />
+                  {highlight.illustration ? (
+                    <div className="aspect-[16/10] w-full rounded-2xl overflow-hidden sm:rounded-3xl">
+                      <highlight.illustration className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <img
+                      src={highlight.image}
+                      alt={highlight.alt}
+                      className="aspect-[16/10] w-full rounded-2xl object-contain sm:rounded-3xl"
+                      loading="lazy"
+                    />
+                  )}
                 </div>
               </div>
 
               <div className={imageFirst ? "lg:order-2" : "lg:order-1"}>
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-sea-600">
-                  {index === 0 ? "Your trip, organized" : index === 1 ? "Plan the route" : "Stay on track"}
+                  {highlight.tag}
                 </p>
                 <h2 className="max-w-xl font-display text-2xl font-bold leading-tight tracking-tight text-lagoon-900 sm:text-3xl lg:text-4xl">
                   {highlight.title}

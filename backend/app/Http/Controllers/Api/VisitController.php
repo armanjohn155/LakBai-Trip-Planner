@@ -9,6 +9,7 @@ use App\Http\Resources\VisitResource;
 use App\Models\Destination;
 use App\Models\Visit;
 use App\Services\CheckInVerifier;
+use App\Services\VisitDestinationLinker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
@@ -16,7 +17,10 @@ use Illuminate\Support\Facades\Gate;
 
 class VisitController extends Controller
 {
-    public function __construct(private readonly CheckInVerifier $verifier) {}
+    public function __construct(
+        private readonly CheckInVerifier $verifier,
+        private readonly VisitDestinationLinker $linker,
+    ) {}
 
     /**
      * Record a GPS-verified check-in for the authenticated user.
@@ -66,6 +70,9 @@ class VisitController extends Controller
             'visited_at' => Carbon::now(),
             'notes' => $request->input('notes'),
         ]);
+
+        // A verified check-in replaces any earlier manual mark at this place.
+        $this->linker->supersedeManualVisits($request->user(), $destination, $visit);
 
         return (new VisitResource($visit->load('destination')))
             ->response()

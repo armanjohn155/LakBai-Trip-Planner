@@ -228,28 +228,33 @@ function Toggle({
   hint: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
+    <div className="flex items-start gap-3">
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors",
-          checked ? "bg-surf-400" : "bg-sand-300",
+          "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400 focus-visible:ring-offset-2",
+          checked ? "bg-surf-400" : "bg-line",
         )}
       >
         <span
           className={cn(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform",
-            checked ? "translate-x-[18px]" : "translate-x-0.5",
+            "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+            checked ? "translate-x-5" : "translate-x-0",
           )}
         />
       </button>
-      <span>
+      <div
+        onClick={() => onChange(!checked)}
+        className="min-w-0 flex-1 cursor-pointer select-none"
+      >
         <span className="block text-sm font-semibold text-ink-900">{label}</span>
         <span className="block text-xs text-ink-600">{hint}</span>
-      </span>
-    </label>
+      </div>
+    </div>
   );
 }

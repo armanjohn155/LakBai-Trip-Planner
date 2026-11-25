@@ -561,7 +561,7 @@ export default function MapPage() {
               </div>
             </section>
 
-            <section className="relative order-1 md:order-2 md:h-[calc(100dvh-4rem)]">
+            <section className="relative isolate z-0 order-1 md:order-2 md:h-[calc(100dvh-4rem)]">
               {loading ? (
                 <div className="flex h-full items-center justify-center">
                   <Spinner className="h-6 w-6 text-surf-400" />
@@ -793,7 +793,7 @@ interface MapSearchOverlayProps {
 function MapSearchOverlay({ query, onQueryChange, matches, onSelect, total }: MapSearchOverlayProps) {
   const showList = query.trim().length > 0;
   return (
-    <div className="pointer-events-none absolute left-1/2 top-3 z-[1000] w-[min(94%,22rem)] -translate-x-1/2">
+    <div className="pointer-events-none absolute left-1/2 top-3 z-[var(--z-map-overlay)] w-[min(94%,22rem)] -translate-x-1/2">
       <div className="pointer-events-auto relative">
         <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600" />
         <input

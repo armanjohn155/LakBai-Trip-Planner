@@ -19,6 +19,8 @@ import { FavoritesProvider } from "@/hooks/use-favorites";
 import InviteAcceptPage from "@/pages/invite/accept";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
+import ForgotPasswordPage from "@/pages/auth/forgot-password";
+import ResetPasswordPage from "@/pages/auth/reset-password";
 import GoogleCallbackPage from "@/pages/auth/google-callback";
 import AdminDestinationEditPage from "@/pages/dashboard/admin/destination-edit";
 import AdminDestinationNewPage from "@/pages/dashboard/admin/destination-new";
@@ -48,6 +50,7 @@ import ContactPage from "@/pages/guest/contact";
 import GuestLayout from "@/pages/guest/layout";
 import HomePage from "@/pages/guest/home";
 import MapPage from "@/pages/guest/map";
+import NotFoundPage from "@/pages/guest/not-found";
 import PublicPageLayout from "@/pages/guest/page-layout";
 
 function DestinationDetailRedirect() {
@@ -86,6 +89,8 @@ createRoot(document.getElementById("root")!).render(
 
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
           <Route path="auth/google/callback" element={<GoogleCallbackPage />} />
           <Route path="invite/:token" element={<InviteAcceptPage />} />
           <Route path="s/:token" element={<SharedRecapPage />} />
@@ -127,7 +132,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="*" element={<Navigate to="trips" replace />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

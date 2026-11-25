@@ -26,7 +26,7 @@ class GoogleAuthController extends Controller
      * chooser (including "Use another account") instead of silently
      * reusing the last signed-in account.
      */
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
         $config = config('google');
 
@@ -34,14 +34,23 @@ class GoogleAuthController extends Controller
             return $this->failure('Google sign-in is not configured. Please contact support.');
         }
 
-        $authUrl = $this->provider($config)->getAuthorizationUrl([
+        $options = [
             'scope' => $config['scopes'],
             'access_type' => 'online',
             'prompt' => 'select_account',
             // league/oauth2-client defaults to `approval_prompt=auto`, which
             // Google rejects when `prompt` is also present. Null removes it.
             'approval_prompt' => null,
-        ]);
+        ];
+
+        if ($request->filled('redirect')) {
+            $redirectTarget = (string) $request->input('redirect');
+            if (str_starts_with($redirectTarget, '/') && ! str_starts_with($redirectTarget, '//')) {
+                $options['state'] = $redirectTarget;
+            }
+        }
+
+        $authUrl = $this->provider($config)->getAuthorizationUrl($options);
 
         Log::debug('Google OAuth authorization URL generated.', ['url' => $authUrl]);
 
@@ -64,16 +73,24 @@ class GoogleAuthController extends Controller
     {
         $config = config('google');
 
+        $targetRedirect = null;
+        if ($request->filled('state')) {
+            $state = (string) $request->input('state');
+            if (str_starts_with($state, '/') && ! str_starts_with($state, '//')) {
+                $targetRedirect = $state;
+            }
+        }
+
         if ($request->filled('error')) {
             $message = $request->input('error') === 'access_denied'
                 ? 'Google sign-in was cancelled.'
                 : $request->input('error_description', 'Google sign-in was cancelled.');
 
-            return $this->failure($message);
+            return $this->failure($message, $targetRedirect);
         }
 
         if (! $request->has('code')) {
-            return $this->failure('No authorization code received from Google.');
+            return $this->failure('No authorization code received from Google.', $targetRedirect);
         }
 
         $provider = $this->provider($config);
@@ -84,7 +101,7 @@ class GoogleAuthController extends Controller
             ]);
             $googleUser = $provider->getResourceOwner($accessToken);
         } catch (IdentityProviderException $e) {
-            return $this->failure('Google authentication failed: '.$e->getMessage());
+            return $this->failure('Google authentication failed: '.$e->getMessage(), $targetRedirect);
         }
 
         $profile = $googleUser->toArray();
@@ -94,7 +111,7 @@ class GoogleAuthController extends Controller
         $avatar = $profile['picture'] ?? null;
 
         if (! $email) {
-            return $this->failure('Google account has no email address.');
+            return $this->failure('Google account has no email address.', $targetRedirect);
         }
 
         $user = User::where('google_id', $googleId)->first();
@@ -131,7 +148,12 @@ class GoogleAuthController extends Controller
 
         $token = $user->createToken('api')->plainTextToken;
 
-        return redirect($config['frontend_callback'].'?token='.urlencode($token));
+        $callbackUrl = $config['frontend_callback'].'?token='.urlencode($token);
+        if ($targetRedirect) {
+            $callbackUrl .= '&redirect='.urlencode($targetRedirect);
+        }
+
+        return redirect($callbackUrl);
     }
 
     /**
@@ -164,10 +186,16 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Send the user back to the frontend callback with a friendly error.
+     * Send the user back to the frontend login page with a friendly error.
      */
-    private function failure(string $message): RedirectResponse
+    private function failure(string $message, ?string $redirect = null): RedirectResponse
     {
-        return redirect(config('google.frontend_callback').'?error='.urlencode($message));
+        $frontendUrl = rtrim((string) (config('google.frontend_url') ?: config('app.frontend_url') ?: 'http://localhost:5173'), '/');
+        $errorUrl = $frontendUrl.'/login?error='.urlencode($message);
+        if ($redirect) {
+            $errorUrl .= '&redirect='.urlencode($redirect);
+        }
+
+        return redirect($errorUrl);
     }
 }

@@ -4,6 +4,7 @@ import L from "leaflet";
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 
 import { createNumberedPin, dayColor } from "@/components/features/map/map-pin";
+import { cn } from "@/lib/cn";
 import type { ItineraryItem } from "@/lib/types";
 
 const CEBU_CENTER: [number, number] = [10.2, 123.6];
@@ -107,7 +108,7 @@ export function ItineraryMap({
     }));
 
   return (
-    <div className={className}>
+    <div className={cn("relative z-0 isolate overflow-hidden", className)}>
       <MapContainer
         center={CEBU_CENTER}
         zoom={9}

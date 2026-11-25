@@ -1,19 +1,9 @@
-import { API_ORIGIN } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { resolveMediaUrl } from "@/lib/media";
 import type { RecapAccent } from "@/lib/types";
 
-/**
- * Photo and destination URLs may be absolute (Laravel's asset()) or relative
- * `/storage/...` paths. Normalise both so the SPA, which can be served from a
- * different origin than the API, always resolves media correctly.
- */
-export function resolveRecapMediaUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url;
-  if (url.startsWith("/storage/")) return `${API_ORIGIN}${url}`;
-  if (url.startsWith("storage/")) return `${API_ORIGIN}/${url}`;
-  return url;
-}
+/** Kept as the recap-local name so existing callers do not need to change. */
+export const resolveRecapMediaUrl = resolveMediaUrl;
 
 export interface AccentTheme {
   /** Solid accent for small marks and filled buttons. */

@@ -32,7 +32,6 @@ import { TripPauseSheet } from "@/components/features/itinerary/trip-pause-sheet
 import { TripStartDialog } from "@/components/features/itinerary/trip-start-dialog";
 import { TripMapCanvas } from "@/components/features/itinerary/trip-map-canvas";
 import { TripPanel, mobileSheetHeight, type MobileSnap } from "@/components/features/itinerary/trip-panel";
-import { formatTripDateRange } from "@/components/features/itinerary/itinerary-constants";
 import { dayColor } from "@/components/features/map/map-pin";
 import {
   ArrowLeftIcon,
@@ -50,6 +49,7 @@ import { InlineError, Spinner } from "@/components/ui/feedback";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/hooks/use-auth";
+import { useDraggable } from "@/hooks/use-draggable";
 import { useGroupTracking } from "@/hooks/use-group-tracking";
 import { useCurrentLocation } from "@/hooks/use-current-location";
 import { useMediaQuery, useViewportHeight, useViewportWidth } from "@/hooks/use-media-query";
@@ -57,6 +57,7 @@ import { useTripTracking, type LivePosition } from "@/hooks/use-trip-tracking";
 import { useLiveRoute, usePlannedRoutes } from "@/hooks/use-route";
 import { useNavigation } from "@/hooks/use-navigation";
 import { useRouteAlerts } from "@/hooks/use-route-alerts";
+import { cn } from "@/lib/cn";
 import { haversineMeters } from "@/lib/geo";
 import {
   addItineraryItem,
@@ -235,6 +236,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
   const autoCollapsedRef = useRef(false);
   const addingRef = useRef(false);
   const initialDayAppliedRef = useRef(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
@@ -1051,6 +1053,32 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
     setFocus({ point: [livePosition.lat, livePosition.lng], nonce: focusNonceRef.current });
   };
 
+  const defaultFollowingPosition = useCallback(
+    (container: DOMRect, element: DOMRect) => {
+      if (isMobile) {
+        const x = Math.max(16, container.width - element.width - 16);
+        const y = Math.max(16, container.height - (bottomChrome + 84) - element.height);
+        return { x, y };
+      }
+      const x = Math.max(16, container.width - Math.max(16, rightMapInset + 10) - element.width);
+      const y = Math.max(16, container.height - 20 - element.height);
+      return { x, y };
+    },
+    [isMobile, bottomChrome, rightMapInset],
+  );
+
+  const {
+    ref: followingButtonRef,
+    position: followingButtonPos,
+    isDragging: isFollowingDragging,
+    bind: followingButtonBind,
+  } = useDraggable<HTMLButtonElement>({
+    containerRef: mapContainerRef,
+    storageKey: "lakbai_following_btn_pos",
+    defaultPosition: defaultFollowingPosition,
+    onTap: handleMyLocation,
+  });
+
   const handlePauseTrip = async () => {
     if (!itinerary || lifecycleBusy) return;
     setLifecycleBusy(true);
@@ -1481,7 +1509,6 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
 
   const activeItem = activeId !== null ? items.find((item) => item.id === activeId) ?? null : null;
   const showEstimates = estimates?.enabled ?? false;
-  const dateRange = formatTripDateRange(itinerary.start_date, itinerary.end_date);
   const showDestinationMarkers = addOpen && addMode === "destination";
 
   const notice = remote ? (
@@ -1557,7 +1584,7 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="relative h-full w-full overflow-hidden bg-sand-100">
+      <div ref={mapContainerRef} className="relative h-full w-full overflow-hidden bg-sand-100">
         <TripMapCanvas
           items={items}
           activeItemId={selectedItemId}
@@ -1636,14 +1663,31 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
         ) : null}
 
         <button
+          ref={followingButtonRef}
           type="button"
-          onClick={handleMyLocation}
           aria-label={followMap && livePosition ? "Stop following your location" : "Show my location"}
           title={followMap && livePosition ? "Following your location" : "My location"}
-          className="absolute z-[930] flex h-12 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-sea-700 shadow-xl ring-1 ring-line/70 transition hover:bg-sand-50"
-          style={isMobile ? { right: 16, bottom: bottomChrome + 18 } : { right: Math.max(16, rightMapInset + 10), bottom: 20 }}
+          className={cn(
+            "absolute z-[930] flex select-none items-center rounded-full bg-white font-semibold text-sea-700 shadow-xl ring-1 ring-line/70 transition-colors hover:bg-sand-50",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surf-400 focus-visible:ring-offset-2",
+            "touch-none",
+            isFollowingDragging ? "cursor-grabbing" : "cursor-grab",
+            "h-9 gap-1.5 px-3 text-xs md:h-12 md:gap-2 md:px-4 md:text-sm",
+          )}
+          style={
+            followingButtonPos
+              ? {
+                  left: 0,
+                  top: 0,
+                  transform: `translate3d(${Math.round(followingButtonPos.x)}px, ${Math.round(followingButtonPos.y)}px, 0)`,
+                }
+              : isMobile
+                ? { right: 16, bottom: bottomChrome + 84 }
+                : { right: Math.max(16, rightMapInset + 10), bottom: 20 }
+          }
+          {...followingButtonBind}
         >
-          <CrosshairIcon className="h-5 w-5" />
+          <CrosshairIcon className="h-4 w-4 md:h-5 md:w-5" />
           {followMap && livePosition ? "Following" : "My location"}
         </button>
 
@@ -1680,23 +1724,13 @@ export function ItineraryBuilder({ itineraryId, initialAddDestinationId }: Itine
             ) : null}
           </div>
 
-          <div className="pointer-events-auto flex max-w-[min(64vw,26rem)] flex-col items-end gap-1.5">
-            <div className="rounded-2xl bg-white/95 px-3.5 py-2 text-right shadow-sm ring-1 ring-line/60 backdrop-blur">
-              <h1 className="truncate font-display text-base font-semibold text-lagoon-900">{itinerary.title}</h1>
-              <p className="mt-0.5 flex flex-wrap items-center justify-end gap-x-1.5 text-[11px] text-ink-600">
-                {dateRange ? <span>{dateRange}</span> : null}
-                <span>{summary.day_count} days</span>
-                {isGroup && (itinerary.member_count ?? 0) > 0 ? (
-                  <span>{itinerary.member_count} travellers</span>
-                ) : null}
-              </p>
-            </div>
-            {showEstimates ? (
+          {showEstimates ? (
+            <div className="pointer-events-auto flex flex-col items-end gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-ink-600 shadow-sm ring-1 ring-line/60 backdrop-blur">
                 <RouteIcon className="h-3.5 w-3.5" /> Route estimates on
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         {showLegend ? (

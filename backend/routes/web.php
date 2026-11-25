@@ -3,9 +3,7 @@
 use App\Http\Controllers\SharedRecapPageController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::view('/', 'welcome');
 
 /*
  * Open Graph landing page for public recaps. Crawlers read the meta tags;

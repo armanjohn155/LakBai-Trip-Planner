@@ -42,26 +42,30 @@ api.interceptors.response.use(
 export const apiError = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
+    const endpoint = error.config?.url ?? "";
+    const devTag = import.meta.env.DEV ? `[${status ?? "ERR"} ${endpoint}] ` : "";
+
     if (status === 429) {
-      return "Too many attempts, please try again later.";
+      return `${devTag}Too many attempts, please try again later.`;
     }
     if (!error.response) {
-      return "Can't reach the server. Check your connection and try again.";
+      return `${devTag}Can't reach the server. Check your connection and try again.`;
     }
     if (status !== undefined && status >= 500) {
       // Only point at the server log when running locally; end users cannot read it.
       const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-      return isLocal
+      const base = isLocal
         ? "Something went wrong on our end. Please try again. Check backend/storage/logs/laravel.log for the exception."
         : "Something went wrong on our end. Please try again.";
+      return `${devTag}${base}`;
     }
     const message = error.response.data?.message;
     const errors = error.response.data?.errors as Record<string, string[]> | undefined;
     if (errors) {
-      return Object.values(errors).flat()[0] ?? "Something went wrong.";
+      return `${devTag}${Object.values(errors).flat()[0] ?? "Something went wrong."}`;
     }
     if (typeof message === "string") {
-      return message;
+      return `${devTag}${message}`;
     }
   }
   return "Something went wrong. Check that the backend is running.";
@@ -84,6 +88,21 @@ export const register = async (payload: { name: string; email: string; password:
 
 export const login = async (payload: { email: string; password: string }) => {
   const { data } = await api.post<AuthPayload>("/login", payload);
+  return data;
+};
+
+export const forgotPassword = async (payload: { email: string }) => {
+  const { data } = await api.post<{ message: string }>("/forgot-password", payload);
+  return data;
+};
+
+export const resetPassword = async (payload: {
+  token: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}) => {
+  const { data } = await api.post<{ message: string }>("/reset-password", payload);
   return data;
 };
 

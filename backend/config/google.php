@@ -32,7 +32,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Frontend callback URL
+    | Frontend URL & callback URL
     |--------------------------------------------------------------------------
     |
     | After successful Google auth, the backend redirects here with the token.
@@ -40,6 +40,8 @@ return [
     |
     */
 
-    'frontend_callback' => env('GOOGLE_FRONTEND_CALLBACK', 'http://localhost:5173/auth/google/callback'),
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    'frontend_callback' => env('GOOGLE_FRONTEND_CALLBACK', rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/').'/auth/google/callback'),
 
 ];

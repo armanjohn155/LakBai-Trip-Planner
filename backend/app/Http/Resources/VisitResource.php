@@ -25,8 +25,12 @@ class VisitResource extends JsonResource
             'distance_m' => $this->distance_m,
             'accuracy_m' => $this->accuracy_m,
             'visited_at' => $this->visited_at?->toIso8601String(),
+            'superseded_at' => $this->superseded_at?->toIso8601String(),
+            'superseded_by_visit_id' => $this->superseded_by_visit_id,
             'notes' => $this->notes,
-            'destination' => new DestinationResource($this->whenLoaded('destination')),
+            'destination' => $this->whenLoaded('destination', fn () => $this->destination !== null
+                ? new DestinationResource($this->destination)
+                : null),
         ];
     }
 }

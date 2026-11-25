@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'distance_m',
     'accuracy_m',
     'visited_at',
+    'superseded_at',
+    'superseded_by_visit_id',
     'notes',
 ])]
 class Visit extends Model
@@ -43,6 +45,7 @@ class Visit extends Model
             'distance_m' => 'integer',
             'accuracy_m' => 'integer',
             'visited_at' => 'datetime',
+            'superseded_at' => 'datetime',
         ];
     }
 
@@ -65,9 +68,22 @@ class Visit extends Model
         return $this->belongsTo(ItineraryItem::class, 'itinerary_stop_id');
     }
 
+    /**
+     * The verified visit that replaced an earlier manual visit.
+     */
+    public function supersededBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'superseded_by_visit_id');
+    }
+
     public function scopeVerified(Builder $query): Builder
     {
         return $query->where('verified', true);
+    }
+
+    public function scopeNotSuperseded(Builder $query): Builder
+    {
+        return $query->whereNull('superseded_at');
     }
 
     public function scopeForUser(Builder $query, User $user): Builder

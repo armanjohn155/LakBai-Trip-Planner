@@ -41,6 +41,7 @@ class TripLifecycleService
         private readonly ItineraryActivityLogger $activity,
         private readonly CheckInVerifier $verifier,
         private readonly GroupTrackingService $group,
+        private readonly VisitDestinationLinker $linker,
     ) {}
 
     /**
@@ -489,19 +490,26 @@ class TripLifecycleService
         $now = Carbon::now();
 
         DB::transaction(function () use ($itinerary, $item, $actor, $position, $destination, &$visit, $now, $distance) {
+            $visit = Visit::query()->create([
+                'user_id' => $actor->id,
+                'destination_id' => $destination?->id,
+                'itinerary_stop_id' => $item->id,
+                'verified' => true,
+                'method' => 'gps',
+                'latitude' => $position['latitude'],
+                'longitude' => $position['longitude'],
+                'distance_m' => $distance,
+                'accuracy_m' => (int) round($position['accuracy']),
+                'visited_at' => $now,
+            ]);
+
             if ($destination instanceof Destination) {
-                $visit = Visit::query()->create([
-                    'user_id' => $actor->id,
-                    'destination_id' => $destination->id,
-                    'itinerary_stop_id' => $item->id,
-                    'verified' => true,
-                    'method' => 'gps',
-                    'latitude' => $position['latitude'],
-                    'longitude' => $position['longitude'],
-                    'distance_m' => $distance,
-                    'accuracy_m' => (int) round($position['accuracy']),
-                    'visited_at' => $now,
-                ]);
+                // A verified stop replaces any earlier manual mark here.
+                $this->linker->supersedeManualVisits($actor, $destination, $visit);
+            } else {
+                // A custom stop starts unlinked and only gains a destination
+                // when exactly one active destination clearly contains it.
+                $this->linker->link($visit);
             }
 
             $item->forceFill([
@@ -685,13 +693,17 @@ class TripLifecycleService
 
     public function canReview(ItineraryItem $item, User $user): bool
     {
-        if ($item->destination_id === null) {
+        // A custom stop's verified visit may have been linked to a destination,
+        // even though the stop itself keeps its original null destination_id.
+        $destinationId = $item->destination_id ?? $item->visit?->destination_id;
+
+        if ($destinationId === null) {
             return false;
         }
 
         return ! Review::query()
             ->where('user_id', $user->id)
-            ->where('destination_id', $item->destination_id)
+            ->where('destination_id', $destinationId)
             ->exists();
     }
 

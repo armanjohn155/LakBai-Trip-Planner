@@ -4,6 +4,7 @@ import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 
 import type { Destination, RouteGeometryResponse } from "@/lib/types";
+import { cn } from "@/lib/cn";
 import { activePin, defaultPin } from "@/components/features/map/map-pin";
 
 const CEBU_CENTER: [number, number] = [10.2, 123.6];
@@ -143,7 +144,7 @@ export function CebuMap({ destinations, activeId, focusId = null, onSelect, onHo
   ));
 
   return (
-    <div ref={containerRef} className={className}>
+    <div ref={containerRef} className={cn("relative z-0 isolate overflow-hidden", className)}>
       <MapContainer
         center={CEBU_CENTER}
         zoom={9}

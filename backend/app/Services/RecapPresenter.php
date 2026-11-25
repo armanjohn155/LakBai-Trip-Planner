@@ -9,6 +9,8 @@ use App\Models\TripPhoto;
 use App\Models\TripRecap;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Turns a TripRecap into two deliberately different shapes:
@@ -394,7 +396,7 @@ class RecapPresenter
         }
 
         if (str_starts_with($imageUrl, '/storage/')) {
-            return asset(ltrim($imageUrl, '/'));
+            return Storage::disk('public')->url(Str::after($imageUrl, '/storage/'));
         }
 
         return $imageUrl;

@@ -4,7 +4,7 @@ import { NavLink } from "react-router";
 import { HeartIcon, LogOutIcon, PinIcon, ShieldIcon, UserIcon } from "@/components/icons";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
-import { API_ORIGIN } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/media";
 import type { User } from "@/lib/types";
 
 interface ProfileSidebarProps {
@@ -65,7 +65,7 @@ export function ProfileSidebar({ user, stats, onSignOut }: ProfileSidebarProps) 
         <button
           type="button"
           onClick={onSignOut}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-transparent font-semibold text-sinulog-red ring-1 ring-inset ring-sinulog-red/20 transition-colors hover:bg-sinulog-red/5"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white font-semibold text-sinulog-red ring-1 ring-inset ring-sinulog-red/20 transition-colors hover:bg-sinulog-red/5"
         >
           <LogOutIcon className="h-4 w-4" />
           Sign Out
@@ -79,21 +79,9 @@ const avatarClasses = cn(
   "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-surf-400 to-sinulog-magenta font-display text-4xl font-semibold text-white ring-2 ring-white/30",
 );
 
-function resolveAvatarUrl(src: string): string {
-  try {
-    const parsed = new URL(src, window.location.origin);
-    if (parsed.pathname.startsWith("/storage/")) {
-      return new URL(parsed.pathname, API_ORIGIN).href;
-    }
-  } catch {
-    return src;
-  }
-  return src;
-}
-
 export function Avatar({ name, src, className }: { name: string; src: string | null; className?: string }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const url = src ? resolveAvatarUrl(src) : null;
+  const url = resolveMediaUrl(src);
 
   if (!url || failedUrl === url) {
     return (

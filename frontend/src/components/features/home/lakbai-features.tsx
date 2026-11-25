@@ -6,11 +6,16 @@
  * hooks, no interactivity.
  */
 
+import type { ComponentType } from "react";
+
+import { CollaborationIllustration } from "./collaboration-illustration";
+
 interface FeatureItem {
   label: string;
   title: string;
   description: string;
-  image: string;
+  image?: string;
+  illustration?: ComponentType<{ className?: string }>;
   alt: string;
 }
 
@@ -26,11 +31,12 @@ const FEATURES: FeatureItem[] = [
     alt: "Illustration of discovering a place and adding it to a travel plan",
   },
   {
-    label: "Budget",
-    title: "Plan around your budget",
-    description: "Set a trip budget and see estimated costs for stops and each day in one place.",
-    image: "/features-images/expense-tracking.png",
-    alt: "Illustration representing trip budget planning",
+    label: "Collaborate",
+    title: "Plan trips together with friends",
+    description:
+      "Invite friends to your trip and build one itinerary together, from stops to schedules.",
+    illustration: CollaborationIllustration,
+    alt: "Illustration representing trip collaboration with friends",
   },
   {
     label: "Progress",
@@ -75,7 +81,7 @@ export function LakbaiFeatures() {
             id="lakbai-features-heading"
             className="font-display text-3xl font-bold tracking-tight text-lagoon-900 sm:text-4xl lg:text-5xl"
           >
-            Features to replace your tools
+            Features
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-600 sm:text-lg">
             Plan your Cebu trip in one place, from finding destinations to sharing your finished itinerary.
@@ -89,14 +95,18 @@ export function LakbaiFeatures() {
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-lagoon-900/10 bg-white/90 shadow-[0_8px_24px_rgba(10,51,48,0.06)] transition duration-300 hover:-translate-y-1 hover:border-surf-500/30 hover:shadow-[0_16px_36px_rgba(10,51,48,0.12)]"
             >
               <div className="aspect-[379/185] w-full overflow-hidden border-b border-lagoon-900/10 bg-sand-50">
-                <img
-                  src={feature.image}
-                  alt={feature.alt}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                  width={379}
-                  height={185}
-                  loading="lazy"
-                />
+                {feature.illustration ? (
+                  <feature.illustration className="h-full w-full transition-transform duration-500 group-hover:scale-[1.04]" />
+                ) : (
+                  <img
+                    src={feature.image}
+                    alt={feature.alt}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                    width={379}
+                    height={185}
+                    loading="lazy"
+                  />
+                )}
               </div>
               <div className="flex flex-1 flex-col px-5 pb-6 pt-5 sm:px-6">
                 <span className="mb-3 w-fit rounded-full bg-surf-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-sea-600">

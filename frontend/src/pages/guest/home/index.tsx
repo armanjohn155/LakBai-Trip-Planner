@@ -15,34 +15,36 @@ import { ProfileSection } from "@/components/features/home/profile-section";
 import { TrendingDestinations } from "@/components/features/home/trending-destinations";
 import { InlineError } from "@/components/ui/feedback";
 import { Section } from "@/components/common/section";
-import { getDestinations, getItineraries, apiError } from "@/lib/api";
+import { getDestinations, apiError } from "@/lib/api";
 import type { Destination, DestinationFilters } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useRecentItineraries } from "@/hooks/use-recent-itineraries";
 
 const EMPTY_FILTERS: DestinationFilters = { category: "", region: "", search: "", min_price: "", max_price: "" };
 
 export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const loggedIn = Boolean(user) && !authLoading;
+  const {
+    trips,
+    loading: tripsLoading,
+    error: tripsError,
+    refresh: refreshTrips,
+  } = useRecentItineraries(user?.id ?? null, loggedIn);
 
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [filters, setFilters] = useState<DestinationFilters>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<Destination | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tripCount, setTripCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      getDestinations({ per_page: 100 }),
-      user ? getItineraries().catch(() => []) : Promise.resolve([]),
-    ])
-      .then(([page, trips]) => {
-        if (cancelled) return;
-        setDestinations(page.data);
-        setTripCount(trips.length);
+    getDestinations({ per_page: 100 })
+      .then((page) => {
+        if (!cancelled) setDestinations(page.data);
       })
       .catch((err) => {
         if (!cancelled) setError(apiError(err));
@@ -53,7 +55,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, []);
 
   const visible = useMemo(() => {
     const search = filters.search?.trim().toLowerCase() ?? "";
@@ -96,7 +98,7 @@ export default function HomePage() {
   };
 
   const buildTrip = () => {
-    navigate(user ? "/app" : "/register");
+    navigate(loggedIn ? "/app" : "/register");
   };
 
   if (loading) {
@@ -109,8 +111,12 @@ export default function HomePage() {
       <div className="order-1">
         <HomepageBannerSection
           destinations={destinations}
-          loggedIn={Boolean(user)}
-          itineraries={[]}
+          loggedIn={loggedIn}
+          sessionLoading={authLoading}
+          itineraries={trips}
+          tripsLoading={tripsLoading}
+          tripsError={tripsError}
+          onRetryTrips={refreshTrips}
           onBrowse={scrollToDestination}
           onBuildTrip={buildTrip}
         />
@@ -125,7 +131,7 @@ export default function HomePage() {
       ) : null}
 
       {/* Mobile-only personalized sections: logged-in only */}
-      {user ? (
+      {loggedIn ? (
         <>
           <div className="order-3 md:hidden">
             <TrendingDestinations
@@ -171,7 +177,7 @@ export default function HomePage() {
           destinations={destinations}
           selected={selected}
           onSelect={setSelected}
-          loggedIn={Boolean(user)}
+          loggedIn={loggedIn}
           onAddToTrip={(destination) => navigate("/app/trips", { state: { addDestinationId: destination.id } })}
           onSignUp={() => navigate("/register")}
         />
@@ -180,7 +186,7 @@ export default function HomePage() {
       <div className="order-9 md:order-6"><FeatureHighlights /></div>
       <div className="order-10 md:order-4"><FeatureSection /></div>
       <div className="order-11 md:order-5"><LakbaiFeatures /></div>
-      <div className="order-12"><ProfileSection loggedIn={Boolean(user)} tripCount={tripCount} onAction={buildTrip} /></div>
+      <div className="order-12"><ProfileSection loggedIn={loggedIn} tripCount={trips.length} onAction={buildTrip} /></div>
     </div>
   );
 }

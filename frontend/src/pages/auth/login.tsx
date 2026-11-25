@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 
 import { useAuth } from "@/hooks/use-auth";
 import { AuthForm, AuthShell } from "@/pages/auth/auth-shell";
@@ -15,8 +15,26 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    const search = new URLSearchParams(location.search);
+    const err = search.get("error");
+    if (!err) return null;
+    return err === "google_failed" ? "Google sign-in failed. Please try again." : decodeURIComponent(err);
+  });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    if (search.has("error")) {
+      search.delete("error");
+      const qs = search.toString();
+      window.history.replaceState(
+        {},
+        document.title,
+        location.pathname + (qs ? `?${qs}` : "") + location.hash,
+      );
+    }
+  }, [location.search, location.pathname, location.hash]);
 
   const redirectTarget = () => {
     const search = new URLSearchParams(location.search);
@@ -65,16 +83,26 @@ export default function LoginPage() {
           error={fieldErrors.email}
           onChange={(event) => setEmail(event.target.value)}
         />
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          error={fieldErrors.password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
+        <div>
+          <Input
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            error={fieldErrors.password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <div className="mt-1.5 flex justify-end">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-semibold text-sea-500 hover:text-sea-600 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        </div>
       </AuthForm>
 
       <div className="flex items-center gap-4 text-ink-600 text-sm mt-6">
@@ -87,7 +115,9 @@ export default function LoginPage() {
         type="button"
         onClick={() => {
           const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
-          window.location.href = `${apiBase.replace(/\/$/, "")}/auth/google/redirect`;
+          const target = redirectTarget();
+          const query = target && target !== "/" ? `?redirect=${encodeURIComponent(target)}` : "";
+          window.location.href = `${apiBase.replace(/\/$/, "")}/auth/google/redirect${query}`;
         }}
         disabled={busy}
         aria-label="Sign in with Google"
@@ -96,14 +126,14 @@ export default function LoginPage() {
         <svg
           width="20"
           height="20"
-          viewBox="0 0 24 24"
+          viewBox="0 0 48 48"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.89 3.28-8.09z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.65H2.18v2.84C3.37 21.02 7.06 23 12 23z"/>
-          <path fill="#F4B400" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12c0 1.77.43 3.45 1.18 4.79l3.66-2.7z"/>
-          <path fill="#EA4335" d="M12 5.38v2.91c-1.71-.98-3.63-1.61-5.73-1.61-2.08 0-4.02.71-5.48 2.08l2.81 2.11c.96-.89 2.27-1.45 3.73-1.45 1.48 0 2.72.81 3.36 2.02l1.87-1.87C16.1 6.69 14.19 5.38 12 5.38z"/>
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
         </svg>
         Continue with Google
       </button>

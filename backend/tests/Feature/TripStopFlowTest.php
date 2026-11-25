@@ -242,13 +242,13 @@ class TripStopFlowTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_custom_stop_completion_verifies_distance_without_a_visit(): void
+    public function test_custom_stop_completion_records_an_unlinked_verified_visit(): void
     {
         $user = User::factory()->create();
         $itinerary = $this->startedTrip($user, custom: true);
         $item = $itinerary->items()->firstOrFail();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->postJson("/api/itineraries/{$itinerary->id}/stops/{$item->id}/complete", [
                 'latitude' => 10.0005,
                 'longitude' => 123.0,
@@ -256,10 +256,19 @@ class TripStopFlowTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('stop.status', 'done')
-            ->assertJsonPath('visit', null);
+            ->assertJsonPath('visit.verified', true)
+            ->assertJsonPath('visit.destination_id', null);
 
-        $this->assertNull($item->refresh()->visit_id);
-        $this->assertDatabaseCount('visits', 0);
+        $visitId = (int) $response->json('visit.id');
+
+        $this->assertSame($visitId, $item->refresh()->visit_id);
+        $this->assertDatabaseHas('visits', [
+            'id' => $visitId,
+            'itinerary_stop_id' => $item->id,
+            'destination_id' => null,
+            'verified' => true,
+            'method' => 'gps',
+        ]);
     }
 
     public function test_custom_stop_completion_fails_when_too_far(): void

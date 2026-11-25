@@ -5,6 +5,8 @@ namespace App\Http\Resources;
 use App\Models\Visit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class DestinationResource extends JsonResource
 {
@@ -79,7 +81,7 @@ class DestinationResource extends JsonResource
         }
 
         if (str_starts_with($imageUrl, '/storage/')) {
-            return asset(ltrim($imageUrl, '/'));
+            return Storage::disk('public')->url(Str::after($imageUrl, '/storage/'));
         }
 
         if (str_starts_with($imageUrl, 'http://') || str_starts_with($imageUrl, 'https://')) {

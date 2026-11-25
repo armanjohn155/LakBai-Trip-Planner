@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -66,5 +71,50 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out.']);
+    }
+
+    /**
+     * Send a password reset link to the given user.
+     */
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $status = Password::sendResetLink(
+            $request->safe()->only('email')
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return response()->json(['message' => __($status)]);
+        }
+
+        throw ValidationException::withMessages([
+            'email' => [__($status)],
+        ]);
+    }
+
+    /**
+     * Reset the given user's password.
+     */
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $status = Password::reset(
+            $request->safe()->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => $password,
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json(['message' => __($status)]);
+        }
+
+        throw ValidationException::withMessages([
+            'email' => [__($status)],
+        ]);
     }
 }
